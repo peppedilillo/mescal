@@ -289,7 +289,7 @@ def dataprep(datafile, fitsfile, ASIC):
     return outputfile, counts_data, line_data, calib_units
 
 
-def smoothing(x, y, w_size, n_peak, window, smooth):
+def detectPeaks(x, y, w_size, n_peak, window, smooth):
     """
     Applies a smoothing to the data collected and finds the peaks in the spectra.
     
