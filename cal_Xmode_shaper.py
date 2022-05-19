@@ -91,7 +91,7 @@ for i in range(len(asics)):
                 
                 try:
                     # smoothing (if required), and find the position of each peak
-                    limit, peak, indexlist = smoothing(x, y, w_size, n_peaks, window, smooth)
+                    limit, peak, indexlist = detectPeaks(x, y, w_size, n_peaks, window, smooth)
                     for l in limit:
                         plt.axvspan(l[0], l[1], alpha=0.2, color='green')
 
