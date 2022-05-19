@@ -5,16 +5,14 @@
 ## Hermes TP/SP Calibration Software Database
 
 
-
 The Hermes TP/SP Calibration Software currently **consists of three main blocks**. 
 
-In this repository, **we update each block separately within three different branches**. After agreeing upon a new version of one of these blocks, its corresponding branch will be merged into the main code, thus creating a new version of the SW. *These* versions will be numbered; as of 19/05/2022 we are working with the v0.0 version.
+In this repository, **we update each block separately within three different branches**. After agreeing upon a new version of one of these blocks, the agreed changes will be submitted as a pull request. Once this is accepted, its corresponding branch will be merged into the main code, thus creating a new version of the SW. *These* versions will be numbered; as of 19/05/2022 we are working with the v0.0 version.
 
 To follow pending issues on each of the branches, please refer to the *Issues* section. And **for each separate suggestion/update of a branch, please create a *new* pending Issue within the *Issues* section**.
 
-Issues will be considered completed once their respective changes have been applied into a branch, and after this branch has been merged into the main.
 
-***The three main blocks (and branches) are:***
+### **The three main blocks (and branches) are:**
 
 1) *X mode*:
 
