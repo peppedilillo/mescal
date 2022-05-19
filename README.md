@@ -1,7 +1,9 @@
 # Hermes-Cal-SW
 Hermes TP/SP Calibration Software Database
 
-The Hermes TP/SP Calibration Software currently consists of three main blocks:
+The Hermes TP/SP Calibration Software currently consists of three main blocks. In this repository, we update each block separately within three different branches. After agreeing upon a new version of one of these blocks, its corresponding branch will be merged into the main code, thus creating a new version of the SW. *These* versions will be numbered; as of 19/05/2022 we are working with the v0.0 version.
+
+The three main blocks (and branches) are:
 
 1) X mode:
 
@@ -18,4 +20,5 @@ It includes the automated detection of *A* gamma-ray peak (Cs137), the fitting o
 3) Specutilities
 
 This is a package of several functions that are used throughout the whole code. It includes histogram building, linear regression, gaussian fitting, peak detection, plot building, data preparation, and more. 
+
 
