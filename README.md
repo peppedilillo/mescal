@@ -26,7 +26,18 @@ This code in particular was written in such a way that it can be used also with 
 2) *S mode*:
 
 This code aims to obtain the light output for each scintillator, and to build a gamma-ray spectrum.
+
 It includes the automated detection of *A* gamma-ray peak (Cs137), the fitting of such peak, and the calibration through the Gain and Offset values obtained in the X mode of each channel, to then normalise it to the light output of each crystal. Finally, spectra are built by summing the events of each coupled channel with its partner.
+
+There are several plots built throughout this code: 
+   
+   1. Smode spectrum *in electrons* **per channel couple**
+   
+   2. Smode spectrum *in energy* **per channel couple**
+   
+   3. Smode spectrum *in energy* **with all channels 'stacked'**
+
+The corresponding event fits files are generated also for all three cases.
 
 3) *Specutilities*:
 
