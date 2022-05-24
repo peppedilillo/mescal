@@ -4,21 +4,9 @@
 @author: Campana, R.; Ceraudo, F.; Della Casa, G.; Dilillo, G.; Marchesini, E. J.
 """
 
-import numpy as np
-import lmfit
-from lmfit.models import GaussianModel, LinearModel, PolynomialModel, Model
-import matplotlib.pyplot as plt
-from astropy.io import fits
-from scipy.signal import find_peaks
-from scipy.signal import find_peaks_cwt
-from scipy.signal import argrelextrema
-from scipy.signal import savgol_filter
-import os
 from itertools import islice
-import statistics
 from specutilities import *
-from pathlib import Path
-import warnings
+
 
 # visualize=True to visualize every intermediate step through several plots
 visualize = False
