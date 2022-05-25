@@ -1,5 +1,4 @@
 from astropy.io import fits
-import dask.array as da
 import numpy as np
 
 fitsfile='Test_20220523_150848_LV0d5.fits'

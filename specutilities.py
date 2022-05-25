@@ -5,17 +5,12 @@
 """
 
 import numpy as np
-import lmfit
 import re
-import matplotlib.patches as mpatches
 from lmfit.models import GaussianModel, LinearModel, PolynomialModel, Model
 import matplotlib.pyplot as plt
 from astropy.io import fits
 from scipy.signal import find_peaks
-from scipy.signal import find_peaks_cwt
-from scipy.signal import argrelextrema
 from scipy.signal import savgol_filter
-import os
 import statistics
 
 
