@@ -5,12 +5,18 @@
 """
 
 import numpy as np
+import lmfit
 import re
+import matplotlib.patches as mpatches
 from lmfit.models import GaussianModel, LinearModel, PolynomialModel, Model
 import matplotlib.pyplot as plt
+import matplotlib.figure as figs
 from astropy.io import fits
 from scipy.signal import find_peaks
+from scipy.signal import find_peaks_cwt
+from scipy.signal import argrelextrema
 from scipy.signal import savgol_filter
+import os
 import statistics
 
 
@@ -36,8 +42,8 @@ def specPlot(x,y,ranges,ch,npeak,lines,window,mode):
     for i in range(0,npeak):
 
         plt.axvspan(lines[i]-window,lines[i]+window,linestyle="dashed",color=colorlines,label=str(lines[i]),linewidth=0.6,alpha=0.5)
-    plt.axvspan(59.0,60.0,linestyle="dashed",color="purple",label="59.5 keV",linewidth=0.6,alpha=0.5)
-    plt.axvspan(57.70,57.72,linestyle="dashed",color="brown",label="59.5 keV -3%",linewidth=0.6,alpha=0.5)
+    #plt.axvspan(59.0,60.0,linestyle="dashed",color="purple",label="59.5 keV",linewidth=0.6,alpha=0.5)
+    #plt.axvspan(57.70,57.72,linestyle="dashed",color="brown",label="59.5 keV -3%",linewidth=0.6,alpha=0.5)
 
     plt.legend(loc="upper right",fontsize="x-small",frameon=False)
 
@@ -245,7 +251,7 @@ def lineFitter(x, y, limits, bkg=None, verbose=True):
     return result,start,stop,x_fine,fitting_curve
 
 
-def dataprep(datafile, fitsfile, ASIC):
+def dataprep(datafile, ASIC):
     """
     Read the file with the expected lines and energies to be fitted the spectrum and prepare both input and output files.
     Also it creates all the arrays that will be used for the analysis.
@@ -268,9 +274,7 @@ def dataprep(datafile, fitsfile, ASIC):
         lname, lenergy = line.split()
         line_data[lname] = (float(lenergy), color[i])
 
-    hdulist = fits.open(fitsfile)
-    counts_data = hdulist[1].data
-    hdulist.close()
+
     
     outputfile = open('./Quad'+ASIC+'/Quad{:s}_{:s}'.format(ASIC, datafile),'w+')
     string = "#ASIC  CH  "
@@ -281,7 +285,7 @@ def dataprep(datafile, fitsfile, ASIC):
     
     calib_units = ''.join(re.findall(r'[a-zA-Z]', lname))
 
-    return outputfile, counts_data, line_data, calib_units
+    return outputfile, line_data, calib_units
 
 
 def detectPeaks(x, y, w_size, n_peak, window, smooth):
@@ -328,7 +332,7 @@ def detectPeaks(x, y, w_size, n_peak, window, smooth):
     
 
 
-def clean_gamma(counts_data, couples, threshold=1200):
+def clean_gamma(counts_data,  couples, threshold,keep):
     """
     Removes the data due to gammas, i.e. that are seen by both the SDD cells optically coupled with the same crystal, in order to do a proper calibration.
 
@@ -340,19 +344,36 @@ def clean_gamma(counts_data, couples, threshold=1200):
     """
     print('Cleaning gamma-ray events with threshold', threshold)
     print('Counts data original length', len(counts_data))
-        
+
+
+    mask = np.ones(counts_data.shape,dtype=bool) #np.ones_like(a,dtype=bool)
+
+    original_counts=len(counts_data)
+
     for couple in couples:
-        print("Looking for events in pair:", couple)
+        print("Looking for events in pair:", couple,' with threshold ', threshold)
         pair_a, pair_b = couple
+
         idx = np.where(np.logical_and( counts_data.field("CH_{:02d}".format(pair_a)) >= threshold, counts_data.field("CH_{:02d}".format(pair_b)) >= threshold))
-        clean_data = np.delete(counts_data, idx)
-    print('Counts data new length', len(clean_data))
-    print('Reduced of {:.2f}%'.format(len(clean_data)/len(counts_data)))
-    
-    return clean_data
+        mask[idx]=False
+
+        if keep:
+
+            clear_data=np.empty_like(counts_data[~mask])
+            clear_data=counts_data[~mask]
+   
+        else:
+            clear_data=np.empty_like(counts_data[mask])
+            clear_data=counts_data[mask]
+
+    print('Counts data new length', len(clear_data))
+    print('Reduced of {:.2f}%'.format( ( len(clear_data) / original_counts )*100. ))
+  
+
+    return clear_data
     
 
-def guess_pedestal(bins, counts, **kwargs):
+def guess_pedestal(bins, counts,**kwargs):
     """
     a scipy.signal.find_peaks wrapper, 
     it checks for peaks and returns the average
@@ -369,17 +390,20 @@ def guess_pedestal(bins, counts, **kwargs):
     :param kwargs: other keyword arguments are passed to find_peaks.
     :return: a number or None, pedestal value
     """
-    default = {'height': 10, 'distance': 20}
+    default = {'height': 20, 'distance': 20}
     params = {k:(kwargs[k] if k in kwargs else default[k]) 
                 for k in set(default)|set(kwargs)}
+    
     peaks, *_ = find_peaks(counts, **params)
  
     if len(peaks) > 1:
         return sum(bins[peaks[:2]])/2
+        
+
     return None
 
 
-def hist(pedestal, ranges, step, data, mode):
+def hist(pedestal, ranges, step, data, automatic, mode):
     """
     Prepare the data, binning it and removing the pedestal. 
 
@@ -394,8 +418,14 @@ def hist(pedestal, ranges, step, data, mode):
     x = binning[:-1] + step/2.
     y, bins = np.histogram(data, bins=binning)
 
-    pedestal2=guess_pedestal(x, y)
-    #print(pedestal,pedestal2)
+    pedestal_auto=guess_pedestal(x, y)
+    
+    print('The automatic minimum value below which everything is discarded is ',pedestal_auto)
+    print(' while the user-defined minimum value is', pedestal)
+
+
+    if automatic:
+        pedestal=pedestal_auto
 
     if mode == "stretcher":
         pedestal_limit = np.where(x >= pedestal)[0][0]
@@ -445,7 +475,7 @@ def fitPeaks(x, y, limits, visualize=False):
     return fit_results
 
 
-def calibrate(ASIC,v,line_data, fit_results, mode='stretcher', verbose=True):
+def calibrate(ASIC,v,line_data, fit_results, calib_units,mode='stretcher',verbose=True):
     """
     This function establish gain and offset values for each channel, with respective errors from the peaks fitted.
     
@@ -475,21 +505,18 @@ def calibrate(ASIC,v,line_data, fit_results, mode='stretcher', verbose=True):
 
     lmod = LinearModel()
     pars = lmod.guess(adc, x=energy_line)
+    
     try:
         resultlin = lmod.fit(adc, pars, x=energy_line, weights=adc_err)
-        figcal=plt.figure(figsize=(16,6))
-        plt.title('Linear Model & Residuals for CH '+str(v)+' ASIC '+ASIC)
-        resultlin.plot()
+        figcal=plt.figure(figsize=(8,6))
+        resultlin.plot(datafmt='o',fitfmt='-', initfmt='--', xlabel=calib_units, ylabel='Instrum. units', yerr=None, numpoints=None, fig=figcal, data_kws=None, fit_kws=None, init_kws=None, ax_res_kws=None, ax_fit_kws=None, fig_kws=None, show_init=False, parse_complex='abs')
         plt.savefig('./Quad'+ASIC+'/'+ASIC+'_FITLIN_CH_'+str(v)+'.png')
         plt.close(figcal)
+    
     except TypeError:
         print('xadc',x_adc)
         print('xline',x_line)
         print('xadcerr',x_adc_err)
-    #plt.figure()
-    #plt.errorbar(energy_line,adc, yerr=adc_err, fmt='ro',marker='s',label='data',color='red')
-    #plt.plot(energy_line,resultlin.best_fit,label='best fit',color='blue')
-    #plt.show()
 
     chi= resultlin.redchi
     gain = resultlin.params['slope'].value
