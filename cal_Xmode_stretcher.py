@@ -4,14 +4,26 @@
 @author: Campana, R.; Ceraudo, F.; Della Casa, G.; Dilillo, G.; Marchesini, E. J.
 """
 
-
+import numpy as np
+import lmfit
+import re
 import seaborn as sns
+from lmfit.models import GaussianModel, LinearModel, PolynomialModel, Model
+import matplotlib.pyplot as plt
+from astropy.io import fits
+from scipy.signal import find_peaks
+from scipy.signal import find_peaks_cwt
+from scipy.signal import argrelextrema
+from scipy.signal import savgol_filter
+import os
 from itertools import islice
+import statistics
 from specutilities import *
 from pathlib import Path
+import warnings
 
 """
-To run this script, a file named stretcher_X_*.txt, * being A, B, C or D (quadrant) should be provided
+To run this script, a file named calparams_X_*.txt, * being A, B, C or D (quadrant) should be provided
 which should include:
 1. a line with the number of channels to be analysed, including those that were turned off (i.e., 0, 1, 2, ..., 31)
 2. a line with the channels that were turned off
@@ -28,31 +40,52 @@ smooth = True
 
 # ranges[1,2] defines the lower and upper limits of the spectra, in ADC channels
 # while step defines how many channels will be contained inside one single bin
-ranges = [1000,2400]
-step = 2
+ranges = [15000,24000]
+step = 7
 
+# if the data are well behaved, they should present only one noise peak/pedestal. if this is the case, then automatic=True
+# will look for these values and discard them.
+# if instead there are more than one noise peaks/pedestals (for any reason), then the code does not discard them all
+# properly. In this case it is better to set automatic=False, and then write down all the minimum ADC values below which the data 
+# will be discarded in the file _X.txt.
+automatic=True
+
+# calibration defines if the calibration is going to be performed or not
 calibration = True
-cleangamma = False
-asics = ['C']
 
-fitsfiles = ['QC_FeAm.fits']
+# the clean gamma function looks for scintillator-generated events and either keeps only them, or discards them
+# if there are no gamma events in your datafile, you can skip this part (cleangamma=False)
+cleangamma = True
+
+
+# threshold defines the threshold above which events are going to be read by the "clean gamma" function
+# (meaning: x is considered a gamma event if channel A > 10 AND channel B > 10, A,B scintillator couple)
+threshold=10
+
+# keep commands if clean gamma is going to *keep* the gamma rays (and thus discard the X-rays) (keep=True)
+# or if clean gamma is going to *discard* the gamma rays (and thus keep the X-rays) (keep=False)
+# generally speaking, cal_Xmode operates with keep=False
+keep=False
+
+asics = ['A','B','C','D']
+
+
+fitsfiles = '20220525_125447.fits'
 datafile = 'calib_lines.txt'
+
+hdulist = fits.open(fitsfiles)
+
 
 
 for i in range(len(asics)):
     ASIC = asics[i]
-    
-
     Path("./Quad" + ASIC).mkdir(parents=True, exist_ok=True)
+     
+    counts_data = hdulist[i+1].data
 
-    #Files should be named in an uniform way
-    #so that the filename depends only on the ASIC
-    #fitstiles= [['DatafileX_'+ASIC]]
-    
-    fitsfile = fitsfiles[i]
 
-    # Reading the data from the stretcher_X_*.txt file and slicing the inputs into variables
-    with open("stretcher_X_%s.txt" % ASIC, 'r') as f:
+    # Reading the data from the calparams_X_*.txt file and slicing the inputs into variables
+    with open("calparams_X_%s.txt" % ASIC, 'r') as f:
         N_channel = np.loadtxt(islice(f, 1), delimiter=" ", dtype= int)
     
         Off_CHst = np.loadtxt(islice(f, 1), delimiter=" ", dtype= int)
@@ -67,19 +100,17 @@ for i in range(len(asics)):
     asic_fit_results = [None]*32
 
 
-    print("Reading file", fitsfile, "using", datafile, "\n")
+    print("Reading file", fitsfiles, "using", datafile, "\n")
     
     # Preparing the variables needed to work
-    outputfile, counts_data, line_data, calib_units = dataprep(datafile, fitsfile, ASIC)
+    outputfile,  line_data, calib_units = dataprep(datafile, ASIC)
 
 
-    # Cleaning the data by selecting gamma events
+    # Cleaning the data by selecting gamma events (optional)
     if cleangamma:
 
-        print(couples)  
-        counts_data = clean_gamma(counts_data, couples, threshold=1100)          
+        counts_data = clean_gamma(counts_data, couples, threshold,keep)          
         
-    
     n_peaks = len(line_data)
     
     
@@ -100,7 +131,9 @@ for i in range(len(asics)):
             channel_data = counts_data.field("CH_{:02d}".format(v))
 
             # building the raw spectrum
-            x, y = hist(pedestal[v], ranges, step, channel_data, 'stretcher')
+            # the pedestal will be discarded automatically only if automatic=True
+            # otherwise remember to set proper threshold values in file calparams_X_*.txt
+            x, y = hist(pedestal[v], ranges, step, channel_data, automatic, 'stretcher')
 
             plt.figure()
             plt.plot(x,y,drawstyle='steps-mid',label='Original data')
@@ -163,7 +196,7 @@ for i in range(len(asics)):
                 print('CALIBRATING ASIC {:s} CH {:02d} STRETCHER\n'.format(ASIC, v))   
                 channel_data = counts_data.field("CH_{:02d}".format(v))     
 
-                chi2, gain, gain_err, offset, offset_err, xcalib_line = calibrate(ASIC,v,line_data, asic_fit_results[v], verbose=False)
+                chi2, gain, gain_err, offset, offset_err, xcalib_line = calibrate(ASIC,v,line_data, asic_fit_results[v], calib_units,verbose=False)
 
                 channel_data_calib=(channel_data-offset)/gain
                 
@@ -177,14 +210,14 @@ for i in range(len(asics)):
                 offsetv[v,0]=offset
                 offsetv[v,1]=offset_err
                 
+                # "manual" version for linearity fit plot. not useful anymore (using modelresult.plot within calibrate function)
+                #with sns.plotting_context("talk"):
 
-                with sns.plotting_context("talk"):
 
-
-                    fig1, ax = linPlot('stretcher',ranges,v,xadc[v],xcalib_line,gain,offset,calib_units,figsize=(16,6))
-                    fig1.suptitle('QUADRANT '+ASIC)
-                    fig1.savefig('./Quad'+ASIC+'/'+ASIC+'_LINEARITY_CH'+str(v)+'.png')
-                    plt.close(fig1)
+                #    fig1, ax = linPlot('stretcher',ranges,v,xadc[v],xcalib_line,gain,offset,calib_units,figsize=(16,6))
+                #    fig1.suptitle('QUADRANT '+ASIC)
+                #    fig1.savefig('./Quad'+ASIC+'/'+ASIC+'_LINEARITY_CH'+str(v)+'.png')
+                #    plt.close(fig1)
 
 
                 cal_summary_string = "{:02d}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\n".format(v, gain, gain_err, offset, offset_err, chi2)
@@ -197,7 +230,7 @@ for i in range(len(asics)):
                 
                 windowcal=5*stepcal
 
-                xcalib,ycalib=hist(pedestalcal,rangescal,stepcal,asiccal,'stretcher')
+                xcalib,ycalib=hist(pedestalcal,rangescal,stepcal,asiccal,automatic,'stretcher')
 
                 with sns.plotting_context("talk"):
                     fig3=plt.figure(figsize=(16,6))
@@ -207,25 +240,7 @@ for i in range(len(asics)):
     
                     plt.savefig('./Quad'+ASIC+'/'+ASIC+'_XSPEC_CH_'+str(v)+'.png')
                     plt.close(fig3)
-    
-                #hdulistfe = fits.open('QA_Fe55.fits')
-                #counts_data_fe = hdulistfe[1].data
-                #hdulistfe.close()
-    #
-                #channel_data_fe = counts_data_fe.field("CH_{:02d}".format(v))     
-#
-                #asiccal_fe=(channel_data_fe-offsetv[v,0])/gainv[v,0]
-                #xcalibraw_fe,ycalibraw_fe=hist(0,rangescal,stepcal,asiccal_fe,'stretcher')
-                #xlines_fe=([5.89,6.49])
-                #with sns.plotting_context("talk"):
-                #    fig4=plt.figure(figsize=(16,6))
-                #    plt.suptitle('QUADRANT '+ASIC)
-        #
-                #    specPlot(xcalibraw_fe,ycalibraw_fe,rangescal,v,2,xlines_fe,windowcal,'stretcher')
-    #
-                #    plt.savefig('./Quad'+ASIC+'/'+ASIC+'_XSPEC_CH_'+str(v)+'_Fe55_raw.png')
-                #    plt.close(fig4)
-    
+
 
         filecal.close()
 
