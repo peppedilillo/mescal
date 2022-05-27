@@ -5,18 +5,12 @@
 """
 
 import numpy as np
-import lmfit
 import re
-import matplotlib.patches as mpatches
 from lmfit.models import GaussianModel, LinearModel, PolynomialModel, Model
 import matplotlib.pyplot as plt
-import matplotlib.figure as figs
 from astropy.io import fits
 from scipy.signal import find_peaks
-from scipy.signal import find_peaks_cwt
-from scipy.signal import argrelextrema
 from scipy.signal import savgol_filter
-import os
 import statistics
 
 
@@ -251,7 +245,7 @@ def lineFitter(x, y, limits, bkg=None, verbose=True):
     return result,start,stop,x_fine,fitting_curve
 
 
-def dataprep(datafile, ASIC):
+def dataprep(outfile_path, datafile, fitsfile, ASIC):
     """
     Read the file with the expected lines and energies to be fitted the spectrum and prepare both input and output files.
     Also it creates all the arrays that will be used for the analysis.
@@ -274,18 +268,19 @@ def dataprep(datafile, ASIC):
         lname, lenergy = line.split()
         line_data[lname] = (float(lenergy), color[i])
 
-
+    hdulist = fits.open(fitsfile)
+    counts_data = hdulist[1].data
+    hdulist.close()
     
-    outputfile = open('./Quad'+ASIC+'/Quad{:s}_{:s}'.format(ASIC, datafile),'w+')
+    outputfile = open(outfile_path,'w+')
     string = "#ASIC  CH  "
     for key in sorted(line_data):
         string = string + "x_adc({0:s})  FWHM({0:s})   x_adc_err({0:s})  FWHM_err({0:s})".format(key)
     outputfile.write(string)
 
-    
     calib_units = ''.join(re.findall(r'[a-zA-Z]', lname))
 
-    return outputfile, line_data, calib_units
+    return outputfile, counts_data, line_data, calib_units
 
 
 def detectPeaks(x, y, w_size, n_peak, window, smooth):
@@ -361,14 +356,14 @@ def clean_gamma(counts_data,  couples, threshold,keep):
 
             clear_data=np.empty_like(counts_data[~mask])
             clear_data=counts_data[~mask]
-   
+
         else:
             clear_data=np.empty_like(counts_data[mask])
             clear_data=counts_data[mask]
 
     print('Counts data new length', len(clear_data))
     print('Reduced of {:.2f}%'.format( ( len(clear_data) / original_counts )*100. ))
-  
+
 
     return clear_data
     
@@ -393,12 +388,12 @@ def guess_pedestal(bins, counts,**kwargs):
     default = {'height': 20, 'distance': 20}
     params = {k:(kwargs[k] if k in kwargs else default[k]) 
                 for k in set(default)|set(kwargs)}
-    
+
     peaks, *_ = find_peaks(counts, **params)
  
     if len(peaks) > 1:
         return sum(bins[peaks[:2]])/2
-        
+
 
     return None
 
@@ -419,7 +414,7 @@ def hist(pedestal, ranges, step, data, automatic, mode):
     y, bins = np.histogram(data, bins=binning)
 
     pedestal_auto=guess_pedestal(x, y)
-    
+
     print('The automatic minimum value below which everything is discarded is ',pedestal_auto)
     print(' while the user-defined minimum value is', pedestal)
 
@@ -434,7 +429,7 @@ def hist(pedestal, ranges, step, data, automatic, mode):
     return x, y
 
 
-def fitPeaks(x, y, limits, visualize=False):
+def fitPeaks(x, y, limits):
     """
     Fit the peaks in the given spectrum, each in the given limits
     
@@ -443,21 +438,23 @@ def fitPeaks(x, y, limits, visualize=False):
             limits : array of limits for each peak 
     Output:
             fit_results : array, rows is each peak, column is mu, mu_err, fwhm, fwhm_err
+            x_fine: array of adu. useful for visualization
+            fitting_curve: array of fit values. useful for visualization
     """
     n_peaks = len(limits)
     x_adc = np.zeros(n_peaks)
     x_adc_err = np.zeros(n_peaks)
     sigma = np.zeros(n_peaks)
     sigma_err = np.zeros(n_peaks)
-    
+    x_fines = []
+    fitting_curves = []
+
     for i in range(n_peaks):
-        result, start, stop ,x_fine, fitting_curve = lineFitter(x, y, (limits[i][0], limits[i][1]), verbose=True) 
+        result, start, stop, x_fine, fitting_curve = lineFitter(x, y, (limits[i][0], limits[i][1]), verbose=True)
         x_adc[i], x_adc_err[i], sigma[i], sigma_err[i] =  result.params['center'].value, result.params['center'].stderr, \
                                                     result.params['sigma'].value, result.params['sigma'].stderr
-           
-        if visualize:                                         
-            plt.plot(x_fine, fitting_curve, lw=2, color='red')
-                                  
+        x_fines.append(x_fine)
+        fitting_curves.append(fitting_curve)
 
         if sigma_err[i] is None:
             sigma_err[i]=0.
@@ -472,7 +469,7 @@ def fitPeaks(x, y, limits, visualize=False):
     x_adc_err = [0 if np.isnan(item) else item for item in x_adc_err]
     
     fit_results = np.column_stack((x_adc, x_adc_err, FWHM, FWHM_err))
-    return fit_results
+    return fit_results, x_fines, fitting_curves
 
 
 def calibrate(ASIC,v,line_data, fit_results, calib_units,mode='stretcher',verbose=True):
@@ -505,14 +502,14 @@ def calibrate(ASIC,v,line_data, fit_results, calib_units,mode='stretcher',verbos
 
     lmod = LinearModel()
     pars = lmod.guess(adc, x=energy_line)
-    
+
     try:
         resultlin = lmod.fit(adc, pars, x=energy_line, weights=adc_err)
         figcal=plt.figure(figsize=(8,6))
         resultlin.plot(datafmt='o',fitfmt='-', initfmt='--', xlabel=calib_units, ylabel='Instrum. units', yerr=None, numpoints=None, fig=figcal, data_kws=None, fit_kws=None, init_kws=None, ax_res_kws=None, ax_fit_kws=None, fig_kws=None, show_init=False, parse_complex='abs')
         plt.savefig('./Quad'+ASIC+'/'+ASIC+'_FITLIN_CH_'+str(v)+'.png')
         plt.close(figcal)
-    
+
     except TypeError:
         print('xadc',x_adc)
         print('xline',x_line)

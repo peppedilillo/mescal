@@ -1,1 +1,6 @@
+*.fits
+output
+__pycache__
+
+# jetbrains IDE stuff
 .idea
