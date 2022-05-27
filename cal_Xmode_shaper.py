@@ -32,7 +32,7 @@ for i in range(len(asics)):
     ASIC = asics[i]
     fitsfile_asic = fitsfiles[i]
     datafile_asic = datafiles[i]
-    channel,baseline=np.loadtxt('Baseline_'+ASIC+'.txt',dtype=float,unpack=True)
+    channel, baseline=np.loadtxt('Baseline_'+ASIC+'.txt',dtype=float,unpack=True)
 
     
     # Reading the data from the couples_*.txt file and slicing the inputs into variables
@@ -60,7 +60,7 @@ for i in range(len(asics)):
         # Fit the defined peaks for the spectrum, one channel at a time
         for v in np.arange(32):    
             if v in CHst: # If the channel is in the list
-                window = 3*step            # TODO: document! Move to general parameters?
+                window = 3*step        # TODO: document! Move to general parameters?
                 w_size = 9             # TODO: document! Move to general parameters?
     
                 print('REDUCING ASIC {:s} CH {:02d} SHAPER\n'.format(ASIC, v))

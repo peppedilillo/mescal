@@ -34,7 +34,6 @@ def specPlot(x,y,ranges,ch,npeak,lines,window,mode):
     plt.plot(x,y,color=colormain,linewidth=0.8,label=labels)
 
     for i in range(0,npeak):
-
         plt.axvspan(lines[i]-window,lines[i]+window,linestyle="dashed",color=colorlines,label=str(lines[i]),linewidth=0.6,alpha=0.5)
     plt.axvspan(59.0,60.0,linestyle="dashed",color="purple",label="59.5 keV",linewidth=0.6,alpha=0.5)
     plt.axvspan(57.70,57.72,linestyle="dashed",color="brown",label="59.5 keV -3%",linewidth=0.6,alpha=0.5)
@@ -245,12 +244,13 @@ def lineFitter(x, y, limits, bkg=None, verbose=True):
     return result,start,stop,x_fine,fitting_curve
 
 
-def dataprep(datafile, fitsfile, ASIC):
+def dataprep(outfile_path, datafile, fitsfile, ASIC):
     """
     Read the file with the expected lines and energies to be fitted the spectrum and prepare both input and output files.
     Also it creates all the arrays that will be used for the analysis.
 
-    Input: datafile : .txt file of two columns with the name of the line and the peak energy
+    Input: outfile : string, output file path.
+           datafile : .txt file of two columns with the name of the line and the peak energy
            fitsfile : .fits file with the data for the spectrum
            ASIC : quadrant in use (A, B, C, or D)
        
@@ -272,13 +272,12 @@ def dataprep(datafile, fitsfile, ASIC):
     counts_data = hdulist[1].data
     hdulist.close()
     
-    outputfile = open('./Quad'+ASIC+'/Quad{:s}_{:s}'.format(ASIC, datafile),'w+')
+    outputfile = open(outfile_path,'w+')
     string = "#ASIC  CH  "
     for key in sorted(line_data):
         string = string + "x_adc({0:s})  FWHM({0:s})   x_adc_err({0:s})  FWHM_err({0:s})".format(key)
     outputfile.write(string)
 
-    
     calib_units = ''.join(re.findall(r'[a-zA-Z]', lname))
 
     return outputfile, counts_data, line_data, calib_units
@@ -398,13 +397,13 @@ def hist(pedestal, ranges, step, data, mode):
     #print(pedestal,pedestal2)
 
     if mode == "stretcher":
-        pedestal_limit = np.where(x >= pedestal)[0][0]
+        pedestal_limit = np.where(x >= pedestal2)[0][0]
         y[0:pedestal_limit] = 0
             
     return x, y
 
 
-def fitPeaks(x, y, limits, visualize=False):
+def fitPeaks(x, y, limits):
     """
     Fit the peaks in the given spectrum, each in the given limits
     
@@ -413,21 +412,23 @@ def fitPeaks(x, y, limits, visualize=False):
             limits : array of limits for each peak 
     Output:
             fit_results : array, rows is each peak, column is mu, mu_err, fwhm, fwhm_err
+            x_fine: TODO
+            fitting_curve: TODO
     """
     n_peaks = len(limits)
     x_adc = np.zeros(n_peaks)
     x_adc_err = np.zeros(n_peaks)
     sigma = np.zeros(n_peaks)
     sigma_err = np.zeros(n_peaks)
-    
+    x_fines = []
+    fitting_curves = []
+
     for i in range(n_peaks):
-        result, start, stop ,x_fine, fitting_curve = lineFitter(x, y, (limits[i][0], limits[i][1]), verbose=True) 
+        result, start, stop, x_fine, fitting_curve = lineFitter(x, y, (limits[i][0], limits[i][1]), verbose=True)
         x_adc[i], x_adc_err[i], sigma[i], sigma_err[i] =  result.params['center'].value, result.params['center'].stderr, \
                                                     result.params['sigma'].value, result.params['sigma'].stderr
-           
-        if visualize:                                         
-            plt.plot(x_fine, fitting_curve, lw=2, color='red')
-                                  
+        x_fines.append(x_fine)
+        fitting_curves.append(fitting_curve)
 
         if sigma_err[i] is None:
             sigma_err[i]=0.
@@ -442,7 +443,7 @@ def fitPeaks(x, y, limits, visualize=False):
     x_adc_err = [0 if np.isnan(item) else item for item in x_adc_err]
     
     fit_results = np.column_stack((x_adc, x_adc_err, FWHM, FWHM_err))
-    return fit_results
+    return fit_results, x_fines, fitting_curves
 
 
 def calibrate(ASIC,v,line_data, fit_results, mode='stretcher', verbose=True):
@@ -480,7 +481,7 @@ def calibrate(ASIC,v,line_data, fit_results, mode='stretcher', verbose=True):
         figcal=plt.figure(figsize=(16,6))
         plt.title('Linear Model & Residuals for CH '+str(v)+' ASIC '+ASIC)
         resultlin.plot()
-        plt.savefig('./Quad'+ASIC+'/'+ASIC+'_FITLIN_CH_'+str(v)+'.png')
+        plt.savefig('output/Quad'+ASIC+'/'+ASIC+'_FITLIN_CH_'+str(v)+'.png')
         plt.close(figcal)
     except TypeError:
         print('xadc',x_adc)
