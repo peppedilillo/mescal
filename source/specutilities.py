@@ -23,7 +23,7 @@ def detect_peaks(bins, counts, lines):
     else:
         raise ValueError("Will get there.")
     limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
-    return limits
+    return np.array(limits).reshape(3,2)
 
 
 def line_fitter(x, y, limits, bkg=None):

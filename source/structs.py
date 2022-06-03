@@ -3,25 +3,9 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from astropy.io import fits as fitsio
-from source import upaths
 
 i2s = (lambda n: chr(65 + n))
 s2i = (lambda asic: "ABCD".find(str.upper(asic)))
-
-
-def get_from(fitspath: Path) -> pd.DataFrame:
-    cached = upaths.CACHEDIR.joinpath(fitspath.name).with_suffix('.pkl.gz')
-    if cached.is_file():
-        print("Reading from cache..")
-        df = pd.read_pickle(cached)
-    elif fitspath.is_file():
-        print("Reading from fits..")
-        df = pandas_from(fitspath)
-        print("Saving to cache..")
-        df.to_pickle(cached)
-    else:
-        raise FileNotFoundError('Could not locate input datafile.')
-    return df
 
 
 def infer_onchannels(data: pd.DataFrame, quad: str):
