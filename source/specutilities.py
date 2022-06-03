@@ -8,7 +8,7 @@ def move_mean(arr, n):
     return pd.Series(arr).rolling(n, center=True).mean().to_numpy()
 
 
-def filter_peaks(lines, peaks, peaks_infos):
+def filter_peaks(lines: list, peaks, peaks_infos):
     lines_ratio = np.array([(l2 - l1) / (l3 - l2) for l1, l2, l3 in zip(lines[:-2], lines[1:-1], lines[2:])])
     peaks_ratio = np.array([(l2 - l1) / (l3 - l2) for l1, l2, l3 in zip(peaks[:-2], peaks[1:-1], peaks[2:])])
     n = np.argmin(np.abs(peaks_ratio - lines_ratio))
