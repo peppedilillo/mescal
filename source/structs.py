@@ -24,6 +24,10 @@ def get_from(fitspath: Path) -> pd.DataFrame:
     return df
 
 
+def infer_onchannels(data: pd.DataFrame, quad: str):
+    return np.unique(data[data['QUADID'] == quad]['CHN'])
+
+
 def pandas_from(fits: Path) -> pd.DataFrame:
     fits_path = Path(fits)
 
@@ -46,7 +50,7 @@ def pandas_from(fits: Path) -> pd.DataFrame:
     return df
 
 
-def add_evtype_flag_to(quad_data, couples):
+def add_evtype_flag_to(quad_data: pd.DataFrame, couples) -> pd.DataFrame:
     d = dict(couples)
     quad_data.insert(loc=3, column='EVTYPE', value=(quad_data
                                                     .assign(CHN=quad_data['CHN'].map(d).fillna(quad_data['CHN']))

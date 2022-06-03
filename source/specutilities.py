@@ -102,7 +102,6 @@ def calibrate(centers, center_errs, lines):
           fit_results : array with the fit of the peaks
     Output:
           chi, gain, gain_err, offset, offset_err : floats
-
     """
 
     lmod = LinearModel()

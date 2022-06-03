@@ -13,9 +13,12 @@ DATADIR = prjpath.joinpath("data")
 OUTDIR = prjpath.joinpath("output")
 CACHEDIR = prjpath.joinpath("cache")
 
-ASICDIR = (lambda asic: OUTDIR.joinpath("Quad{}".format(asic)))
-FILECONF = (lambda asic: CONFDIR.joinpath("calparams_X_{}.txt".format(asic)))
-FITREPORT = (lambda asic: ASICDIR(asic).joinpath('Quad{}_fitreport.txt'.format(asic)))
+OUTFILEDIR = (lambda filename: OUTDIR.joinpath(filename))
+REPORTS = (lambda filename: OUTFILEDIR().joinpath(filename))
+
+
+ASICDIR = (lambda filename, asic: OUTDIR.joinpath("Quad{}".format(asic)))
+FITREPORT = (lambda filename, asic: ASICDIR(asic).joinpath('Quad{}_fitreport.txt'.format(asic)))
 LINPLOT = (lambda asic, v: ASICDIR(asic).joinpath('{}_FITLIN_CH_{:02d}.png'.format(asic, v)))
 SPECPLOT = (lambda asic, v: ASICDIR(asic).joinpath(asic + '_XSPEC_CH_{}.png'.format(v)))
 XSPECFIT = (lambda asic: ASICDIR(asic).joinpath('Spectrum_X_{}.fits'.format(asic)))
