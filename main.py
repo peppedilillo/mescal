@@ -19,7 +19,6 @@ start, stop, step = 15000, 24000, 10
 nbins = int((stop - start) / step)
 
 
-
 def calibrate_fits(asics, data, lines, start, nbins, step):
     results_fit, results_cal, hists = {}, {}, {}
     lines_keys, lines_values = zip(*lines.items())
@@ -60,8 +59,10 @@ def plot_all_diagnostics(asics, bins, hists, res_fit, saveto):
             fig, ax = plot.diagnostics(bins,
                                        hists[asic][ch],
                                        res_fit[asic].loc[ch]['center'],
-                                       res_fit[asic].loc[ch][['lim_low', 'lim_high']].unstack(level = 0).values)
-            fig.savefig(saveto(asic,ch))
+                                       res_fit[asic].loc[ch][['lim_low', 'lim_high']].unstack(level=0).values,
+                                       figsize=(9, 4.5))
+            ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch,asic))
+            fig.savefig(saveto(asic, ch))
             plt.close(fig)
     return True
 
@@ -70,9 +71,14 @@ def plot_all_spectra(asics, bins, hists, res_cal, lines, saveto):
     for asic in asics:
         onchannels = infer_onchannels(data, asic)
         for ch in onchannels:
-            enbins = (bins - res_cal[asic].loc[ch]['offset'])/res_cal[asic].loc[ch]['gain']
-            fig, ax = plot.spectrum(enbins, hists[asic][ch], lines, elims = (2.0,40.0))
-            fig.savefig(saveto(asic,ch))
+            enbins = (bins - res_cal[asic].loc[ch]['offset']) / res_cal[asic].loc[ch]['gain']
+            fig, ax = plot.spectrum(enbins,
+                                    hists[asic][ch],
+                                    lines,
+                                    elims=(2.0, 40.0),
+                                    figsize=(9, 4.5))
+            ax.set_title("Spectra plot - CH{:02d}Q{}".format(ch,asic))
+            fig.savefig(saveto(asic, ch))
             plt.close(fig)
     return True
 
@@ -81,16 +87,25 @@ def plot_all_linearity(asics, res_cal, res_fit, lines, saveto):
     for asic in asics:
         onchannels = infer_onchannels(data, asic)
         for ch in onchannels:
-            fig, ax = plot. linearity(*res_cal[asic].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']],
-                                      res_fit[asic].loc[ch][['center']].values,
-                                      res_fit[asic].loc[ch][['center_err']].values,
-                                      lines)
-            fig.savefig(saveto(asic,ch))
+            fig, ax = plot.linearity(*res_cal[asic].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']],
+                                     res_fit[asic].loc[ch][['center']].values,
+                                     res_fit[asic].loc[ch][['center_err']].values,
+                                     lines)
+            ax[0].set_title("Linearity plot - CH{:02d}Q{}".format(ch,asic))
+            fig.savefig(saveto(asic, ch))
             plt.close(fig)
     return True
 
 
-def get_from(fitspath, console, cache = True):
+def plot_quicklook(asics, rescal, saveto):
+    for asic in asics:
+        fig, axs = plot.quicklook(rescal[asic])
+        fig.savefig(saveto(asic))
+        plt.close(fig)
+    return True
+
+
+def get_from(fitspath, console, cache=True):
     cached = upaths.CACHEDIR().joinpath(fitspath.name).with_suffix('.pkl.gz')
     if cached.is_file() and cache:
         out = pd.read_pickle(cached)
@@ -120,15 +135,16 @@ if __name__ == '__main__':
     with console.status("Running calibration.."):
         res_fit, res_cal, (bins, histograms) = calibrate_fits(asics, data, lines, start, nbins, step)
         console.log(":white_check_mark: Calibration done!")
-    with console.status("Writing results.."):
+    with console.status("Writing and drawing.."):
         reps = write_reports(res_fit, res_cal, upaths.FITREPORT(filepath), upaths.CALREPORT(filepath))
         console.log(":writing_hand_medium_skin_tone: Wrote fit and calibration results.")
-        plot_all_linearity(asics, res_cal, res_fit, lines, upaths.LINPLOT(filepath))
-        console.log(":chart_increasing: Saved linearity plots.")
+        plot_quicklook(asics, res_cal, upaths.QLKPLOT(filepath))
+        console.log(":chart_increasing: Saved quicklook plots.")
         plot_all_diagnostics(asics, bins, histograms, res_fit, upaths.DNGPLOT(filepath))
         console.log(":chart_increasing: Saved fit diagnostics plots.")
         plot_all_spectra(asics, bins, histograms, res_cal, lines, upaths.SPEPLOT(filepath))
         console.log(":chart_increasing: Saved spectra plots.")
-
+        plot_all_linearity(asics, res_cal, res_fit, lines, upaths.LINPLOT(filepath))
+        console.log(":chart_increasing: Saved linearity plots.")
 
     goodbye = interface.shutdown(console)

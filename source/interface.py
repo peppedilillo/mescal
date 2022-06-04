@@ -13,13 +13,13 @@ asciilogo = \
 
 def boot():
     console = Console()
-    for line in asciilogo.split("\n"):
-        console.print(line); sleep(0.1)
+    for i, line in enumerate(asciilogo.split("\n", )):
+        console.print(line, style="color({})".format(i+160)); sleep(0.1)
     return console
 
 
 def shutdown(console):
-    console.print("\nShutting down, goodbye! :waving_hand:\n")
+    console.print("\nShutting down, goodbye!\n")
     return
 
 

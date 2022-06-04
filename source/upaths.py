@@ -46,16 +46,18 @@ def LINDIR(filepath: Path) -> Path:
 
 @create_if_not_exists
 def SPEDIR(filepath: Path) -> Path:
-    return PLTDIR(filepath).joinpath("diagnostics")
+    return PLTDIR(filepath).joinpath("spectra")
 
 
 @create_if_not_exists
 def DNGDIR(filepath: Path) -> Path:
-    return PLTDIR(filepath).joinpath("spectra")
+    return PLTDIR(filepath).joinpath("diagnostics")
 
 
 FITREPORT = (lambda filepath: (lambda asic: RESDIR(filepath).joinpath("fit_report_quad{}.csv".format(asic))))
 CALREPORT = (lambda filepath: (lambda asic: RESDIR(filepath).joinpath("cal_report_quad{}.csv".format(asic))))
-LINPLOT = (lambda filepath: (lambda asic, ch: LINDIR(filepath).joinpath("linearity_q{}_ch{}.png".format(asic, ch))))
-SPEPLOT = (lambda filepath: (lambda asic, ch: SPEDIR(filepath).joinpath("diagnostic_q{}_ch{}.png".format(asic, ch))))
-DNGPLOT = (lambda filepath: (lambda asic, ch: DNGDIR(filepath).joinpath("spectra_q{}_ch{}.png".format(asic, ch))))
+
+QLKPLOT = (lambda filepath: (lambda asic: PLTDIR(filepath).joinpath("quicklook_quad{}.png".format(asic))))
+LINPLOT = (lambda filepath: (lambda asic, ch: LINDIR(filepath).joinpath("linearity_quad{}_ch{:02d}.png".format(asic, ch))))
+SPEPLOT = (lambda filepath: (lambda asic, ch: SPEDIR(filepath).joinpath("spectra_quad{}_ch{:02d}.png".format(asic, ch))))
+DNGPLOT = (lambda filepath: (lambda asic, ch: DNGDIR(filepath).joinpath("diagnostic_quad{}_ch{:02d}.png".format(asic, ch))))

@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from lmfit.models import GaussianModel, LinearModel, PolynomialModel
 from scipy.signal import find_peaks
+from itertools import combinations
 
 
 def move_mean(arr, n):
@@ -9,17 +10,21 @@ def move_mean(arr, n):
 
 
 def filter_peaks(lines: list, peaks, peaks_infos):
-    lines_ratio = np.array([(l2 - l1) / (l3 - l2) for l1, l2, l3 in zip(lines[:-2], lines[1:-1], lines[2:])])
-    peaks_ratio = np.array([(l2 - l1) / (l3 - l2) for l1, l2, l3 in zip(peaks[:-2], peaks[1:-1], peaks[2:])])
-    n = np.argmin(np.abs(peaks_ratio - lines_ratio))
-    return peaks[n:n + 3], {key: val[n:n + 3] for key, val in peaks_infos.items()}
+    normalize = (lambda x: [(x[i + 1] - x[i]) / (x[-1] - x[0]) for i in range(len(x) - 1)])
+
+    peaks_combinations = [*combinations(peaks, r=len(lines))]
+    norm_ls = normalize(lines)
+    norm_ps = [*map(normalize, peaks_combinations)]
+    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)), axis=1)
+    best_peaks = peaks_combinations[np.argmin(loss)]
+    return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
 
 
-def detect_peaks(bins, counts, lines):
-    mm = move_mean(move_mean(counts, 10), 1)
-    unfiltered_peak, unfiltered_peaks_info = find_peaks(mm, prominence=50, width=5)
-    if len(unfiltered_peak) > 2:
-        peaks, peaks_info = filter_peaks(lines, unfiltered_peak, unfiltered_peaks_info)
+def detect_peaks(bins, counts, lines: list):
+    mm = move_mean(counts, 5)
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=50, width=0)
+    if len(unfiltered_peaks) > 2:
+        peaks, peaks_info = filter_peaks(lines, unfiltered_peaks, unfiltered_peaks_info)
     else:
         raise ValueError("Will get there.")
     limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
