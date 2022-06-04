@@ -13,22 +13,25 @@ def diagnostics(bins, counts, centers, limits, **kwargs):
     return fig, ax
 
 
-def spectrum(enbins, counts, lines: dict, **kwargs):
+def spectrum(enbins, counts, lines: dict, elims=None, **kwargs):
     fig, ax = plt.subplots(**kwargs)
     ax.step(enbins[:-1], counts, color='red', linewidth=0.8)
     for lines_keys, lines_values in lines.items():
         ax.axvline(lines_values, linestyle="dashed", color='green', label=lines_keys, linewidth=0.6, alpha=0.5)
+    if elims:
+        ax.set_xlim(*elims)
     ax.legend(loc="upper right")
     ax.set_xlabel('Energy [keV]')
     ax.set_ylabel('N')
     return fig, ax
 
 
-def linearity(gain, gain_err, offset, offset_err, adcs, adcs_err, lines, **kwargs):
+def linearity(gain, gain_err, offset, offset_err, adcs, adcs_err, lines: dict, **kwargs):
     """
     TODO: is error propagation ok?
     """
     _, ls = zip(*lines.items())
+    ls = np.array(ls)
     margin = (ls[-1] - ls[0]) / 10
     xs = np.linspace(ls[0] - margin, ls[-1] + margin, 10)
     residual = gain * ls + offset - adcs
@@ -47,3 +50,5 @@ def linearity(gain, gain_err, offset, offset_err, adcs, adcs_err, lines, **kwarg
     axs[1].set_ylabel("Residuals [%]")
     axs[1].set_xlabel("Energy [keV]")
     return fig, axs
+
+

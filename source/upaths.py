@@ -9,9 +9,6 @@ from pathlib import Path
 prjpath = Path(__file__).parent.parent
 
 CONFDIR = prjpath.joinpath("configs")
-DATADIR = prjpath.joinpath("data")
-OUTDIR = prjpath.joinpath("output")
-CACHEDIR = prjpath.joinpath("cache")
 
 
 def create_if_not_exists(func):
@@ -23,14 +20,42 @@ def create_if_not_exists(func):
 
 
 @create_if_not_exists
-def RESFOLDER(filepath):
-    return OUTDIR.joinpath(filepath.name)
+def CACHEDIR():
+    return prjpath.joinpath("cache")
 
 
 @create_if_not_exists
-def PLOTFOLDER(filepath):
-    return RESFOLDER(filepath).joinpath("plots")
+def OUTDIR():
+    return prjpath.joinpath("output")
 
 
-FITREPORT = (lambda filepath, asic: RESFOLDER(filepath).joinpath("fit_report_quad{}.csv".format(asic)))
-CALREPORT = (lambda filepath, asic: RESFOLDER(filepath).joinpath("cal_report_quad{}.csv".format(asic)))
+@create_if_not_exists
+def RESDIR(filepath: Path) -> Path:
+    return OUTDIR().joinpath(filepath.name.rstrip(''.join(filepath.suffixes)))
+
+
+@create_if_not_exists
+def PLTDIR(filepath: Path) -> Path:
+    return RESDIR(filepath).joinpath("plots")
+
+
+@create_if_not_exists
+def LINDIR(filepath: Path) -> Path:
+    return PLTDIR(filepath).joinpath("linearity")
+
+
+@create_if_not_exists
+def SPEDIR(filepath: Path) -> Path:
+    return PLTDIR(filepath).joinpath("diagnostics")
+
+
+@create_if_not_exists
+def DNGDIR(filepath: Path) -> Path:
+    return PLTDIR(filepath).joinpath("spectra")
+
+
+FITREPORT = (lambda filepath: (lambda asic: RESDIR(filepath).joinpath("fit_report_quad{}.csv".format(asic))))
+CALREPORT = (lambda filepath: (lambda asic: RESDIR(filepath).joinpath("cal_report_quad{}.csv".format(asic))))
+LINPLOT = (lambda filepath: (lambda asic, ch: LINDIR(filepath).joinpath("linearity_q{}_ch{}.png".format(asic, ch))))
+SPEPLOT = (lambda filepath: (lambda asic, ch: SPEDIR(filepath).joinpath("diagnostic_q{}_ch{}.png".format(asic, ch))))
+DNGPLOT = (lambda filepath: (lambda asic, ch: DNGDIR(filepath).joinpath("spectra_q{}_ch{}.png".format(asic, ch))))

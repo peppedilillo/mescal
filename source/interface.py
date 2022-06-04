@@ -13,7 +13,6 @@ asciilogo = \
 
 def boot():
     console = Console()
-    console.set_alt_screen(True)
     for line in asciilogo.split("\n"):
         console.print(line); sleep(0.1)
     return console
