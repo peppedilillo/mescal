@@ -1,7 +1,66 @@
 import matplotlib.pyplot as plt
+from joblib import Parallel, delayed
 import numpy as np
-
 plt.style.use('seaborn')
+
+
+def draw_and_save_diagns(asics, onchannels, bins, hists, res_fit, saveto, ncore=1):
+    def helper(asic):
+        for ch in onchannels[asic]:
+            fig, ax = diagnostics(bins,
+                                  hists[asic][ch],
+                                  res_fit[asic].loc[ch]['center'],
+                                  res_fit[asic].loc[ch][['lim_low', 'lim_high']].unstack(level=0).values,
+                                  figsize=(9, 4.5))
+            ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, asic))
+            fig.savefig(saveto(asic, ch))
+            plt.close(fig)
+
+    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in asics)
+    return True
+
+
+def draw_and_save_xspectra(asics, onchannels, bins, hists, res_cal, lines, saveto, ncore=1):
+    def helper(asic):
+        for ch in onchannels[asic]:
+            enbins = (bins - res_cal[asic].loc[ch]['offset']) / res_cal[asic].loc[ch]['gain']
+            fig, ax = spectrum(enbins,
+                               hists[asic][ch],
+                               lines,
+                               elims=(2.0, 40.0),
+                               figsize=(9, 4.5))
+            ax.set_title("Spectra plot - CH{:02d}Q{}".format(ch, asic))
+            fig.savefig(saveto(asic, ch))
+            plt.close(fig)
+
+    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in asics)
+    return True
+
+
+def draw_and_save_lins(asics, onchannels, res_cal, res_fit, lines, saveto, ncore=1):
+    def helper(asic):
+        for ch in onchannels[asic]:
+            fig, ax = linearity(*res_cal[asic].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']],
+                                res_fit[asic].loc[ch][['center']].values,
+                                res_fit[asic].loc[ch][['center_err']].values,
+                                lines)
+            ax[0].set_title("Linearity plot - CH{:02d}Q{}".format(ch, asic))
+            fig.savefig(saveto(asic, ch))
+            plt.close(fig)
+
+    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in asics)
+    return True
+
+
+def draw_and_save_qlooks(asics, res_cal, saveto, ncore=1):
+    def helper(asic):
+        fig, axs = quicklook(res_cal[asic])
+        axs[0].set_title("Calibration quicklook - Quadrant {}".format(asic))
+        fig.savefig(saveto(asic))
+        plt.close(fig)
+
+    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in asics)
+    return True
 
 
 def diagnostics(bins, counts, centers, limits, **kwargs):
@@ -68,7 +127,6 @@ def quicklook(calres, **kwargs):
     for vg in gainpercs:
         axs[0].axhline(vg, color='r', lw=1)
     axs[0].set_ylabel("Gain")
-    axs[0].set_title("Calibration quicklook")
     axs[0].legend()
 
     axs[1].errorbar(calres.index, calres['offset'], yerr=calres['offset_err'], fmt='o')

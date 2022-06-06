@@ -8,11 +8,10 @@ i2s = (lambda n: chr(65 + n))
 s2i = (lambda asic: "ABCD".find(str.upper(asic)))
 
 
-def infer_onchannels(data: pd.DataFrame, quad: str):
-    return np.unique(data[data['QUADID'] == quad]['CHN'])
 
 
-def pandas_from(fits: Path) -> pd.DataFrame:
+
+def pandas_from(fits: Path):
     fits_path = Path(fits)
 
     with fitsio.open(fits_path) as fits_file:
@@ -23,7 +22,6 @@ def pandas_from(fits: Path) -> pd.DataFrame:
 
     columns = ['ADC', 'CHN', 'QUADID', 'NMULT', 'TIME', 'EVTID']
     types = ['int32', 'int8', 'object', 'int8', 'float32', 'int32']
-    # types = ['int32', 'int8', 'int8', 'int8', 'float32', 'int32']
     dtypes = {col: tp for col, tp in zip(columns, types)}
 
     temp = np.concatenate([df[['ADC' + i, 'CHANNEL' + i, 'QUADID', 'NMULT', 'TIME', 'EVTID']] for i in '012345'])
@@ -34,7 +32,7 @@ def pandas_from(fits: Path) -> pd.DataFrame:
     return df
 
 
-def add_evtype_flag_to(quad_data: pd.DataFrame, couples) -> pd.DataFrame:
+def add_evtype_flag_to(quad_data: pd.DataFrame, couples):
     d = dict(couples)
     quad_data.insert(loc=3, column='EVTYPE', value=(quad_data
                                                     .assign(CHN=quad_data['CHN'].map(d).fillna(quad_data['CHN']))

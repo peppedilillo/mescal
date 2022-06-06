@@ -97,7 +97,7 @@ def fit_peaks(x, y, limits):
     return centers, center_errs, fwhms, fwhm_errs, amps, amp_errs
 
 
-def calibrate(centers, center_errs, lines):
+def calibrate_chn(centers, center_errs, lines):
     """
     TODO: FUNCTION CHANGED. UPDATE DOCSTRING
     This function establish gain and offset values for each channel, with respective errors from the peaks fitted.
