@@ -8,15 +8,12 @@ i2s = (lambda n: chr(65 + n))
 s2i = (lambda asic: "ABCD".find(str.upper(asic)))
 
 
-
-
-
 def pandas_from(fits: Path):
     fits_path = Path(fits)
 
     with fitsio.open(fits_path) as fits_file:
         # would be nice to just pd.DataFrame(fits_file[1].data) but endians
-        df = pd.DataFrame(np.array(fits_file[1].data).byteswap().newbyteorder())
+        df = pd.DataFrame(np.array(fits_file[-1].data).byteswap().newbyteorder())
     start_t = floor(df[df['TIME'] > 1].iloc[0]['TIME']) - 1
     df.loc[df['TIME'] < 1, 'TIME'] += start_t
 
@@ -36,7 +33,7 @@ def add_evtype_flag_to(quad_data: pd.DataFrame, couples):
     d = dict(couples)
     quad_data.insert(loc=3, column='EVTYPE', value=(quad_data
                                                     .assign(CHN=quad_data['CHN'].map(d).fillna(quad_data['CHN']))
-                                                    .duplicated(['EVTID', 'CHN'], keep=False)
+                                                    .duplicated(['TIME', 'CHN'], keep=False)
                                                     .map({False: 'X', True: 'S'})
                                                     .astype('string')))
     return quad_data

@@ -22,13 +22,13 @@ def filter_peaks(lines: list, peaks, peaks_infos):
 
 def detect_peaks(bins, counts, lines: list):
     mm = move_mean(counts, 5)
-    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=50, width=0)
-    if len(unfiltered_peaks) > 2:
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=20, width=5)
+    if len(unfiltered_peaks) >= len(lines):
         peaks, peaks_info = filter_peaks(lines, unfiltered_peaks, unfiltered_peaks_info)
     else:
-        raise ValueError("Will get there.")
+        raise ValueError("candidate peaks are less than lines to fit.")
     limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
-    return np.array(limits).reshape(3, 2)
+    return np.array(limits).reshape(len(peaks), 2)
 
 
 def line_fitter(x, y, limits, bkg=None):

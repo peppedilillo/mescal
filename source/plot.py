@@ -1,12 +1,27 @@
 import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
 import numpy as np
+
 plt.style.use('seaborn')
 
 
-def draw_and_save_diagns(asics, onchannels, bins, hists, res_fit, saveto, ncore=1):
+def draw_and_save_uncalibrated(bins, chndic, data, saveto, ncore=1):
     def helper(asic):
-        for ch in onchannels[asic]:
+        for ch in chndic[asic]:
+            fig, ax = uncalibrated(bins,
+                                   data[(data['QUADID'] == asic) & (data['CHN'] == ch)],
+                                   figsize=(9, 4.5))
+            ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, asic))
+            fig.savefig(saveto(asic, ch))
+            plt.close(fig)
+
+    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in chndic.keys())
+    return True
+
+
+def draw_and_save_diagns(bins, hists, res_fit, saveto, ncore=1):
+    def helper(asic):
+        for ch in res_fit[asic].index:
             fig, ax = diagnostics(bins,
                                   hists[asic][ch],
                                   res_fit[asic].loc[ch]['center'],
@@ -16,13 +31,13 @@ def draw_and_save_diagns(asics, onchannels, bins, hists, res_fit, saveto, ncore=
             fig.savefig(saveto(asic, ch))
             plt.close(fig)
 
-    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in asics)
+    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in res_fit.keys())
     return True
 
 
-def draw_and_save_xspectra(asics, onchannels, bins, hists, res_cal, lines, saveto, ncore=1):
+def draw_and_save_xspectra(bins, hists, res_cal, lines, saveto, ncore=1):
     def helper(asic):
-        for ch in onchannels[asic]:
+        for ch in res_cal[asic].index:
             enbins = (bins - res_cal[asic].loc[ch]['offset']) / res_cal[asic].loc[ch]['gain']
             fig, ax = spectrum(enbins,
                                hists[asic][ch],
@@ -33,13 +48,13 @@ def draw_and_save_xspectra(asics, onchannels, bins, hists, res_cal, lines, savet
             fig.savefig(saveto(asic, ch))
             plt.close(fig)
 
-    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in asics)
+    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in res_cal.keys())
     return True
 
 
-def draw_and_save_lins(asics, onchannels, res_cal, res_fit, lines, saveto, ncore=1):
+def draw_and_save_lins(res_cal, res_fit, lines, saveto, ncore=1):
     def helper(asic):
-        for ch in onchannels[asic]:
+        for ch in res_cal[asic].index:
             fig, ax = linearity(*res_cal[asic].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']],
                                 res_fit[asic].loc[ch][['center']].values,
                                 res_fit[asic].loc[ch][['center_err']].values,
@@ -48,19 +63,31 @@ def draw_and_save_lins(asics, onchannels, res_cal, res_fit, lines, saveto, ncore
             fig.savefig(saveto(asic, ch))
             plt.close(fig)
 
-    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in asics)
+    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in res_cal.keys())
     return True
 
 
-def draw_and_save_qlooks(asics, res_cal, saveto, ncore=1):
+def draw_and_save_qlooks(res_cal, saveto, ncore=1):
     def helper(asic):
         fig, axs = quicklook(res_cal[asic])
         axs[0].set_title("Calibration quicklook - Quadrant {}".format(asic))
         fig.savefig(saveto(asic))
         plt.close(fig)
 
-    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in asics)
+    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in res_cal.keys())
     return True
+
+
+def uncalibrated(bins, chdata, **kwargs):
+    counts, _ = np.histogram(chdata['ADC'], bins=bins)
+
+    fig, ax = plt.subplots(1, 1, **kwargs)
+    ax.step(bins[:-1], counts)
+    ax.fill_between(bins[:-1], counts, step="pre", alpha=0.4)
+    ax.set_ylim(bottom=0)
+    ax.set_ylabel("Counts")
+    ax.set_xlabel("ADU")
+    return fig, ax
 
 
 def diagnostics(bins, counts, centers, limits, **kwargs):
