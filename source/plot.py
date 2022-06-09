@@ -79,14 +79,18 @@ def draw_and_save_qlooks(res_cal, saveto, ncore=1):
 
 
 def uncalibrated(bins, chdata, **kwargs):
-    counts, _ = np.histogram(chdata['ADC'], bins=bins)
+    counts_x, _ = np.histogram(chdata[chdata['EVTYPE'] == 'X']['ADC'], bins=bins)
+    counts_s, _ = np.histogram(chdata[chdata['EVTYPE'] == 'S']['ADC'], bins=bins)
 
     fig, ax = plt.subplots(1, 1, **kwargs)
-    ax.step(bins[:-1], counts)
-    ax.fill_between(bins[:-1], counts, step="pre", alpha=0.4)
+    ax.step(bins[:-1], counts_x, label='X events')
+    ax.fill_between(bins[:-1], counts_x, step="pre", alpha=0.2)
+    ax.step(bins[:-1], counts_s, color='tomato', label='S events')
+    ax.fill_between(bins[:-1], counts_s, step="pre", alpha=0.2, color='tomato')
     ax.set_ylim(bottom=0)
     ax.set_ylabel("Counts")
     ax.set_xlabel("ADU")
+    ax.legend()
     return fig, ax
 
 

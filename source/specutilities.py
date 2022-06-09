@@ -11,11 +11,13 @@ def move_mean(arr, n):
 
 def filter_peaks(lines: list, peaks, peaks_infos):
     normalize = (lambda x: [(x[i + 1] - x[i]) / (x[-1] - x[0]) for i in range(len(x) - 1)])
+    weight = (lambda x: [x[i + 1]*x[i] for i in range(len(x) - 1)])
 
     peaks_combinations = [*combinations(peaks, r=len(lines))]
     norm_ls = normalize(lines)
     norm_ps = [*map(normalize, peaks_combinations)]
-    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)), axis=1)
+    weights = [*map(weight,combinations(peaks_infos["prominences"], r=len(lines)))]
+    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls))/weights, axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
     return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
 

@@ -29,11 +29,20 @@ def pandas_from(fits: Path):
     return df
 
 
-def add_evtype_flag_to(quad_data: pd.DataFrame, couples):
-    d = dict(couples)
-    quad_data.insert(loc=3, column='EVTYPE', value=(quad_data
-                                                    .assign(CHN=quad_data['CHN'].map(d).fillna(quad_data['CHN']))
-                                                    .duplicated(['TIME', 'CHN'], keep=False)
-                                                    .map({False: 'X', True: 'S'})
-                                                    .astype('string')))
-    return quad_data
+def add_evtype_tag(data, couples):
+    """
+    inplace add event type (X or S) column
+    :param data:
+    :return:
+    """
+    data['CHN'] = data['CHN'] + 1
+    qm = data['QUADID'].map({key: 100 ** s2i(key) for key in 'ABCD'})
+    chm_dict = dict(np.concatenate([(couples[key] + 1) * 100**s2i(key) for key in 'ABCD']))
+    chm = data['CHN']*qm
+    data.insert(loc=3, column='EVTYPE', value=(data
+                                               .assign(CHN=chm.map(chm_dict).fillna(chm))
+                                               .duplicated(['EVTID', 'CHN'], keep=False)
+                                               .map({False: 'X', True: 'S'})
+                                               .astype('string')))
+    data['CHN'] = data['CHN'] - 1
+    return data
