@@ -72,7 +72,7 @@ def get_from(fitspath, console, cache=True):
             return out
         return out
     else:
-        raise FileNotFoundError('Could not locate input datafile.')
+        raise FileNotFoundError('could not find input datafile.')
 
 
 def infer_onchannels(data: pd.DataFrame, asics):
@@ -90,8 +90,8 @@ if __name__ == '__main__':
         data = add_evtype_tag(get_from(filepath, console, cache), {q: fm1.get_couples(q) for q in asics})
         onchannels = infer_onchannels(data, asics)
 
-    tracked = interface.tracked_onchannels(onchannels, asics, console)
-    res_fit, res_cal, bins, histograms, flagged = xcalibrate(asics, tracked, data, lines, start, nbins, step)
+    _onchannels = interface.tracked_onchannels(onchannels, asics, console)
+    res_fit, res_cal, bins, histograms, flagged = xcalibrate(asics, _onchannels, data, lines, start, nbins, step)
     console.log(":white_check_mark: Calibration done!")
 
     with console.status("Writing and drawing.."):

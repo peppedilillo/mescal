@@ -1,8 +1,8 @@
-import matplotlib.pyplot as plt
-from joblib import Parallel, delayed
-import numpy as np
+import matplotlib.pyplot as plt;
 
 plt.style.use('seaborn')
+from joblib import Parallel, delayed
+import numpy as np
 
 
 def draw_and_save_uncalibrated(bins, chndic, data, saveto, ncore=1):
@@ -83,10 +83,10 @@ def uncalibrated(bins, chdata, **kwargs):
     counts_s, _ = np.histogram(chdata[chdata['EVTYPE'] == 'S']['ADC'], bins=bins)
 
     fig, ax = plt.subplots(1, 1, **kwargs)
-    ax.step(bins[:-1], counts_x, label='X events')
-    ax.fill_between(bins[:-1], counts_x, step="pre", alpha=0.2)
-    ax.step(bins[:-1], counts_s, color='tomato', label='S events')
-    ax.fill_between(bins[:-1], counts_s, step="pre", alpha=0.2, color='tomato')
+    ax.step(bins[:-1], counts_x, label='X events', where='post')
+    ax.fill_between(bins[:-1], counts_x, step="post", alpha=0.2)
+    ax.step(bins[:-1], counts_s, color='tomato', label='S events', where='post')
+    ax.fill_between(bins[:-1], counts_s, step="post", alpha=0.2, color='tomato')
     ax.set_ylim(bottom=0)
     ax.set_ylabel("Counts")
     ax.set_xlabel("ADU")
@@ -98,8 +98,8 @@ def diagnostics(bins, counts, centers, limits, **kwargs):
     colors = [plt.cm.tab10(i) for i in range(len(limits))]
 
     fig, ax = plt.subplots(1, 1, **kwargs)
-    ax.step(bins[:-1], counts)
-    ax.fill_between(bins[:-1], counts, step="pre", alpha=0.4)
+    ax.step(bins[:-1], counts, where='post')
+    ax.fill_between(bins[:-1], counts, step="post", alpha=0.4)
     for ctr, lims, col in zip(centers, limits, colors):
         ax.axvline(ctr, linestyle='dotted')
         ax.axvspan(*lims, color=col, alpha=0.1)
@@ -113,12 +113,18 @@ def spectrum(enbins, counts, lines: dict, elims=None, **kwargs):
     colors = [plt.cm.tab10(i) for i in range(len(lines))]
 
     fig, ax = plt.subplots(**kwargs)
-    ax.step(enbins[:-1], counts)
-    ax.fill_between(enbins[:-1], counts, step="pre", alpha=0.4)
+    if elims:
+        lo, hi = elims
+        mask = (enbins[:-1] >= lo) & (enbins[:-1] < hi)
+        xs, ys = enbins[:-1][mask], counts[mask]
+
+        ax.set_xlim((lo, hi))
+    else:
+        xs, ys = enbins[:-1], counts
+    ax.step(xs, ys, where='post')
+    ax.fill_between(xs, ys, step="post", alpha=0.4)
     for (lines_keys, lines_values), col in zip(lines.items(), colors):
         ax.axvline(lines_values, linestyle="dashed", color=col, label=lines_keys)
-    if elims:
-        ax.set_xlim(*elims)
     ax.set_ylim(bottom=0)
     ax.set_xlabel('Energy [keV]')
     ax.set_ylabel('Counts')
