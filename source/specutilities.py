@@ -5,6 +5,10 @@ from scipy.signal import find_peaks
 from itertools import combinations
 
 
+class DetectPeakError(Exception):
+    """An error while finding peaks."""
+
+
 def move_mean(arr, n):
     return pd.Series(arr).rolling(n, center=True).mean().to_numpy()
 
@@ -17,9 +21,23 @@ def filter_peaks(lines: list, peaks, peaks_infos):
     norm_ls = normalize(lines)
     norm_ps = [*map(normalize, peaks_combinations)]
     weights = [*map(weight,combinations(peaks_infos["prominences"], r=len(lines)))]
-    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls))/weights, axis=1)
+    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls))/weights
+                  , axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
     return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
+
+
+def histogram(data, start, nbins, step):
+    hists = {}
+    for asic in 'ABCD':
+        hist_asics = {}
+        quad_df = data[data['QUADID'] == asic]
+        for ch in range(32):
+            ch_data = quad_df[(quad_df['CHN'] == ch)]
+            counts, bins = np.histogram(ch_data['ADC'], range=(start, start + nbins * step), bins=nbins)
+            hist_asics[ch] = counts
+        hists[asic] = hist_asics
+    return bins, hists
 
 
 def detect_peaks(bins, counts, lines: list):
@@ -28,7 +46,7 @@ def detect_peaks(bins, counts, lines: list):
     if len(unfiltered_peaks) >= len(lines):
         peaks, peaks_info = filter_peaks(lines, unfiltered_peaks, unfiltered_peaks_info)
     else:
-        raise ValueError("candidate peaks are less than lines to fit.")
+        raise DetectPeakError("candidate peaks are less than lines to fit.")
     limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
     return np.array(limits).reshape(len(peaks), 2)
 

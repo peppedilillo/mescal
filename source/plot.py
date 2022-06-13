@@ -5,21 +5,21 @@ from joblib import Parallel, delayed
 import numpy as np
 
 
-def draw_and_save_uncalibrated(bins, chndic, data, saveto, ncore=1):
+def draw_and_save_uncalibrated(xbins, xhists, sbins, shists, to_path, nthreads=1):
     def helper(asic):
-        for ch in chndic[asic]:
-            fig, ax = uncalibrated(bins,
-                                   data[(data['QUADID'] == asic) & (data['CHN'] == ch)],
+        for ch in range(32):
+            xcounts = xhists[asic][ch]
+            scounts = shists[asic][ch]
+            fig, ax = uncalibrated(xbins, xcounts, sbins, scounts,
                                    figsize=(9, 4.5))
             ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(saveto(asic, ch))
+            fig.savefig(to_path(asic, ch))
             plt.close(fig)
 
-    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in chndic.keys())
-    return True
+    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in xhists.keys())
 
 
-def draw_and_save_diagns(bins, hists, res_fit, saveto, ncore=1):
+def draw_and_save_diagns(bins, hists, res_fit, to_path, nthreads=1):
     def helper(asic):
         for ch in res_fit[asic].index:
             fig, ax = diagnostics(bins,
@@ -28,14 +28,13 @@ def draw_and_save_diagns(bins, hists, res_fit, saveto, ncore=1):
                                   res_fit[asic].loc[ch][['lim_low', 'lim_high']].unstack(level=0).values,
                                   figsize=(9, 4.5))
             ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(saveto(asic, ch))
+            fig.savefig(to_path(asic, ch))
             plt.close(fig)
 
-    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in res_fit.keys())
-    return True
+    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_fit.keys())
 
 
-def draw_and_save_xspectra(bins, hists, res_cal, lines, saveto, ncore=1):
+def draw_and_save_xspectra(bins, hists, res_cal, lines, to_path, nthreads=1):
     def helper(asic):
         for ch in res_cal[asic].index:
             enbins = (bins - res_cal[asic].loc[ch]['offset']) / res_cal[asic].loc[ch]['gain']
@@ -45,14 +44,13 @@ def draw_and_save_xspectra(bins, hists, res_cal, lines, saveto, ncore=1):
                                elims=(2.0, 40.0),
                                figsize=(9, 4.5))
             ax.set_title("Spectra plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(saveto(asic, ch))
+            fig.savefig(to_path(asic, ch))
             plt.close(fig)
 
-    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in res_cal.keys())
-    return True
+    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_cal.keys())
 
 
-def draw_and_save_lins(res_cal, res_fit, lines, saveto, ncore=1):
+def draw_and_save_lins(res_cal, res_fit, lines, to_path, nthreads=1):
     def helper(asic):
         for ch in res_cal[asic].index:
             fig, ax = linearity(*res_cal[asic].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']],
@@ -60,33 +58,28 @@ def draw_and_save_lins(res_cal, res_fit, lines, saveto, ncore=1):
                                 res_fit[asic].loc[ch][['center_err']].values,
                                 lines)
             ax[0].set_title("Linearity plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(saveto(asic, ch))
+            fig.savefig(to_path(asic, ch))
             plt.close(fig)
 
-    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in res_cal.keys())
-    return True
+    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_cal.keys())
 
 
-def draw_and_save_qlooks(res_cal, saveto, ncore=1):
+def draw_and_save_qlooks(res_cal, to_path, nthreads=1):
     def helper(asic):
         fig, axs = quicklook(res_cal[asic])
         axs[0].set_title("Calibration quicklook - Quadrant {}".format(asic))
-        fig.savefig(saveto(asic))
+        fig.savefig(to_path(asic))
         plt.close(fig)
 
-    Parallel(n_jobs=ncore)(delayed(helper)(asic) for asic in res_cal.keys())
-    return True
+    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_cal.keys())
 
 
-def uncalibrated(bins, chdata, **kwargs):
-    counts_x, _ = np.histogram(chdata[chdata['EVTYPE'] == 'X']['ADC'], bins=bins)
-    counts_s, _ = np.histogram(chdata[chdata['EVTYPE'] == 'S']['ADC'], bins=bins)
-
+def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
     fig, ax = plt.subplots(1, 1, **kwargs)
-    ax.step(bins[:-1], counts_x, label='X events', where='post')
-    ax.fill_between(bins[:-1], counts_x, step="post", alpha=0.2)
-    ax.step(bins[:-1], counts_s, color='tomato', label='S events', where='post')
-    ax.fill_between(bins[:-1], counts_s, step="post", alpha=0.2, color='tomato')
+    ax.step(xbins[:-1], xcounts, label='X events', where='post')
+    ax.fill_between(xbins[:-1], xcounts, step="post", alpha=0.2)
+    ax.step(sbins[:-1], scounts, color='tomato', label='S events', where='post')
+    ax.fill_between(sbins[:-1], scounts, step="post", alpha=0.2, color='tomato')
     ax.set_ylim(bottom=0)
     ax.set_ylabel("Counts")
     ax.set_xlabel("ADU")

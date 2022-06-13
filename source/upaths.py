@@ -58,6 +58,10 @@ def DNGDIR(filepath: Path) -> Path:
 def FLGDIR(filepath: Path) -> Path:
     return PLTDIR(filepath).joinpath("flagged")
 
+@create_if_not_exists
+def UNCDIR(filepath: Path) -> Path:
+    return PLTDIR(filepath).joinpath("uncalibrated")
+
 
 FITREPORT = (lambda filepath: (lambda asic: RESDIR(filepath).joinpath("fit_report_quad{}.csv".format(asic))))
 CALREPORT = (lambda filepath: (lambda asic: RESDIR(filepath).joinpath("cal_report_quad{}.csv".format(asic))))
@@ -67,3 +71,4 @@ LINPLOT = (lambda filepath: (lambda asic, ch: LINDIR(filepath).joinpath("lineari
 SPEPLOT = (lambda filepath: (lambda asic, ch: SPEDIR(filepath).joinpath("spectra_quad{}_ch{:02d}.png".format(asic, ch))))
 DNGPLOT = (lambda filepath: (lambda asic, ch: DNGDIR(filepath).joinpath("diagnostic_quad{}_ch{:02d}.png".format(asic, ch))))
 FLGPLOT = (lambda filepath: (lambda asic, ch: FLGDIR(filepath).joinpath("flagged_quad{}_ch{:02d}.png".format(asic, ch))))
+UNCPLOT = (lambda filepath: (lambda asic, ch: UNCDIR(filepath).joinpath("uncalibrated_quad{}_ch{:02d}.png".format(asic, ch))))
