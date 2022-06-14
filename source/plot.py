@@ -1,8 +1,16 @@
-import matplotlib.pyplot as plt;
-
-plt.style.use('seaborn')
+import matplotlib.pyplot as plt; plt.style.use('seaborn')
 from joblib import Parallel, delayed
 import numpy as np
+
+
+def draw_and_save_slo(res_slo, to_path, nthreads=1):
+    def helper(asic):
+        fig, ax = sloplot(res_slo[asic])
+        ax.set_title("Light output - Quadrant {}".format(asic))
+        fig.savefig(to_path(asic))
+        plt.close(fig)
+
+    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_slo.keys())
 
 
 def draw_and_save_uncalibrated(xbins, xhists, sbins, shists, to_path, nthreads=1):
@@ -167,3 +175,21 @@ def quicklook(calres, **kwargs):
     axs[1].set_xlabel("Channel")
     axs[1].set_ylabel("Offset")
     return fig, axs
+
+
+def sloplot(res_slo, **kwargs):
+    x = res_slo.index
+    y = res_slo['light_out'].T.mean()
+    yerr = res_slo['light_out_err'].T.mean()
+    ypercs = np.percentile(y, [30, 70])
+
+    fig, ax = plt.subplots(1,1, **kwargs)
+    ax.errorbar(x, y, yerr = yerr, fmt = 'o')
+    ax.axhspan(*ypercs, color='red', alpha=0.1, label='$30$-$70$ percentiles')
+    for vg in ypercs:
+        ax.axhline(vg, color='r', lw=1)
+    ax.set_xlabel("Channel")
+    ax.set_ylabel("Light Output [ph/keV]")
+    ax.set_xticks(x)
+    ax.legend()
+    return fig, ax

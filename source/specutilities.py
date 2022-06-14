@@ -4,16 +4,72 @@ from lmfit.models import GaussianModel, LinearModel, PolynomialModel
 from scipy.signal import find_peaks
 from itertools import combinations
 
+PHT_KEV = 3.65/1000
+
 
 class DetectPeakError(Exception):
     """An error while finding peaks."""
 
 
-def move_mean(arr, n):
-    return pd.Series(arr).rolling(n, center=True).mean().to_numpy()
+dist_from_intv = (lambda x, lo, hi: abs((x - lo) + (x - hi)))
 
 
-def filter_peaks(lines: list, peaks, peaks_infos):
+def scalibrate(bins, histograms, cal_df, lines, lout_guess):
+    results_lo = {}
+    line_keys, line_values = zip(*lines.items())
+    for asic in cal_df.keys():
+        for ch in cal_df[asic].index:
+            counts = histograms[asic][ch]
+            gain, gain_err, offset = cal_df[asic].loc[ch][['gain', 'gain_err', 'offset']]
+            guesses = [[lout_lim*PHT_KEV*lv*gain + offset for lout_lim in lout_guess] for lv in line_values]
+            limits = estimate_peaks_from_guess(bins, counts, guess=guesses)
+            centers, center_errs, *etc = fit_peaks(bins, counts, limits)
+            light_outs, light_out_errs = compute_lout(centers, center_errs, gain, gain_err, offset, line_values)
+
+            results_lo.setdefault(asic, {})[ch] = np.concatenate((light_outs, light_out_errs))
+    return results_lo
+
+
+def closest_peaks(guess, peaks, peaks_infos):
+    peaks_dist_from_guess = [[dist_from_intv(peak, guess_lo, guess_hi) for peak in peaks]
+                             for guess_lo, guess_hi in guess]
+    best_peaks = peaks[np.argmin(peaks_dist_from_guess, axis=1)]
+    return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
+
+
+def estimate_peaks_from_guess(bins, counts, guess):
+    mm = move_mean(counts, 5)
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=10, width=5)
+    peaks, peaks_info = closest_peaks(guess, unfiltered_peaks, unfiltered_peaks_info)
+    limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
+    return np.array(limits).reshape(len(peaks), 2)
+
+
+def compute_lout(centers, center_errs, gain, gain_err, offset, lines: list):
+    light_outs = (centers - offset) / gain / PHT_KEV / lines
+    light_out_errs = np.sqrt((center_errs/offset)**2 + (gain_err/offset)**2 + ((centers - gain)/offset)**2)/PHT_KEV/lines
+    return light_outs, light_out_errs
+
+
+def xcalibrate(bins, histograms, lines, onchannels):
+    results_fit, results_cal, flagged = {}, {}, {}
+    lines_keys, lines_values = zip(*lines.items())
+    for asic in onchannels.keys():
+        for ch in onchannels[asic]:
+            counts = histograms[asic][ch]
+            try:
+                limits = estimate_peaks_from_lratio(bins, counts, lines_values)
+                centers, center_errs, *etc = fit_peaks(bins, counts, limits)
+                gain, gain_err, offset, offset_err, chi2 = calibrate_chn(centers, center_errs, lines_values)
+            except DetectPeakError:
+                flagged.setdefault(asic, []).append(ch)
+            else:
+                results_fit.setdefault(asic, {})[ch] = np.concatenate((centers, center_errs, *etc, *limits.T))
+                results_cal.setdefault(asic, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
+    return results_fit, results_cal, flagged
+
+
+def filter_peaks_ratio(lines: list, peaks, peaks_infos):
     normalize = (lambda x: [(x[i + 1] - x[i]) / (x[-1] - x[0]) for i in range(len(x) - 1)])
     weight = (lambda x: [x[i + 1]*x[i] for i in range(len(x) - 1)])
 
@@ -27,24 +83,11 @@ def filter_peaks(lines: list, peaks, peaks_infos):
     return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
 
 
-def histogram(data, start, nbins, step):
-    hists = {}
-    for asic in 'ABCD':
-        hist_asics = {}
-        quad_df = data[data['QUADID'] == asic]
-        for ch in range(32):
-            ch_data = quad_df[(quad_df['CHN'] == ch)]
-            counts, bins = np.histogram(ch_data['ADC'], range=(start, start + nbins * step), bins=nbins)
-            hist_asics[ch] = counts
-        hists[asic] = hist_asics
-    return bins, hists
-
-
-def detect_peaks(bins, counts, lines: list):
+def estimate_peaks_from_lratio(bins, counts, lines: list):
     mm = move_mean(counts, 5)
     unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=20, width=5)
     if len(unfiltered_peaks) >= len(lines):
-        peaks, peaks_info = filter_peaks(lines, unfiltered_peaks, unfiltered_peaks_info)
+        peaks, peaks_info = filter_peaks_ratio(lines, unfiltered_peaks, unfiltered_peaks_info)
     else:
         raise DetectPeakError("candidate peaks are less than lines to fit.")
     limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
@@ -140,3 +183,20 @@ def calibrate_chn(centers, center_errs, lines):
     offset_err = resultlin.params['intercept'].stderr
 
     return gain, gain_err, offset, offset_err, chi2
+
+
+def histogram(data, start, nbins, step):
+    hists = {}
+    for asic in 'ABCD':
+        hist_asics = {}
+        quad_df = data[data['QUADID'] == asic]
+        for ch in range(32):
+            ch_data = quad_df[(quad_df['CHN'] == ch)]
+            counts, bins = np.histogram(ch_data['ADC'], range=(start, start + nbins * step), bins=nbins)
+            hist_asics[ch] = counts
+        hists[asic] = hist_asics
+    return bins, hists
+
+
+def move_mean(arr, n):
+    return pd.Series(arr).rolling(n, center=True).mean().to_numpy()

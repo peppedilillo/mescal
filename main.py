@@ -5,38 +5,22 @@ from os import cpu_count
 
 from configs import fm1
 from source.structs import add_evtype_tag, pandas_from
-from source.specutilities import detect_peaks, fit_peaks, calibrate_chn, histogram
-from source.specutilities import DetectPeakError
+from source.specutilities import xcalibrate, scalibrate, histogram
 from source.plot import draw_and_save_diagns, draw_and_save_xspectra, \
-    draw_and_save_lins, draw_and_save_qlooks, draw_and_save_uncalibrated
+    draw_and_save_lins, draw_and_save_qlooks, draw_and_save_uncalibrated, draw_and_save_slo
 from source.parser import parser
 from source import upaths
 from source import interface
 
-lines = {'Fe 5.9 keV': 5.90, 'Cd 22.1 keV': 22.16, 'Cd 24.9 keV': 24.94}
 
-fit_params = ["center", "center_err", "fwhm", "fwhm_err", "amp", "amp_err", "lim_low", "lim_high"]
-cal_params = ["gain", "gain_err", "offset", "offset_err", "chi2"]
+xlines = {'Fe 5.9 keV': 5.90, 'Cd 22.1 keV': 22.16, 'Cd 24.9 keV': 24.94}
+slines = {'Cs 662 keV': 661.6}
+
 start, stop, step = 15000, 24000, 10
 nbins = int((stop - start) / step)
-
-
-def xcalibrate(bins, histograms, onchannels):
-    results_fit, results_cal, flagged = {}, {}, {}
-    lines_keys, lines_values = zip(*lines.items())
-    for asic in onchannels.keys():
-        for ch in onchannels[asic]:
-            counts = histograms[asic][ch]
-            try:
-                limits = detect_peaks(bins, counts, lines_values)
-                centers, center_errs, *etc = fit_peaks(bins, counts, limits)
-                gain, gain_err, offset, offset_err, chi2 = calibrate_chn(centers, center_errs, lines_values)
-            except DetectPeakError:
-                flagged.setdefault(asic, []).append(ch)
-            else:
-                results_fit.setdefault(asic, {})[ch] = np.concatenate((centers, center_errs, *etc, *limits.T))
-                results_cal.setdefault(asic, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
-    return results_fit, results_cal, flagged
+fit_params = ["center", "center_err", "fwhm", "fwhm_err", "amp", "amp_err", "lim_low", "lim_high"]
+cal_params = ["gain", "gain_err", "offset", "offset_err", "chi2"]
+lo_params = ['light_out', 'light_out_err']
 
 
 def infer_asics_and_channels(data: pd.DataFrame):
@@ -67,8 +51,6 @@ def get_from(fitspath, use_cache=True):
     return out
 
 
-
-
 if __name__ == '__main__':
     args = parser.parse_args()
     console = interface.boot()
@@ -85,17 +67,22 @@ if __name__ == '__main__':
         _, onchannels = infer_asics_and_channels(data)
         console.log(":white_check_mark: Preprocessing done.")
 
-    _onchannels = interface.progress_bar(onchannels, log_to=console)
-    _fitdf, _caldf, flagged = xcalibrate(xbins, xhists, _onchannels)
-    res_fit = {q: pd.DataFrame(_fitdf[q], index=pd.MultiIndex.from_product((fit_params, lines.keys()))).T
-               for q in _fitdf.keys()}
-    res_cal = {q: pd.DataFrame(_caldf[q], index=cal_params).T
-               for q in _fitdf.keys()}
-    console.log(":white_check_mark: Calibration done.")
+    with console.status("Calibrating.."):
+        # _onchannels = interface.progress_bar(onchannels, log_to=console)
+        _fitdf, _caldf, flagged = xcalibrate(xbins, xhists, xlines, onchannels)
+        res_fit = {q: pd.DataFrame(_fitdf[q], index=pd.MultiIndex.from_product((fit_params, xlines.keys()))).T
+                   for q in _fitdf.keys()}
+        res_cal = {q: pd.DataFrame(_caldf[q], index=cal_params).T
+                   for q in _fitdf.keys()}
+        _res_slo = scalibrate(sbins, shists, res_cal, slines, lout_guess = (10.,15.))
+        res_slo = {q: pd.DataFrame(_res_slo[q], index=pd.MultiIndex.from_product((lo_params, slines.keys()))).T
+                   for q in _res_slo.keys()}
+        console.log(":white_check_mark: Calibration done.")
 
     with console.status("Writing and drawing.."):
         write_reports(res_fit, to_path=upaths.FITREPORT(filepath))
         write_reports(res_cal, to_path=upaths.CALREPORT(filepath))
+        write_reports(res_slo, to_path=upaths.SLOREPORT(filepath))
         console.log(":blue_book: Wrote fit and calibration results.")
 
         systhreads = min(4, cpu_count())
@@ -103,11 +90,13 @@ if __name__ == '__main__':
             console.log(":chart_increasing: Saved uncalibrated plots.")
         if draw_and_save_qlooks(res_cal, upaths.QLKPLOT(filepath)):
             console.log(":chart_increasing: Saved fit quicklooks.")
+        if draw_and_save_slo(res_slo, upaths.SLOPLOT(filepath), systhreads):
+            console.log(":chart_increasing: Saved light-output plots.")
         if draw_and_save_diagns(xbins, xhists, res_fit, upaths.DNGPLOT(filepath), systhreads):
             console.log(":chart_increasing: Saved fit diagnostics plots.")
-        if draw_and_save_xspectra(xbins, xhists, res_cal, lines, upaths.SPEPLOT(filepath), systhreads):
+        if draw_and_save_xspectra(xbins, xhists, res_cal, xlines, upaths.SPEPLOT(filepath), systhreads):
             console.log(":chart_increasing: Saved spectra plots.")
-        if draw_and_save_lins(res_cal, res_fit, lines, upaths.LINPLOT(filepath), systhreads):
+        if draw_and_save_lins(res_cal, res_fit, xlines, upaths.LINPLOT(filepath), systhreads):
             console.log(":chart_increasing: Saved linearity plots.")
 
     if flagged:
