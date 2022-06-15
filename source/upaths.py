@@ -8,7 +8,7 @@ from pathlib import Path
 
 prjpath = Path(__file__).parent.parent
 
-CONFDIR = prjpath.joinpath("configs")
+ASTDIR = prjpath.joinpath("assets")
 
 
 def create_if_not_exists(func):
@@ -63,9 +63,11 @@ def UNCDIR(filepath: Path) -> Path:
     return PLTDIR(filepath).joinpath("uncalibrated")
 
 
-FITREPORT = (lambda filepath: (lambda asic: RESDIR(filepath).joinpath("fit_report_quad{}.csv".format(asic))))
-CALREPORT = (lambda filepath: (lambda asic: RESDIR(filepath).joinpath("cal_report_quad{}.csv".format(asic))))
-SLOREPORT = (lambda filepath: (lambda asic: RESDIR(filepath).joinpath("slo_report_quad{}.csv".format(asic))))
+LOGOPATH = ASTDIR.joinpath("logo.txt")
+
+FITREPORT = (lambda filepath: RESDIR(filepath).joinpath("fit_report.xlsx"))
+CALREPORT = (lambda filepath: RESDIR(filepath).joinpath("cal_report.xlsx"))
+SLOREPORT = (lambda filepath: RESDIR(filepath).joinpath("slo_report.xlsx"))
 
 QLKPLOT = (lambda filepath: (lambda asic: PLTDIR(filepath).joinpath("quicklook_quad{}.png".format(asic))))
 SLOPLOT = (lambda filepath: (lambda asic: PLTDIR(filepath).joinpath("slo_quad{}.png".format(asic))))

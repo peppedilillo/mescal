@@ -1,8 +1,11 @@
+from itertools import combinations
+
 import numpy as np
 import pandas as pd
+
+from joblib import Parallel, delayed
 from lmfit.models import GaussianModel, LinearModel, PolynomialModel
 from scipy.signal import find_peaks
-from itertools import combinations
 
 PHT_KEV = 3.65 / 1000
 
@@ -15,19 +18,22 @@ dist_from_intv = (lambda x, lo, hi: abs((x - lo) + (x - hi)))
 
 
 def scalibrate(bins, histograms, cal_df, lines, lout_guess):
-    results_lo = {}
+    results_lo, flagged = {}, {}
     line_keys, line_values = zip(*lines.items())
     for asic in cal_df.keys():
         for ch in cal_df[asic].index:
             counts = histograms[asic][ch]
             gain, gain_err, offset = cal_df[asic].loc[ch][['gain', 'gain_err', 'offset']]
-            guesses = [[lout_lim * PHT_KEV * lv * gain + offset for lout_lim in lout_guess] for lv in line_values]
-            limits = estimate_peaks_from_guess(bins, counts, guess=guesses)
-            centers, center_errs, *etc = fit_peaks(bins, counts, limits)
-            light_outs, light_out_errs = compute_lout(centers, center_errs, gain, gain_err, offset, line_values)
-
-            results_lo.setdefault(asic, {})[ch] = np.concatenate((light_outs, light_out_errs))
-    return results_lo
+            try:
+                guesses = [[lout_lim * PHT_KEV * lv * gain + offset for lout_lim in lout_guess] for lv in line_values]
+                limits = estimate_peaks_from_guess(bins, counts, guess=guesses)
+                centers, center_errs, *etc = fit_peaks(bins, counts, limits)
+                light_outs, light_out_errs = compute_lout(centers, center_errs, gain, gain_err, offset, line_values)
+            except DetectPeakError:
+                flagged.setdefault(asic, []).append(ch)
+            else:
+                results_lo.setdefault(asic, {})[ch] = np.concatenate((light_outs, light_out_errs))
+    return results_lo, flagged
 
 
 def closest_peaks(guess, peaks, peaks_infos):
@@ -40,7 +46,10 @@ def closest_peaks(guess, peaks, peaks_infos):
 def estimate_peaks_from_guess(bins, counts, guess):
     mm = move_mean(counts, 5)
     unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=10, width=5)
-    peaks, peaks_info = closest_peaks(guess, unfiltered_peaks, unfiltered_peaks_info)
+    if len(unfiltered_peaks) >= len(guess):
+        peaks, peaks_info = closest_peaks(guess, unfiltered_peaks, unfiltered_peaks_info)
+    else:
+        raise DetectPeakError("candidate peaks are less than lines to fit.")
     limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
     return np.array(limits).reshape(len(peaks), 2)
 
@@ -60,7 +69,10 @@ def xcalibrate(bins, histograms, lines, onchannels):
         for ch in onchannels[asic]:
             counts = histograms[asic][ch]
             try:
-                limits = estimate_peaks_from_lratio(bins, counts, lines_values)
+                if len(lines_values) > 2:
+                    limits = estimate_peaks_from_lratio(bins, counts, lines_values)
+                else:
+                    raise DetectPeakError("not enough lines to calibrate.")
                 centers, center_errs, *etc = fit_peaks(bins, counts, limits)
                 gain, gain_err, offset, offset_err, chi2 = calibrate_chn(centers, center_errs, lines_values)
             except DetectPeakError:
@@ -71,7 +83,7 @@ def xcalibrate(bins, histograms, lines, onchannels):
     return results_fit, results_cal, flagged
 
 
-def filter_peaks_ratio(lines: list, peaks, peaks_infos):
+def filter_peaks_lratio(lines: list, peaks, peaks_infos):
     normalize = (lambda x: [(x[i + 1] - x[i]) / (x[-1] - x[0]) for i in range(len(x) - 1)])
     weight = (lambda x: [x[i + 1] * x[i] for i in range(len(x) - 1)])
 
@@ -89,7 +101,7 @@ def estimate_peaks_from_lratio(bins, counts, lines: list):
     mm = move_mean(counts, 5)
     unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=20, width=5)
     if len(unfiltered_peaks) >= len(lines):
-        peaks, peaks_info = filter_peaks_ratio(lines, unfiltered_peaks, unfiltered_peaks_info)
+        peaks, peaks_info = filter_peaks_lratio(lines, unfiltered_peaks, unfiltered_peaks_info)
     else:
         raise DetectPeakError("candidate peaks are less than lines to fit.")
     limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
@@ -187,18 +199,56 @@ def calibrate_chn(centers, center_errs, lines):
     return gain, gain_err, offset, offset_err, chi2
 
 
-def histogram(data, start, nbins, step):
-    hists = {}
-    for asic in 'ABCD':
+# def histogram(data, start, nbins, step):
+#     hists = {}
+#     for asic in 'ABCD':
+#         hist_asics = {}
+#         quad_df = data[data['QUADID'] == asic]
+#         for ch in range(32):
+#             ch_data = quad_df[(quad_df['CHN'] == ch)]
+#             counts, bins = np.histogram(ch_data['ADC'], range=(start, start + nbins * step), bins=nbins)
+#             hist_asics[ch] = counts
+#         hists[asic] = hist_asics
+#     return bins, hists
+
+def histogram(data, start, nbins, step, nthreads = 1):
+    def helper(asic):
         hist_asics = {}
         quad_df = data[data['QUADID'] == asic]
         for ch in range(32):
             ch_data = quad_df[(quad_df['CHN'] == ch)]
             counts, bins = np.histogram(ch_data['ADC'], range=(start, start + nbins * step), bins=nbins)
             hist_asics[ch] = counts
-        hists[asic] = hist_asics
+        return asic, hist_asics, bins
+
+    bins = np.linspace(start, start + nbins * step, nbins + 1)
+    results = Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in 'ABCD')
+    hists = {key: value for key, value, _ in results}
     return bins, hists
 
 
 def move_mean(arr, n):
     return pd.Series(arr).rolling(n, center=True).mean().to_numpy()
+
+
+s2i = (lambda asic: "ABCD".find(str.upper(asic)))
+i2s = (lambda n: chr(65 + n))
+
+
+def add_evtype_tag(data, couples):
+    """
+    inplace add event type (X or S) column
+    :param data:
+    :return:
+    """
+    data['CHN'] = data['CHN'] + 1
+    qm = data['QUADID'].map({key: 100 ** s2i(key) for key in 'ABCD'})
+    chm_dict = dict(np.concatenate([(couples[key] + 1) * 100**s2i(key) for key in couples.keys()]))
+    chm = data['CHN']*qm
+    data.insert(loc=3, column='EVTYPE', value=(data
+                                               .assign(CHN=chm.map(chm_dict).fillna(chm))
+                                               .duplicated(['TIME', 'EVTID', 'CHN'], keep=False)
+                                               .map({False: 'X', True: 'S'})
+                                               .astype('string')))
+    data['CHN'] = data['CHN'] - 1
+    return data

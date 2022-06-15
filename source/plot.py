@@ -3,17 +3,17 @@ from joblib import Parallel, delayed
 import numpy as np
 
 
-def draw_and_save_slo(res_slo, to_path, nthreads=1):
+def draw_and_save_slo(res_slo, path, nthreads=1):
     def helper(asic):
         fig, ax = sloplot(res_slo[asic])
         ax.set_title("Light output - Quadrant {}".format(asic))
-        fig.savefig(to_path(asic))
+        fig.savefig(path(asic))
         plt.close(fig)
 
     return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_slo.keys())
 
 
-def draw_and_save_uncalibrated(xbins, xhists, sbins, shists, to_path, nthreads=1):
+def draw_and_save_uncalibrated(xbins, xhists, sbins, shists, path, nthreads=1):
     def helper(asic):
         for ch in range(32):
             xcounts = xhists[asic][ch]
@@ -21,13 +21,13 @@ def draw_and_save_uncalibrated(xbins, xhists, sbins, shists, to_path, nthreads=1
             fig, ax = uncalibrated(xbins, xcounts, sbins, scounts,
                                    figsize=(9, 4.5))
             ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(to_path(asic, ch))
+            fig.savefig(path(asic, ch))
             plt.close(fig)
 
     return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in xhists.keys())
 
 
-def draw_and_save_diagns(bins, hists, res_fit, to_path, nthreads=1):
+def draw_and_save_diagns(bins, hists, res_fit, path, nthreads=1):
     def helper(asic):
         for ch in res_fit[asic].index:
             fig, ax = diagnostics(bins,
@@ -36,13 +36,13 @@ def draw_and_save_diagns(bins, hists, res_fit, to_path, nthreads=1):
                                   res_fit[asic].loc[ch][['lim_low', 'lim_high']].unstack(level=0).values,
                                   figsize=(9, 4.5))
             ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(to_path(asic, ch))
+            fig.savefig(path(asic, ch))
             plt.close(fig)
 
     return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_fit.keys())
 
 
-def draw_and_save_xspectra(bins, hists, res_cal, lines, to_path, nthreads=1):
+def draw_and_save_xspectra(bins, hists, res_cal, lines, path, nthreads=1):
     def helper(asic):
         for ch in res_cal[asic].index:
             enbins = (bins - res_cal[asic].loc[ch]['offset']) / res_cal[asic].loc[ch]['gain']
@@ -52,13 +52,13 @@ def draw_and_save_xspectra(bins, hists, res_cal, lines, to_path, nthreads=1):
                                elims=(2.0, 40.0),
                                figsize=(9, 4.5))
             ax.set_title("Spectra plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(to_path(asic, ch))
+            fig.savefig(path(asic, ch))
             plt.close(fig)
 
     return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_cal.keys())
 
 
-def draw_and_save_lins(res_cal, res_fit, lines, to_path, nthreads=1):
+def draw_and_save_lins(res_cal, res_fit, lines, path, nthreads=1):
     def helper(asic):
         for ch in res_cal[asic].index:
             fig, ax = linearity(*res_cal[asic].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']],
@@ -66,17 +66,17 @@ def draw_and_save_lins(res_cal, res_fit, lines, to_path, nthreads=1):
                                 res_fit[asic].loc[ch][['center_err']].values,
                                 lines)
             ax[0].set_title("Linearity plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(to_path(asic, ch))
+            fig.savefig(path(asic, ch))
             plt.close(fig)
 
     return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_cal.keys())
 
 
-def draw_and_save_qlooks(res_cal, to_path, nthreads=1):
+def draw_and_save_qlooks(res_cal, path, nthreads=1):
     def helper(asic):
         fig, axs = quicklook(res_cal[asic])
         axs[0].set_title("Calibration quicklook - Quadrant {}".format(asic))
-        fig.savefig(to_path(asic))
+        fig.savefig(path(asic))
         plt.close(fig)
 
     return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_cal.keys())
@@ -165,6 +165,7 @@ def quicklook(calres, **kwargs):
     for vg in gainpercs:
         axs[0].axhline(vg, color='r', lw=1)
     axs[0].set_ylabel("Gain")
+    axs[0].set_xlim((0,32))
     axs[0].legend()
 
     axs[1].errorbar(calres.index, calres['offset'], yerr=calres['offset_err'], fmt='o')
@@ -174,6 +175,7 @@ def quicklook(calres, **kwargs):
     axs[1].set_xticks(calres.index)
     axs[1].set_xlabel("Channel")
     axs[1].set_ylabel("Offset")
+    axs[1].set_xlim((0,32))
     return fig, axs
 
 
@@ -191,5 +193,6 @@ def sloplot(res_slo, **kwargs):
     ax.set_xlabel("Channel")
     ax.set_ylabel("Light Output [ph/keV]")
     ax.set_xticks(x)
+    ax.set_xlim((0,32))
     ax.legend()
     return fig, ax

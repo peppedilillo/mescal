@@ -1,25 +1,28 @@
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 from rich.prompt import Confirm
 from rich.progress import track
 from rich.pretty import pprint
 from time import sleep
+from source.upaths import LOGOPATH
 
-asciilogo = \
-'''
-       __ __   ____   ___    __  ___   ____   ____       _____         __
-      / // /  / __/  / _ \  /  |/  /  / __/  / __/ ____ / ___/ ___ _  / /
-     / _  /  / _/   / , _/ / /|_/ /  / _/   _\ \  /___// /__  / _ `/ / / 
-    /_//_/  /___/  /_/|_| /_/  /_/  /___/  /___/       \___/  \_,_/ /_/  
-'''
+hdr_text = Text()\
+    .append("Welcome to ", style='italic')\
+    .append("HERMES-CAL v1.0", style='purple bold')\
+    .append(", a software toolkit to analyze HERMES-TP/SP data.\n", style='italic')
 
 
 def boot():
     console = Console()
-    for i, line in enumerate(asciilogo.split("\n", )):
-        console.print(line, style="color({})".format(i + 160));
-        sleep(0.1)
-    print("")
+    console.print()
+    with open(LOGOPATH, 'r') as logo:
+        for i, line in enumerate(logo.readlines()):
+            console.print(line.strip("\n"), style="color({})".format(i + 160), justify='center');
+            sleep(0.1)
+    console.print()
+    console.rule(hdr_text)
+    console.print()
     return console
 
 
@@ -41,8 +44,8 @@ def confirm_prompt(message):
     return Confirm.ask(message)
 
 
-def prettyprint(x):
-    return pprint(x)
+def prettyprint(x, **kwargs):
+    return pprint(x, **kwargs)
 
 
 def shutdown(console):
