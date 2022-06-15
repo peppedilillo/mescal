@@ -69,14 +69,21 @@ if __name__ == '__main__':
 
     with console.status("Calibrating.."):
         # _onchannels = interface.progress_bar(onchannels, log_to=console)
-        _fitdf, _caldf, flagged = xcalibrate(xbins, xhists, xlines, onchannels)
-        res_fit = {q: pd.DataFrame(_fitdf[q], index=pd.MultiIndex.from_product((fit_params, xlines.keys()))).T
+        if xlines:
+            _fitdf, _caldf, flagged = xcalibrate(xbins, xhists, xlines, onchannels)
+            res_fit = {q: pd.DataFrame(_fitdf[q], index=pd.MultiIndex.from_product((fit_params, xlines.keys()))).T
+                       for q in _fitdf.keys()}
+            res_cal = {q: pd.DataFrame(_caldf[q], index=cal_params).T
                    for q in _fitdf.keys()}
-        res_cal = {q: pd.DataFrame(_caldf[q], index=cal_params).T
-                   for q in _fitdf.keys()}
-        _res_slo = scalibrate(sbins, shists, res_cal, slines, lout_guess = (10.,15.))
-        res_slo = {q: pd.DataFrame(_res_slo[q], index=pd.MultiIndex.from_product((lo_params, slines.keys()))).T
-                   for q in _res_slo.keys()}
+        else:
+            res_cal = {}
+
+        if slines:
+            _res_slo = scalibrate(sbins, shists, res_cal, slines, lout_guess = (10.,15.))
+            res_slo = {q: pd.DataFrame(_res_slo[q], index=pd.MultiIndex.from_product((lo_params, slines.keys()))).T
+                       for q in _res_slo.keys()}
+        else:
+            res_slo = {}
         console.log(":white_check_mark: Calibration done.")
 
     with console.status("Writing and drawing.."):

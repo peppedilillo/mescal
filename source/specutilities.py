@@ -4,7 +4,7 @@ from lmfit.models import GaussianModel, LinearModel, PolynomialModel
 from scipy.signal import find_peaks
 from itertools import combinations
 
-PHT_KEV = 3.65/1000
+PHT_KEV = 3.65 / 1000
 
 
 class DetectPeakError(Exception):
@@ -21,7 +21,7 @@ def scalibrate(bins, histograms, cal_df, lines, lout_guess):
         for ch in cal_df[asic].index:
             counts = histograms[asic][ch]
             gain, gain_err, offset = cal_df[asic].loc[ch][['gain', 'gain_err', 'offset']]
-            guesses = [[lout_lim*PHT_KEV*lv*gain + offset for lout_lim in lout_guess] for lv in line_values]
+            guesses = [[lout_lim * PHT_KEV * lv * gain + offset for lout_lim in lout_guess] for lv in line_values]
             limits = estimate_peaks_from_guess(bins, counts, guess=guesses)
             centers, center_errs, *etc = fit_peaks(bins, counts, limits)
             light_outs, light_out_errs = compute_lout(centers, center_errs, gain, gain_err, offset, line_values)
@@ -45,9 +45,11 @@ def estimate_peaks_from_guess(bins, counts, guess):
     return np.array(limits).reshape(len(peaks), 2)
 
 
-def compute_lout(centers, center_errs, gain, gain_err, offset, lines: list):
+def compute_lout(centers, center_errs, gain, gain_err, offset, lines):
     light_outs = (centers - offset) / gain / PHT_KEV / lines
-    light_out_errs = np.sqrt((center_errs/offset)**2 + (gain_err/offset)**2 + ((centers - gain)/offset)**2)/PHT_KEV/lines
+    light_out_errs = np.sqrt((center_errs / offset) ** 2
+                             + (gain_err / offset) ** 2
+                             + ((centers - gain) / offset) ** 2) / PHT_KEV / lines
     return light_outs, light_out_errs
 
 
@@ -71,13 +73,13 @@ def xcalibrate(bins, histograms, lines, onchannels):
 
 def filter_peaks_ratio(lines: list, peaks, peaks_infos):
     normalize = (lambda x: [(x[i + 1] - x[i]) / (x[-1] - x[0]) for i in range(len(x) - 1)])
-    weight = (lambda x: [x[i + 1]*x[i] for i in range(len(x) - 1)])
+    weight = (lambda x: [x[i + 1] * x[i] for i in range(len(x) - 1)])
 
     peaks_combinations = [*combinations(peaks, r=len(lines))]
     norm_ls = normalize(lines)
     norm_ps = [*map(normalize, peaks_combinations)]
-    weights = [*map(weight,combinations(peaks_infos["prominences"], r=len(lines)))]
-    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls))/weights
+    weights = [*map(weight, combinations(peaks_infos["prominences"], r=len(lines)))]
+    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)) / weights
                   , axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
     return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
