@@ -7,7 +7,6 @@ from source.structs import get_couples
 from source.structs import pandas_from
 from source.structs import infer_onchannels
 from source.structs import write_report_to_excel
-from source.structs import compile_sources_dicts
 from source.specutilities import xcalibrate
 from source.specutilities import scalibrate
 from source.specutilities import histogram
@@ -18,6 +17,7 @@ from source.plot import draw_and_save_qlooks
 from source.plot import draw_and_save_uncalibrated
 from source.plot import draw_and_save_slo
 from source.plot import draw_and_save_lins
+from source.parser import compile_sources_dicts
 from source.parser import parser
 from source import upaths
 from source import interface
@@ -94,6 +94,11 @@ if __name__ == '__main__':
                            for q in _res_slo.keys()}
             else:
                 res_slo, sflagged = {}, {}
+
+            if not (res_fit or res_cal or res_slo):
+                console.log(":cross_mark: Calibration failed.")
+            else:
+                console.log(":white_check_mark: Calibration complete.")
         else:
             res_fit, res_cal, xflagged = {}, {}, {}
             res_slo, sflagged = {}, {}
@@ -107,8 +112,6 @@ if __name__ == '__main__':
             write_report_to_excel(res_slo, path=upaths.SLOREPORT(filepath))
         if res_cal or res_fit or res_slo:
             console.log(":blue_book: Wrote fit and calibration results.")
-        else:
-            console.log(":cross_mark: Calibration failed.")
 
 
         if draw_and_save_uncalibrated(xbins, xhists, sbins, shists, path=upaths.UNCPLOT(filepath), nthreads=systhreads):

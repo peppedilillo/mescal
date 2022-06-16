@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from astropy.io import fits as fitsio
-from assets import lines
 from assets import detectors
 
 
@@ -13,26 +12,6 @@ class SourceNotFoundError(Exception):
 
 class UnknownModelError(Exception):
     """An error when querying an unsupported detector."""
-
-
-def _parse_to_list(source_string):
-    if source_string:
-        return [source_string[i:i + 2] for i in range(0, len(source_string), 2)]
-    return []
-
-
-def compile_sources_dicts(sources_string):
-    xlines = {}
-    slines = {}
-    sources_list = _parse_to_list(sources_string)
-    for element in sources_list:
-        if element in lines.x_sources:
-            xlines.update(lines.x_sources[element])
-        elif element in lines.s_sources:
-            slines.update(lines.s_sources[element])
-        else:
-            raise SourceNotFoundError("unknown calibration source source.")
-    return xlines, slines
 
 
 def infer_onchannels(data: pd.DataFrame):
