@@ -113,7 +113,6 @@ if __name__ == '__main__':
         if res_cal or res_fit or res_slo:
             console.log(":blue_book: Wrote fit and calibration results.")
 
-
         if draw_and_save_uncalibrated(xbins, xhists, sbins, shists, path=upaths.UNCPLOT(filepath), nthreads=systhreads):
             console.log(":chart_increasing: Saved uncalibrated plots.")
         if draw_and_save_qlooks(res_cal, upaths.QLKPLOT(filepath)):

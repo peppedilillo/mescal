@@ -1,24 +1,26 @@
+from time import sleep
+
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 from rich.prompt import Confirm
 from rich.progress import track
 from rich.pretty import pprint
-from time import sleep
+
 from source.upaths import LOGOPATH
+
 
 hdr_text = Text()\
     .append("Welcome to ", style='italic')\
-    .append("HERMES-CAL v1.0", style='purple bold')\
+    .append("mescal v1.0", style='purple bold')\
     .append(", a software toolkit to analyze HERMES-TP/SP data.\n", style='italic')
 
 
 def boot():
     console = Console()
-    console.print()
     with open(LOGOPATH, 'r') as logo:
         for i, line in enumerate(logo.readlines()):
-            console.print(line.strip("\n"), style="color({})".format(i + 160), justify='center');
+            console.print(line.strip("\n"), style="bold color({})".format(int(i + 160)), justify='center');
             sleep(0.1)
     console.print()
     console.rule(hdr_text)

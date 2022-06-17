@@ -1,6 +1,6 @@
+import numpy as np
 import matplotlib.pyplot as plt; plt.style.use('seaborn')
 from joblib import Parallel, delayed
-import numpy as np
 
 
 def draw_and_save_slo(res_slo, path, nthreads=1):

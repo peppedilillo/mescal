@@ -36,7 +36,7 @@ def read_report_from_excel(from_path):
 
 def write_report_to_csv(result_df, path):
     for quad, df in result_df.items():
-        df.to_csv(path(quad, asic), sep=';')
+        df.to_csv(path(quad, asic))
     return True
 
 

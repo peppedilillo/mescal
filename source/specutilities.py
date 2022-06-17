@@ -4,7 +4,9 @@ import numpy as np
 import pandas as pd
 
 from joblib import Parallel, delayed
-from lmfit.models import GaussianModel, LinearModel, PolynomialModel
+from lmfit.models import GaussianModel
+from lmfit.models import LinearModel
+from lmfit.models import PolynomialModel
 from scipy.signal import find_peaks
 
 PHT_KEV = 3.65 / 1000
