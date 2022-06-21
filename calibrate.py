@@ -57,7 +57,7 @@ def make_calibrated_evlist(data, res_cal, res_slo, couples):
         sevents_grouped = sevents.groupby(['TIME', 'CHN'])
         stimes, schns = np.array([*sevents_grouped.groups.keys()]).T
         schns_comp = pd.Series(schns).map({v: k for k,v in dict(couples[quad]).items()})
-        slos = res_slo[quad].T.loc['light_out'].mean()
+        slos = res_slo[quad].groupby(axis=1,level=-1).mean()['light_out']
         sens = sevents_grouped.sum()['XENS'].values/(slos.loc[schns].values + slos.loc[schns_comp].values)/(3.65/1000)
 
         times = np.concatenate((times, xtimes, stimes))
@@ -109,7 +109,6 @@ if __name__ == '__main__':
     xlines, slines = compile_sources_dicts(args.lines)
 
     console = interface.boot()
-
     with console.status("Building dataset.."):
         console.log(":question_mark: Looking for data..")
         filepath = Path(args.filepath_in)
@@ -127,28 +126,31 @@ if __name__ == '__main__':
         console.log(":white_check_mark: Preprocessing done.")
 
     with console.status("Calibrating.."):
+        reshape = (lambda dic, lines: x.reshape(len(fit_params),len(lines)).T.flatten())
         to_dfdict = (lambda x, idx: {q: pd.DataFrame(x[q], index=idx).T for q in x.keys()})
 
         if xlines:
             _fitdict, _caldict, xflagged = xcalibrate(xbins, xhists, xlines, onchannels)
-            res_fit = to_dfdict(_fitdict, pd.MultiIndex.from_product((fit_params, xlines.keys())))
+            res_fit = to_dfdict(_fitdict, pd.MultiIndex.from_product((xlines.keys(), fit_params,)))
             res_cal = to_dfdict(_caldict, cal_params)
             if slines:
                 _slodict, sflagged = scalibrate(sbins, shists, res_cal, slines, lout_guess = (10.,15.))
-                res_slo = to_dfdict(_slodict, pd.MultiIndex.from_product((lo_params, slines.keys())))
+                res_slo = to_dfdict(_slodict, pd.MultiIndex.from_product((slines.keys(), lo_params)))
             else:
                 res_slo, sflagged = {}, {}
-
-            if not (res_fit or res_cal or res_slo):
-                console.log(":cross_mark: Calibration failed.")
-                calibrated_events = pd.DataFrame({})
-            else:
-                console.log(":white_check_mark: Calibration complete.")
-                calibrated_events = make_calibrated_evlist(data, res_cal, res_slo, fm1couples)
-                console.log(":white_check_mark: Built calibrated event list.")
         else:
             res_fit, res_cal, xflagged = {}, {}, {}
             res_slo, sflagged = {}, {}
+
+        if not res_cal and not res_slo:
+            calibrated_events = pd.DataFrame({})
+            console.log(":cross_mark: Calibration failed.")
+        elif not res_slo or not res_slo:
+            calibrated_events = pd.DataFrame({})
+            console.log(":yellow_circle: Calibration partially completed. ")
+        else:
+            calibrated_events = make_calibrated_evlist(data, res_cal, res_slo, fm1couples)
+            console.log(":white_check_mark: Calibration complete.")
 
     with console.status("Writing and drawing.."):
         if res_fit:
@@ -161,7 +163,6 @@ if __name__ == '__main__':
             write_eventlist_to_fits(calibrated_events, path=upaths.EVLFITS(filepath))
         if res_cal or res_fit or res_slo or not calibrated_events.empty:
             console.log(":blue_book: Wrote fit and calibration results.")
-
 
         if not args.noplot:
             if draw_and_save_sspectrum(calibrated_events, slines,

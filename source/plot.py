@@ -32,8 +32,8 @@ def draw_and_save_diagns(bins, hists, res_fit, path, nthreads=1):
         for ch in res_fit[asic].index:
             fig, ax = diagnostics(bins,
                                   hists[asic][ch],
-                                  res_fit[asic].loc[ch]['center'],
-                                  res_fit[asic].loc[ch][['lim_low', 'lim_high']].unstack(level=0).values,
+                                  res_fit[asic].loc[ch].loc[:, 'center'],
+                                  res_fit[asic].loc[ch].loc[:, ['lim_low', 'lim_high']].values.reshape(2, -1).T,
                                   figsize=(9, 4.5))
             ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, asic))
             fig.savefig(path(asic, ch))
@@ -89,12 +89,13 @@ def draw_and_save_sspectrum(calibrated_events, lines, path):
         plt.close(fig)
         return True
 
+
 def draw_and_save_lins(res_cal, res_fit, lines, path, nthreads=1):
     def helper(asic):
         for ch in res_cal[asic].index:
             fig, ax = linearity(*res_cal[asic].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']],
-                                res_fit[asic].loc[ch][['center']].values,
-                                res_fit[asic].loc[ch][['center_err']].values,
+                                res_fit[asic].loc[ch].loc[:, 'center'],
+                                res_fit[asic].loc[ch].loc[:, 'center_err'],
                                 lines)
             ax[0].set_title("Linearity plot - CH{:02d}Q{}".format(ch, asic))
             fig.savefig(path(asic, ch))
@@ -212,8 +213,10 @@ def quicklook(calres, **kwargs):
 
 def sloplot(res_slo, **kwargs):
     x = res_slo.index
-    y = res_slo['light_out'].T.mean()
-    yerr = res_slo['light_out_err'].T.mean()
+    y = res_slo.groupby(axis=1,level=-1).mean()['light_out']
+    yerr = res_slo.groupby(axis=1,level=-1).mean()['light_out_err']
+    #y = res_slo['light_out'].T.mean()
+    #yerr = res_slo['light_out_err'].T.mean()
     ypercs = np.percentile(y, [30, 70])
 
     fig, ax = plt.subplots(1,1, **kwargs)

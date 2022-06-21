@@ -80,7 +80,8 @@ def xcalibrate(bins, histograms, lines, onchannels):
             except DetectPeakError:
                 flagged.setdefault(asic, []).append(ch)
             else:
-                results_fit.setdefault(asic, {})[ch] = np.concatenate((centers, center_errs, *etc, *limits.T))
+                #results_fit.setdefault(asic, {})[ch] = np.concatenate((centers, center_errs, *etc, *limits.T))
+                results_fit.setdefault(asic, {})[ch] = np.column_stack((centers, center_errs, *etc, *limits.T)).flatten()
                 results_cal.setdefault(asic, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
     return results_fit, results_cal, flagged
 
@@ -200,18 +201,6 @@ def calibrate_chn(centers, center_errs, lines):
 
     return gain, gain_err, offset, offset_err, chi2
 
-
-# def histogram(data, start, nbins, step):
-#     hists = {}
-#     for asic in 'ABCD':
-#         hist_asics = {}
-#         quad_df = data[data['QUADID'] == asic]
-#         for ch in range(32):
-#             ch_data = quad_df[(quad_df['CHN'] == ch)]
-#             counts, bins = np.histogram(ch_data['ADC'], range=(start, start + nbins * step), bins=nbins)
-#             hist_asics[ch] = counts
-#         hists[asic] = hist_asics
-#     return bins, hists
 
 def histogram(data, start, nbins, step, nthreads = 1):
     def helper(asic):
