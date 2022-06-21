@@ -249,7 +249,7 @@ def add_evtype_tag(data, couples):
     chm = data['CHN']*qm
     data.insert(loc=3, column='EVTYPE', value=(data
                                                .assign(CHN=chm.map(chm_dict).fillna(chm))
-                                               .duplicated(['TIME', 'EVTID', 'CHN'], keep=False)
+                                               .duplicated(['SID', 'CHN'], keep=False)
                                                .map({False: 'X', True: 'S'})
                                                .astype('string')))
     data['CHN'] = data['CHN'] - 1

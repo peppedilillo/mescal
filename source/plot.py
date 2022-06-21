@@ -42,7 +42,7 @@ def draw_and_save_diagns(bins, hists, res_fit, path, nthreads=1):
     return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_fit.keys())
 
 
-def draw_and_save_xspectra(bins, hists, res_cal, lines, path, nthreads=1):
+def draw_and_save_channels_xspectra(bins, hists, res_cal, lines, path, nthreads=1):
     def helper(asic):
         for ch in res_cal[asic].index:
             enbins = (bins - res_cal[asic].loc[ch]['offset']) / res_cal[asic].loc[ch]['gain']
@@ -57,6 +57,37 @@ def draw_and_save_xspectra(bins, hists, res_cal, lines, path, nthreads=1):
 
     return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_cal.keys())
 
+
+def draw_and_save_xspectrum(calibrated_events, lines, path):
+    if not calibrated_events.empty:
+        xevs = calibrated_events[calibrated_events['EVTYPE'] == 'X']
+        xcounts, xbins = np.histogram(xevs['ENERGY'], bins=np.arange(2, 40, 0.05))
+
+        fig, ax = spectrum(xbins,
+                           xcounts,
+                           lines,
+                           elims=(2.0, 40.0),
+                           figsize=(9, 4.5))
+        ax.set_title("Spectrum X")
+        fig.savefig(path)
+        plt.close(fig)
+        return True
+
+
+def draw_and_save_sspectrum(calibrated_events, lines, path):
+    if not calibrated_events.empty:
+        sevs = calibrated_events[calibrated_events['EVTYPE'] == 'S']
+        scounts, sbins = np.histogram(sevs['ENERGY'], bins=np.arange(30, 1000, 2))
+
+        fig, ax = spectrum(sbins,
+                           scounts,
+                           lines,
+                           elims=(30, 1000),
+                           figsize=(9, 4.5))
+        ax.set_title("Spectrum S")
+        fig.savefig(path)
+        plt.close(fig)
+        return True
 
 def draw_and_save_lins(res_cal, res_fit, lines, path, nthreads=1):
     def helper(asic):
@@ -110,7 +141,7 @@ def diagnostics(bins, counts, centers, limits, **kwargs):
     return fig, ax
 
 
-def spectrum(enbins, counts, lines: dict, elims=None, **kwargs):
+def spectrum(enbins, counts, lines: dict={}, elims=None, **kwargs):
     colors = [plt.cm.tab10(i) for i in range(len(lines))]
 
     fig, ax = plt.subplots(**kwargs)

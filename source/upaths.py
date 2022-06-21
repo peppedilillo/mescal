@@ -65,14 +65,18 @@ def UNCDIR(filepath: Path) -> Path:
 
 LOGOPATH = ASTDIR.joinpath("logo.txt")
 
-FITREPORT = (lambda filepath: RESDIR(filepath).joinpath("fit_report.xlsx"))
-CALREPORT = (lambda filepath: RESDIR(filepath).joinpath("cal_report.xlsx"))
-SLOREPORT = (lambda filepath: RESDIR(filepath).joinpath("slo_report.xlsx"))
+EVLFITS = (lambda filepath: RESDIR(filepath).joinpath("event_list.fits"))
 
+FITREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_fit.xlsx"))
+CALREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_cal.xlsx"))
+SLOREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_slo.xlsx"))
+
+XSPPLOT = (lambda filepath: PLTDIR(filepath).joinpath("spectrum_x.png"))
+SSPPLOT = (lambda filepath: PLTDIR(filepath).joinpath("spectrum_s.png"))
 QLKPLOT = (lambda filepath: (lambda asic: PLTDIR(filepath).joinpath("quicklook_quad{}.png".format(asic))))
 SLOPLOT = (lambda filepath: (lambda asic: PLTDIR(filepath).joinpath("slo_quad{}.png".format(asic))))
 LINPLOT = (lambda filepath: (lambda asic, ch: LINDIR(filepath).joinpath("linearity_quad{}_ch{:02d}.png".format(asic, ch))))
-SPEPLOT = (lambda filepath: (lambda asic, ch: SPEDIR(filepath).joinpath("spectra_quad{}_ch{:02d}.png".format(asic, ch))))
+SPCPLOT = (lambda filepath: (lambda asic, ch: SPEDIR(filepath).joinpath("spectra_quad{}_ch{:02d}.png".format(asic, ch))))
 DNGPLOT = (lambda filepath: (lambda asic, ch: DNGDIR(filepath).joinpath("diagnostic_quad{}_ch{:02d}.png".format(asic, ch))))
 FLGPLOT = (lambda filepath: (lambda asic, ch: FLGDIR(filepath).joinpath("flagged_quad{}_ch{:02d}.png".format(asic, ch))))
 UNCPLOT = (lambda filepath: (lambda asic, ch: UNCDIR(filepath).joinpath("uncalibrated_quad{}_ch{:02d}.png".format(asic, ch))))
