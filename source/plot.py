@@ -1,6 +1,12 @@
+from math import sqrt
+from math import pi
+
 import numpy as np
 import matplotlib.pyplot as plt; plt.style.use('seaborn')
-from joblib import Parallel, delayed
+from joblib import Parallel
+from joblib import delayed
+
+from source.specutilities import PHT_KEV
 
 
 def draw_and_save_slo(res_slo, path, nthreads=1):
@@ -33,10 +39,12 @@ def draw_and_save_diagns(bins, hists, res_fit, path, nthreads=1):
             fig, ax = diagnostics(bins,
                                   hists[asic][ch],
                                   res_fit[asic].loc[ch].loc[:, 'center'],
+                                  res_fit[asic].loc[ch].loc[:, 'amp'],
+                                  res_fit[asic].loc[ch].loc[:, 'fwhm'],
                                   res_fit[asic].loc[ch].loc[:, ['lim_low', 'lim_high']].values.reshape(2, -1).T,
-                                  figsize=(9, 4.5))
+                                  figsize=(18, 9))
             ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(path(asic, ch))
+            fig.savefig(path(asic, ch), dpi=150)
             plt.close(fig)
 
     return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_fit.keys())
@@ -51,7 +59,25 @@ def draw_and_save_channels_xspectra(bins, hists, res_cal, lines, path, nthreads=
                                lines,
                                elims=(2.0, 40.0),
                                figsize=(9, 4.5))
-            ax.set_title("Spectra plot - CH{:02d}Q{}".format(ch, asic))
+            ax.set_title("Spectra plot X - CH{:02d}Q{}".format(ch, asic))
+            fig.savefig(path(asic, ch))
+            plt.close(fig)
+
+    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_cal.keys())
+
+
+def draw_and_save_channels_sspectra(bins, hists, res_cal, res_slo, lines, path, nthreads=1):
+    def helper(asic):
+        for ch in res_slo[asic].index:
+            xenbins = (bins - res_cal[asic].loc[ch]['offset']) / res_cal[asic].loc[ch]['gain']
+            enbins = xenbins/res_slo[asic]['light_out'].loc[ch]/PHT_KEV
+
+            fig, ax = spectrum(enbins,
+                               hists[asic][ch],
+                               lines,
+                               elims=(30.0, 1000.0),
+                               figsize=(9, 4.5))
+            ax.set_title("Spectra plot S - CH{:02d}Q{}".format(ch, asic))
             fig.savefig(path(asic, ch))
             plt.close(fig)
 
@@ -127,15 +153,20 @@ def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
     return fig, ax
 
 
-def diagnostics(bins, counts, centers, limits, **kwargs):
-    colors = [plt.cm.tab10(i) for i in range(len(limits))]
+normal = (lambda x, amp, sigma, x0: amp*np.exp(-(x-x0)**2/(2*sigma**2))/(sigma*sqrt(2*pi)))
+
+
+def diagnostics(bins, counts, centers, amps, fwhms, limits, **kwargs):
+    colors = [plt.cm.tab10(i) for i in range(1, len(limits) + 1)]
 
     fig, ax = plt.subplots(1, 1, **kwargs)
     ax.step(bins[:-1], counts, where='post')
     ax.fill_between(bins[:-1], counts, step="post", alpha=0.4)
-    for ctr, lims, col in zip(centers, limits, colors):
+    for ctr, amp, fwhm, lims, col in zip(centers, amps, fwhms, limits, colors):
         ax.axvline(ctr, linestyle='dotted')
         ax.axvspan(*lims, color=col, alpha=0.1)
+        xs = np.linspace(*lims, 100)
+        ax.plot(xs, normal(xs, amp, fwhm/2.355, ctr), color=col)
     ax.set_ylim(bottom=0)
     ax.set_ylabel("Counts")
     ax.set_xlabel("ADU")
@@ -213,8 +244,8 @@ def quicklook(calres, **kwargs):
 
 def sloplot(res_slo, **kwargs):
     x = res_slo.index
-    y = res_slo.groupby(axis=1,level=-1).mean()['light_out']
-    yerr = res_slo.groupby(axis=1,level=-1).mean()['light_out_err']
+    y = res_slo['light_out']
+    yerr = res_slo['light_out_err']
     #y = res_slo['light_out'].T.mean()
     #yerr = res_slo['light_out_err'].T.mean()
     ypercs = np.percentile(y, [30, 70])

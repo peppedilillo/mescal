@@ -16,11 +16,34 @@ class DetectPeakError(Exception):
     """An error while finding peaks."""
 
 
-dist_from_intv = (lambda x, lo, hi: abs((x - lo) + (x - hi)))
+def xcalibrate(bins, histograms, lines, onchannels):
+    results_fit, results_cal, flagged = {}, {}, {}
+    lines_keys, lines_values = zip(*lines.items())
+    for asic in onchannels.keys():
+        for ch in onchannels[asic]:
+            counts = histograms[asic][ch]
+            try:
+                if len(lines_values) > 2:
+                    limits = estimate_peakpos_from_lratio(bins, counts, lines_values)
+                else:
+                    raise DetectPeakError("not enough lines to calibrate.")
+                centers, center_errs, *etc = fit_peaks(bins, counts, limits)
+                gain, gain_err, offset, offset_err, chi2 = calibrate_chn(centers, center_errs, lines_values)
+            except DetectPeakError:
+                flagged.setdefault(asic, []).append(ch)
+            else:
+                results_fit.setdefault(asic, {})[ch] = np.column_stack((centers, center_errs, *etc, *limits.T)).flatten()
+                results_cal.setdefault(asic, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
+    return results_fit, results_cal, flagged
+
+
+def do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_lines(light_outs, light_outs_errs):
+    # i mean, in doubt just mean
+    return light_outs.mean(), np.sqrt(np.sum(light_outs_errs**2))
 
 
 def scalibrate(bins, histograms, cal_df, lines, lout_guess):
-    results_lo, flagged = {}, {}
+    results_fit, results_slo, flagged = {}, {}, {}
     line_keys, line_values = zip(*lines.items())
     for asic in cal_df.keys():
         for ch in cal_df[asic].index:
@@ -30,19 +53,25 @@ def scalibrate(bins, histograms, cal_df, lines, lout_guess):
                 guesses = [[lout_lim * PHT_KEV * lv * gain + offset for lout_lim in lout_guess] for lv in line_values]
                 limits = estimate_peaks_from_guess(bins, counts, guess=guesses)
                 centers, center_errs, *etc = fit_peaks(bins, counts, limits)
-                light_outs, light_out_errs = compute_lout(centers, center_errs, gain, gain_err, offset, line_values)
+                los, lo_errs = compute_louts(centers, center_errs, gain, gain_err, offset, line_values)
+                lo, lo_err = do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_lines(los, lo_errs)
             except DetectPeakError:
                 flagged.setdefault(asic, []).append(ch)
             else:
-                results_lo.setdefault(asic, {})[ch] = np.concatenate((light_outs, light_out_errs))
-    return results_lo, flagged
+                results_fit.setdefault(asic, {})[ch] = np.column_stack((centers, center_errs, *etc, *limits.T)).flatten()
+                results_slo.setdefault(asic, {})[ch] = np.array((lo, lo_err))
+    return results_fit, results_slo, flagged
+
+
+dist_from_intv = (lambda x, lo, hi: abs((x - lo) + (x - hi)))
 
 
 def closest_peaks(guess, peaks, peaks_infos):
     peaks_dist_from_guess = [[dist_from_intv(peak, guess_lo, guess_hi) for peak in peaks]
                              for guess_lo, guess_hi in guess]
-    best_peaks = peaks[np.argmin(peaks_dist_from_guess, axis=1)]
-    return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
+    argmin = np.argmin(peaks_dist_from_guess, axis=1)
+    best_peaks = peaks[argmin]
+    return best_peaks, {key: val[argmin] for key, val in peaks_infos.items()}
 
 
 def estimate_peaks_from_guess(bins, counts, guess):
@@ -56,34 +85,12 @@ def estimate_peaks_from_guess(bins, counts, guess):
     return np.array(limits).reshape(len(peaks), 2)
 
 
-def compute_lout(centers, center_errs, gain, gain_err, offset, lines):
+def compute_louts(centers, center_errs, gain, gain_err, offset, lines):
     light_outs = (centers - offset) / gain / PHT_KEV / lines
     light_out_errs = np.sqrt((center_errs / offset) ** 2
                              + (gain_err / offset) ** 2
                              + ((centers - gain) / offset) ** 2) / PHT_KEV / lines
     return light_outs, light_out_errs
-
-
-def xcalibrate(bins, histograms, lines, onchannels):
-    results_fit, results_cal, flagged = {}, {}, {}
-    lines_keys, lines_values = zip(*lines.items())
-    for asic in onchannels.keys():
-        for ch in onchannels[asic]:
-            counts = histograms[asic][ch]
-            try:
-                if len(lines_values) > 2:
-                    limits = estimate_peaks_from_lratio(bins, counts, lines_values)
-                else:
-                    raise DetectPeakError("not enough lines to calibrate.")
-                centers, center_errs, *etc = fit_peaks(bins, counts, limits)
-                gain, gain_err, offset, offset_err, chi2 = calibrate_chn(centers, center_errs, lines_values)
-            except DetectPeakError:
-                flagged.setdefault(asic, []).append(ch)
-            else:
-                #results_fit.setdefault(asic, {})[ch] = np.concatenate((centers, center_errs, *etc, *limits.T))
-                results_fit.setdefault(asic, {})[ch] = np.column_stack((centers, center_errs, *etc, *limits.T)).flatten()
-                results_cal.setdefault(asic, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
-    return results_fit, results_cal, flagged
 
 
 def filter_peaks_lratio(lines: list, peaks, peaks_infos):
@@ -100,7 +107,7 @@ def filter_peaks_lratio(lines: list, peaks, peaks_infos):
     return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
 
 
-def estimate_peaks_from_lratio(bins, counts, lines: list):
+def estimate_peakpos_from_lratio(bins, counts, lines: list):
     mm = move_mean(counts, 5)
     unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=20, width=5)
     if len(unfiltered_peaks) >= len(lines):
@@ -123,7 +130,7 @@ def line_fitter(x, y, limits, bkg=None):
     y_err = np.sqrt(y)
     x_start = np.where(x > start)[0][0]
     x_stop = np.where(x < stop)[0][-1]
-    x_fit = x[x_start:x_stop]
+    x_fit = (x[x_start:x_stop + 1][1:] + x[x_start:x_stop + 1][:-1])/2
     y_fit = y[x_start:x_stop]
     y_fit_err = y_err[x_start:x_stop]
 
@@ -132,8 +139,6 @@ def line_fitter(x, y, limits, bkg=None):
     else:
         mod = GaussianModel()
     pars = mod.guess(y_fit, x=x_fit)
-    center = x_fit[np.argmax(y_fit)]
-    pars['center'].set(center, min=start, max=stop)
     result = mod.fit(y_fit, pars, x=x_fit, weights=y_fit_err)
 
     x_fine = np.linspace(x[0], x[-1], len(x) * 100)

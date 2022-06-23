@@ -14,6 +14,7 @@ from source.specutilities import histogram
 from source.specutilities import add_evtype_tag
 from source.plot import draw_and_save_diagns
 from source.plot import draw_and_save_channels_xspectra
+from source.plot import draw_and_save_channels_sspectra
 from source.plot import draw_and_save_sspectrum
 from source.plot import draw_and_save_xspectrum
 from source.plot import draw_and_save_qlooks
@@ -34,6 +35,9 @@ lo_params = ['light_out', 'light_out_err']
 
 ########################
 import numpy as np
+
+from source.specutilities import PHT_KEV
+
 
 def make_calibrated_evlist(data, res_cal, res_slo, couples):
     times = np.array([])
@@ -57,8 +61,8 @@ def make_calibrated_evlist(data, res_cal, res_slo, couples):
         sevents_grouped = sevents.groupby(['TIME', 'CHN'])
         stimes, schns = np.array([*sevents_grouped.groups.keys()]).T
         schns_comp = pd.Series(schns).map({v: k for k,v in dict(couples[quad]).items()})
-        slos = res_slo[quad].groupby(axis=1,level=-1).mean()['light_out']
-        sens = sevents_grouped.sum()['XENS'].values/(slos.loc[schns].values + slos.loc[schns_comp].values)/(3.65/1000)
+        slos = res_slo[quad]['light_out']
+        sens = sevents_grouped.sum()['XENS'].values/(slos.loc[schns].values + slos.loc[schns_comp].values)/PHT_KEV
 
         times = np.concatenate((times, xtimes, stimes))
         ens = np.concatenate((ens, xens, sens))
@@ -130,16 +134,17 @@ if __name__ == '__main__':
         to_dfdict = (lambda x, idx: {q: pd.DataFrame(x[q], index=idx).T for q in x.keys()})
 
         if xlines:
-            _fitdict, _caldict, xflagged = xcalibrate(xbins, xhists, xlines, onchannels)
-            res_fit = to_dfdict(_fitdict, pd.MultiIndex.from_product((xlines.keys(), fit_params,)))
+            _xfitdict, _caldict, xflagged = xcalibrate(xbins, xhists, xlines, onchannels)
+            res_xfit = to_dfdict(_xfitdict, pd.MultiIndex.from_product((xlines.keys(), fit_params,)))
             res_cal = to_dfdict(_caldict, cal_params)
             if slines:
-                _slodict, sflagged = scalibrate(sbins, shists, res_cal, slines, lout_guess = (10.,15.))
-                res_slo = to_dfdict(_slodict, pd.MultiIndex.from_product((slines.keys(), lo_params)))
+                _sfitdict, _slodict, sflagged = scalibrate(sbins, shists, res_cal, slines, lout_guess = (10.,15.))
+                res_sfit = to_dfdict(_sfitdict, pd.MultiIndex.from_product((slines.keys(), fit_params,)))
+                res_slo = to_dfdict(_slodict, lo_params)
             else:
                 res_slo, sflagged = {}, {}
         else:
-            res_fit, res_cal, xflagged = {}, {}, {}
+            res_xfit, res_cal, xflagged = {}, {}, {}
             res_slo, sflagged = {}, {}
 
         if not res_cal and not res_slo:
@@ -153,18 +158,23 @@ if __name__ == '__main__':
             console.log(":white_check_mark: Calibration complete.")
 
     with console.status("Writing and drawing.."):
-        if res_fit:
-            write_report_to_excel(res_fit, path=upaths.FITREPORT(filepath))
+        if res_xfit:
+            write_report_to_excel(res_xfit, path=upaths.XFTREPORT(filepath))
+        if res_sfit:
+            write_report_to_excel(res_sfit, path=upaths.SFTREPORT(filepath))
         if res_cal:
             write_report_to_excel(res_cal, path=upaths.CALREPORT(filepath))
         if res_slo:
             write_report_to_excel(res_slo, path=upaths.SLOREPORT(filepath))
         if not calibrated_events.empty:
             write_eventlist_to_fits(calibrated_events, path=upaths.EVLFITS(filepath))
-        if res_cal or res_fit or res_slo or not calibrated_events.empty:
+        if res_cal or res_xfit or res_slo or not calibrated_events.empty:
             console.log(":blue_book: Wrote fit and calibration results.")
 
         if not args.noplot:
+            if draw_and_save_uncalibrated(xbins, xhists, sbins, shists,
+                                        path=upaths.UNCPLOT(filepath), nthreads=systhreads):
+                console.log(":chart_increasing: Saved uncalibrated plots.")
             if draw_and_save_sspectrum(calibrated_events, slines,
                                         path=upaths.SSPPLOT(filepath)):
                 console.log(":chart_increasing: Saved S spectrum.")
@@ -174,24 +184,27 @@ if __name__ == '__main__':
             if draw_and_save_qlooks(res_cal,
                                         path=upaths.QLKPLOT(filepath), nthreads=systhreads):
                 console.log(":chart_increasing: Saved fit quicklooks.")
-            if draw_and_save_uncalibrated(xbins, xhists, sbins, shists,
-                                        path=upaths.UNCPLOT(filepath), nthreads=systhreads):
-                console.log(":chart_increasing: Saved uncalibrated plots.")
             if draw_and_save_slo(res_slo,
                                         path=upaths.SLOPLOT(filepath), nthreads=systhreads):
                 console.log(":chart_increasing: Saved light-output plots.")
-            if draw_and_save_diagns(xbins, xhists, res_fit,
-                                        path=upaths.DNGPLOT(filepath), nthreads=systhreads):
-                console.log(":chart_increasing: Saved fit diagnostics plots.")
+            if draw_and_save_diagns(xbins, xhists, res_xfit,
+                                        path=upaths.XDNPLOT(filepath), nthreads=systhreads):
+                console.log(":chart_increasing: Saved X fit diagnostics plots.")
+            if draw_and_save_diagns(sbins, shists, res_sfit,
+                                        path=upaths.SDNPLOT(filepath), nthreads=systhreads):
+                console.log(":chart_increasing: Saved S fit diagnostics plots.")
             if draw_and_save_channels_xspectra(xbins, xhists, res_cal, xlines,
-                                        path=upaths.SPCPLOT(filepath), nthreads=systhreads):
-                console.log(":chart_increasing: Saved spectra plots.")
-            if draw_and_save_lins(res_cal, res_fit, xlines,
+                                        path=upaths.XCSPLOT(filepath), nthreads=systhreads):
+                console.log(":chart_increasing: Saved X channel spectra plots.")
+            if draw_and_save_channels_sspectra(sbins, shists, res_cal, res_slo, slines,
+                                        path=upaths.SCSPLOT(filepath), nthreads=systhreads):
+                console.log(":chart_increasing: Saved S channel spectra plots.")
+            if draw_and_save_lins(res_cal, res_xfit, xlines,
                                         path=upaths.LINPLOT(filepath), nthreads=systhreads):
                 console.log(":chart_increasing: Saved linearity plots.")
     console.rule()
 
-    if (xflagged or sflagged) and (res_cal or res_fit or res_slo):
+    if (xflagged or sflagged) and (res_cal or res_xfit or res_slo):
         flagged = merge_flagged_dicts(xflagged, sflagged)
         console.print("\nWhile processing data I've found {} channels out of {} "
                       "for which calibration could not be completed."

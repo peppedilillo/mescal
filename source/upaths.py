@@ -45,14 +45,22 @@ def LINDIR(filepath: Path) -> Path:
 
 
 @create_if_not_exists
-def SPEDIR(filepath: Path) -> Path:
-    return PLTDIR(filepath).joinpath("spectra")
+def XCSDIR(filepath: Path) -> Path:
+    return PLTDIR(filepath).joinpath("chnspectra_x")
 
 
 @create_if_not_exists
-def DNGDIR(filepath: Path) -> Path:
-    return PLTDIR(filepath).joinpath("diagnostics")
+def SCSDIR(filepath: Path) -> Path:
+    return PLTDIR(filepath).joinpath("chnspectra_s")
 
+
+@create_if_not_exists
+def XDNDIR(filepath: Path) -> Path:
+    return PLTDIR(filepath).joinpath("diagnostics_x")
+
+@create_if_not_exists
+def SDNDIR(filepath: Path) -> Path:
+    return PLTDIR(filepath).joinpath("diagnostics_s")
 
 @create_if_not_exists
 def FLGDIR(filepath: Path) -> Path:
@@ -67,7 +75,8 @@ LOGOPATH = ASTDIR.joinpath("logo.txt")
 
 EVLFITS = (lambda filepath: RESDIR(filepath).joinpath("event_list.fits"))
 
-FITREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_fit.xlsx"))
+XFTREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_xfit.xlsx"))
+SFTREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_sfit.xlsx"))
 CALREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_cal.xlsx"))
 SLOREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_slo.xlsx"))
 
@@ -76,7 +85,9 @@ SSPPLOT = (lambda filepath: PLTDIR(filepath).joinpath("spectrum_s.png"))
 QLKPLOT = (lambda filepath: (lambda asic: PLTDIR(filepath).joinpath("quicklook_quad{}.png".format(asic))))
 SLOPLOT = (lambda filepath: (lambda asic: PLTDIR(filepath).joinpath("slo_quad{}.png".format(asic))))
 LINPLOT = (lambda filepath: (lambda asic, ch: LINDIR(filepath).joinpath("linearity_quad{}_ch{:02d}.png".format(asic, ch))))
-SPCPLOT = (lambda filepath: (lambda asic, ch: SPEDIR(filepath).joinpath("spectra_quad{}_ch{:02d}.png".format(asic, ch))))
-DNGPLOT = (lambda filepath: (lambda asic, ch: DNGDIR(filepath).joinpath("diagnostic_quad{}_ch{:02d}.png".format(asic, ch))))
+XCSPLOT = (lambda filepath: (lambda asic, ch: XCSDIR(filepath).joinpath("spectra_x_quad{}_ch{:02d}.png".format(asic, ch))))
+SCSPLOT = (lambda filepath: (lambda asic, ch: SCSDIR(filepath).joinpath("spectra_s_quad{}_ch{:02d}.png".format(asic, ch))))
+XDNPLOT = (lambda filepath: (lambda asic, ch: XDNDIR(filepath).joinpath("diagnostic_x_quad{}_ch{:02d}.png".format(asic, ch))))
+SDNPLOT = (lambda filepath: (lambda asic, ch: SDNDIR(filepath).joinpath("diagnostic_s_quad{}_ch{:02d}.png".format(asic, ch))))
 FLGPLOT = (lambda filepath: (lambda asic, ch: FLGDIR(filepath).joinpath("flagged_quad{}_ch{:02d}.png".format(asic, ch))))
 UNCPLOT = (lambda filepath: (lambda asic, ch: UNCDIR(filepath).joinpath("uncalibrated_quad{}_ch{:02d}.png".format(asic, ch))))
