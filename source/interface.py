@@ -28,11 +28,6 @@ def boot():
     return console
 
 
-def progress_bar(onchannels, log_to):
-    return {asic: track(onchannels[asic], "Processing ASIC {}..".format(asic), console=log_to)
-            for asic in onchannels.keys()}
-
-
 def df_to_table(df, title):
     table = Table(title=title)
     for i, col in enumerate(df.columns):

@@ -6,27 +6,23 @@ from astropy.io import fits as fitsio
 from assets import detectors
 
 
-class SourceNotFoundError(Exception):
-    """An error while parsing calib sources."""
-
-
 class UnknownModelError(Exception):
     """An error when querying an unsupported detector."""
 
 
 def infer_onchannels(data: pd.DataFrame):
     out = {}
-    for asic in 'ABCD':
-        onchs = np.unique(data[data['QUADID'] == asic]['CHN'])
+    for quad in 'ABCD':
+        onchs = np.unique(data[data['QUADID'] == quad]['CHN'])
         if onchs.any():
-            out[asic] = onchs
+            out[quad] = onchs
     return out
 
 
 def write_report_to_excel(result_df, path):
     with pd.ExcelWriter(path) as output:
-        for asic in result_df.keys():
-            result_df[asic].to_excel(output, sheet_name=asic, engine='xlsxwriter', encoding='utf8')
+        for quad in result_df.keys():
+            result_df[quad].to_excel(output, sheet_name=quad, engine='xlsxwriter', encoding='utf8')
     return True
 
 
@@ -36,7 +32,7 @@ def read_report_from_excel(from_path):
 
 def write_report_to_csv(result_df, path):
     for quad, df in result_df.items():
-        df.to_csv(path(quad, asic))
+        df.to_csv(path(quad, quad))
     return True
 
 
@@ -47,9 +43,9 @@ def read_report_from_csv(from_path):
 def write_report_to_fits(result_df, path):
     header = fitsio.PrimaryHDU()
     output = fitsio.HDUList([header])
-    for asic in result_df.keys():
-        table_asic = fitsio.BinTableHDU.from_columns(result_df[asic].to_records(), name=asic)
-        output.append(table_asic)
+    for quad in result_df.keys():
+        table_quad = fitsio.BinTableHDU.from_columns(result_df[quad].to_records(), name=quad)
+        output.append(table_quad)
     output.writeto(path, overwrite=True)
     return True
 
@@ -61,10 +57,10 @@ def read_report_from_fits(path):
 def write_eventlist_to_fits(eventlist, path):
     header = fitsio.PrimaryHDU()
     output = fitsio.HDUList([header])
-    table_asic = fitsio.BinTableHDU.from_columns(
+    table_quad = fitsio.BinTableHDU.from_columns(
         eventlist.to_records(index=False, column_dtypes={'EVTYPE':'U1', 'CHN': 'i8', 'QUADID':'U1'}),
         name='Event list')
-    output.append(table_asic)
+    output.append(table_quad)
     output.writeto(path, overwrite=True)
     return True
 
@@ -98,7 +94,6 @@ def pandas_from(fits: Path):
     fits_path = Path(fits)
 
     with fitsio.open(fits_path) as fits_file:
-        # would be nice to just pd.DataFrame(fits_file[1].data) but endians
         df = pd.DataFrame(np.array(fits_file[-1].data).byteswap().newbyteorder())
     start_t = floor(df[df['TIME'] > 1].iloc[0]['TIME']) - 1
     df.loc[df['TIME'] < 1, 'TIME'] += start_t
