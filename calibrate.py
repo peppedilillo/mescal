@@ -1,4 +1,5 @@
 from os import cpu_count
+from collections import namedtuple
 
 import pandas as pd
 from pathlib import Path
@@ -33,6 +34,9 @@ FIT_PARAMS = ["center", "center_err", "fwhm", "fwhm_err", "amp", "amp_err", "lim
 CAL_PARAMS = ["gain", "gain_err", "offset", "offset_err", "chi2"]
 LO_PARAMS = ['light_out', 'light_out_err']
 
+option = namedtuple('option', ['display','reply', 'action', 'args', 'kwargs'], defaults=[(), {}])
+options = [option('Goodbye.', '', (lambda _: None))]
+
 
 def get_from(fitspath, use_cache=True):
     cached = upaths.CACHEDIR().joinpath(fitspath.name).with_suffix('.pkl.gz')
@@ -60,6 +64,14 @@ def merge_flagged_dicts(dx, ds):
         if content:
             out[key] = [fs(fx((x,), dx[key]), ds[key]) for x in content]
     return out
+
+
+def save_event_list_and_plots(data, sdds_calibration, scintillators_lightout, fm1couples, xlines, slines):
+    calibrated_events = make_calibrated_events_list(data, sdds_calibration, scintillators_lightout, fm1couples)
+    write_eventlist_to_fits(calibrated_events, path=upaths.EVLFITS(filepath))
+    draw_and_save_sspectrum(calibrated_events, slines, path=upaths.SSPPLOT(filepath))
+    draw_and_save_xspectrum(calibrated_events, xlines, path=upaths.XSPPLOT(filepath))
+    return True
 
 
 if __name__ == '__main__':
@@ -104,62 +116,81 @@ if __name__ == '__main__':
             sfit_results, scintillators_lightout, sflagged = {}, {}, {}
 
         if not sdds_calibration and not scintillators_lightout:
-            calibrated_events = pd.DataFrame({})
             console.log(":cross_mark: Calibration failed.")
         elif not scintillators_lightout or not scintillators_lightout:
-            calibrated_events = pd.DataFrame({})
             console.log(":yellow_circle: Calibration partially completed. ")
         else:
             console.log(":white_check_mark: Calibration complete.")
-            calibrated_events = make_calibrated_events_list(data, sdds_calibration, scintillators_lightout, fm1couples)
-            console.log(":white_check_mark: Built calibrated event list.")
 
     with console.status("Writing and drawing.."):
+        options.append(option(display="Save uncalibrated plots.",
+                              reply=":sparkles: Saved uncalibrated plots. :sparkles:",
+                              action=draw_and_save_uncalibrated,
+                              args=(xbins, xhistograms, sbins, shistograms),
+                              kwargs={'path': upaths.UNCPLOT(filepath),
+                                      'nthreads': systhreads}))
         if xfit_results:
-            write_report_to_excel(xfit_results, path=upaths.XFTREPORT(filepath))
+            options.append(option(display="Save X fit diagnostic plots.",
+                                  reply=":sparkles: Plots saved. :sparkles:",
+                                  action=draw_and_save_diagns,
+                                  args=(xbins, xhistograms, xfit_results),
+                                  kwargs={'path': upaths.XDNPLOT(filepath),
+                                          'nthreads':systhreads}))
+            options.append(option(display="Save X fit results.",
+                                  reply=":sparkles: Fit table saved. :sparkles:",
+                                  action=write_report_to_excel,
+                                  args=(xfit_results,),
+                                  kwargs={'path': upaths.XFTREPORT(filepath)}))
+
         if sfit_results:
-            write_report_to_excel(sfit_results, path=upaths.SFTREPORT(filepath))
+            options.append(option(display="Save S fit diagnostic plots.",
+                                  reply=":sparkles: Plots saved. :sparkles:",
+                                  action=draw_and_save_diagns,
+                                  args=(sbins, shistograms, sfit_results),
+                                  kwargs={'path': upaths.SDNPLOT(filepath),
+                                          'nthreads': systhreads}))
+            options.append(option(display="Save S fit results.",
+                                  reply=":sparkles: Fit table saved. :sparkles:",
+                                  action=write_report_to_excel,
+                                  args=(sfit_results,),
+                                  kwargs={'path': upaths.SFTREPORT(filepath)}))
+
         if sdds_calibration:
+            draw_and_save_qlooks(sdds_calibration, path=upaths.QLKPLOT(filepath), nthreads=systhreads)
+            console.log(":chart_increasing: Saved X fit quicklook plots.")
             write_report_to_excel(sdds_calibration, path=upaths.CALREPORT(filepath))
+            console.log(":blue_book: Wrote SDD calibration results.")
+
+            options.append(option(display="Save X channel spectra plots.",
+                                  reply=":sparkles: Plots saved. :sparkles:",
+                                  action=draw_and_save_channels_xspectra,
+                                  args=(xbins, xhistograms, sdds_calibration, xlines),
+                                  kwargs={'path': upaths.XCSPLOT(filepath),
+                                          'nthreads': systhreads}))
+            options.append(option(display="Save SDD linearity plots.",
+                                  reply=":sparkles: Plots saved. :sparkles:",
+                                  action=draw_and_save_lins,
+                                  args=(sdds_calibration, xfit_results, xlines),
+                                  kwargs={'path': upaths.LINPLOT(filepath),
+                                          'nthreads': systhreads}))
         if scintillators_lightout:
             write_report_to_excel(scintillators_lightout, path=upaths.SLOREPORT(filepath))
-        if not calibrated_events.empty:
-            write_eventlist_to_fits(calibrated_events, path=upaths.EVLFITS(filepath))
-        if sdds_calibration or xfit_results or scintillators_lightout or not calibrated_events.empty:
-            console.log(":blue_book: Wrote fit and calibration results.")
+            console.log(":blue_book: Wrote scintillators calibration results.")
+            draw_and_save_slo(scintillators_lightout, path=upaths.SLOPLOT(filepath), nthreads=systhreads)
+            console.log(":chart_increasing: Saved light-output plots.")
 
-        if not args.noplot:
+            options.append(option(display="Save S channel spectra plots.",
+                                  reply=":sparkles: Plots saved. :sparkles:",
+                                  action=draw_and_save_channels_sspectra,
+                                  args=(sbins, shistograms, sdds_calibration, scintillators_lightout, slines),
+                                  kwargs={'path': upaths.SCSPLOT(filepath),
+                                          'nthreads': systhreads}))
+        if sdds_calibration and scintillators_lightout:
+            options.append(option(display="Save calibrated events list and plots.",
+                                  reply=":sparkles: Event list and plots saved. :sparkles:",
+                                  action=save_event_list_and_plots,
+                                  args=(data, sdds_calibration, scintillators_lightout, fm1couples, xlines, slines)))
 
-            if draw_and_save_uncalibrated(xbins, xhistograms, sbins, shistograms,
-                                          path=upaths.UNCPLOT(filepath), nthreads=systhreads):
-                console.log(":chart_increasing: Saved uncalibrated plots.")
-            if draw_and_save_sspectrum(calibrated_events, slines,
-                                       path=upaths.SSPPLOT(filepath)):
-                console.log(":chart_increasing: Saved S spectrum.")
-            if draw_and_save_xspectrum(calibrated_events, xlines,
-                                       path=upaths.XSPPLOT(filepath)):
-                console.log(":chart_increasing: Saved X spectrum.")
-            if draw_and_save_qlooks(sdds_calibration,
-                                    path=upaths.QLKPLOT(filepath), nthreads=systhreads):
-                console.log(":chart_increasing: Saved fit quicklooks.")
-            if draw_and_save_slo(scintillators_lightout,
-                                 path=upaths.SLOPLOT(filepath), nthreads=systhreads):
-                console.log(":chart_increasing: Saved light-output plots.")
-            if draw_and_save_diagns(xbins, xhistograms, xfit_results,
-                                    path=upaths.XDNPLOT(filepath), nthreads=systhreads):
-                console.log(":chart_increasing: Saved X fit diagnostics plots.")
-            if draw_and_save_diagns(sbins, shistograms, sfit_results,
-                                    path=upaths.SDNPLOT(filepath), nthreads=systhreads):
-                console.log(":chart_increasing: Saved S fit diagnostics plots.")
-            if draw_and_save_channels_xspectra(xbins, xhistograms, sdds_calibration, xlines,
-                                               path=upaths.XCSPLOT(filepath), nthreads=systhreads):
-                console.log(":chart_increasing: Saved X channel spectra plots.")
-            if draw_and_save_channels_sspectra(sbins, shistograms, sdds_calibration, scintillators_lightout, slines,
-                                               path=upaths.SCSPLOT(filepath), nthreads=systhreads):
-                console.log(":chart_increasing: Saved S channel spectra plots.")
-            if draw_and_save_lins(sdds_calibration, xfit_results, xlines,
-                                  path=upaths.LINPLOT(filepath), nthreads=systhreads):
-                console.log(":chart_increasing: Saved linearity plots.")
     console.rule()
 
     if (xflagged or sflagged) and (sdds_calibration or xfit_results or scintillators_lightout):
@@ -170,4 +201,19 @@ if __name__ == '__main__':
         if interface.confirm_prompt("Display flagged channels?"):
             interface.prettyprint(flagged, console=console)
 
+    done_already = []
+    console.print(interface.option_prompt_message(options))
+    while True and len(done_already) != len(options) - 1:
+        selected = interface.options_prompt(options, done_already)
+        if selected:
+            with console.status("Working.."):
+                option = options[selected]
+                option.action(*option.args, **option.kwargs)
+                console.print(option.reply)
+                done_already.append(selected)
+        else:
+            break
+
     goodbye = interface.shutdown(console)
+
+

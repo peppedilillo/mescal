@@ -4,8 +4,8 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 from rich.prompt import Confirm
-from rich.progress import track
 from rich.pretty import pprint
+from rich.prompt import IntPrompt
 
 from source.upaths import LOGOPATH
 
@@ -46,5 +46,17 @@ def prettyprint(x, **kwargs):
 
 
 def shutdown(console):
-    console.print("\nShutting down, goodbye!\n")
+    console.print("Shutting down, goodbye!\n")
     return
+
+
+def option_prompt_message(options):
+    message = Text.assemble("\nAnything else?\n",
+                            *("{}. ".format(i) + option.display + '\n' for i, option in enumerate(options)))
+    return message
+
+
+def options_prompt(options, done_already):
+    message = Text("Select one: ", style='italic')
+    choices = [*range(len(options))]
+    return IntPrompt.ask(message, choices=[str(i) for i in [v for v in choices if v not in done_already]])
