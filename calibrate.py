@@ -17,8 +17,6 @@ from source.spectra import make_events_list
 from source.plot import draw_and_save_diagns
 from source.plot import draw_and_save_channels_xspectra
 from source.plot import draw_and_save_channels_sspectra
-from source.plot import draw_and_save_sspectrum
-from source.plot import draw_and_save_xspectrum
 from source.plot import draw_and_save_qlooks
 from source.plot import draw_and_save_uncalibrated
 from source.plot import draw_and_save_slo
@@ -27,7 +25,6 @@ from source.parser import compile_sources_dicts
 from source.parser import parser
 from source import upaths
 from source import interface
-
 
 START, STOP, STEP = 15000, 30000, 10
 NBINS = int((STOP - START) / STEP)
@@ -76,7 +73,6 @@ if __name__ == '__main__':
 
     console = interface.boot()
 
-    ####################################################################################################################
     with console.status("Building dataset.."):
         console.log(":question_mark: Looking for data..")
         filepath = Path(args.filepath_in)
@@ -193,22 +189,18 @@ if __name__ == '__main__':
 
         if sdds_calibration and scintillators_lightout:
             write_eventlist_to_fits_ = (lambda *args: write_eventlist_to_fits(
-                                                        make_events_list(*args,
-                                                                         nthreads=systhreads),
-                                                        upaths.EVLFITS(filepath)))
+                make_events_list(*args,
+                                 nthreads=systhreads),
+                upaths.EVLFITS(filepath)))
             options.append(option(display="Write calibrated events to fits.",
                                   reply=":sparkles: Event list saved. :sparkles:",
                                   action=write_eventlist_to_fits_,
                                   args=(data, sdds_calibration, scintillators_lightout, fm1couples)))
 
-    ####################################################################################################################
-
     if xflagged or sflagged:
         interface.print_rule(console, "[bold italic]Warning", style='red', align='center')
         flagged = merge_flagged_dicts(xflagged, sflagged)
         console.print(interface.flagged_message(flagged, onchannels))
-
-    ####################################################################################################################
 
     interface.print_rule(console, "[italic]Optional Outputs", align='center')
     console.print(interface.options_message(options))
