@@ -82,7 +82,7 @@ def get_qmap(model:str, quad: str, arr_borders: bool = True):
 
 
 def get_channels(model:str, quad: str):
-    return [ch for ch, _ in enumerate(get_qmap(model, quad)) if ch is not UNBOND]
+    return [ch for ch, _ in enumerate(get_qmap(model, quad)) if ch is not detectors.UNBOND]
 
 
 def get_couples(model:str, quad: str):

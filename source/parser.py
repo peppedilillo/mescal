@@ -13,8 +13,6 @@ parser.add_argument("filepath_in",
                     help="input file")
 parser.add_argument("--nocache", action="store_true",
                     help="disable loading and saving from cache.")
-parser.add_argument("--noplot", action="store_true",
-                    help="disables all plot output.")
 parser.add_argument("-l", "--lines",
                     help="radioactive sources used for calibration."
                          "separated by comma, e.g.:  `-l=Fe,Cd,Cs`."

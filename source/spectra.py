@@ -1,3 +1,4 @@
+from collections import namedtuple
 from itertools import combinations
 import numpy as np
 import pandas as pd
@@ -8,18 +9,24 @@ from scipy.signal import find_peaks
 
 PHT_KEV = 3.65 / 1000
 
+histograms_collection = namedtuple('histogram', ['bins', 'counts'])
+
 
 class DetectPeakError(Exception):
     """An error while finding peaks."""
 
 
-def make_calibrated_events_list(data, calibrated_sdds, calibrated_scintillators, scintillator_couples):
+def make_events_list(data, calibrated_sdds, calibrated_scintillators, scintillator_couples, nthreads=1):
     columns = ['TIME', 'ENERGY', 'EVTYPE', 'CHN', 'QUADID']
     types = ['float64', 'float32', 'U1', 'int8', 'U1']
     dtypes = {col: tp for col, tp in zip(columns, types)}
     container = np.recarray(shape=0, dtype=[*dtypes.items()])
 
-    disorganized_events = _get_calibrated_events(data, calibrated_sdds, calibrated_scintillators, scintillator_couples)
+    disorganized_events = _get_calibrated_events(data,
+                                                 calibrated_sdds,
+                                                 calibrated_scintillators,
+                                                 scintillator_couples,
+                                                 nthreads=nthreads)
     for quadrant in disorganized_events.keys():
         x_events, gamma_events = disorganized_events[quadrant]
         xtimes, xenergies, xchannels, xquadrants, xevtypes = (*x_events.T,
@@ -33,6 +40,23 @@ def make_calibrated_events_list(data, calibrated_sdds, calibrated_scintillators,
         container = np.hstack((container, x_array, s_array))
     out = pd.DataFrame(container).sort_values('TIME').reset_index(drop=True)
     return out
+
+
+def _get_calibrated_events(data, calibrated_sdds, calibrated_scintillators, scintillator_couples, nthreads=1):
+    def helper(quadrant):
+        quadrant_data = data[(data['QUADID'] == quadrant) &
+                             (data['CHN'].isin(calibrated_scintillators[quadrant].index))]
+        quadrant_data = _insert_xenergy_column(quadrant_data, calibrated_sdds[quadrant])
+
+        x_events = _extract_x_events(quadrant_data)
+        gamma_events = _extract_gamma_events(quadrant_data,
+                                             calibrated_scintillators[quadrant],
+                                             scintillator_couples[quadrant])
+
+        return quadrant, (x_events, gamma_events)
+
+    results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in calibrated_scintillators.keys())
+    return {quadrant: value for quadrant, value in results}
 
 
 def _extract_gamma_events(quadrant_data, calibrated_scintillators, scintillator_couples):
@@ -67,46 +91,31 @@ def _insert_xenergy_column(data, calibrated_sdds):
     return data
 
 
-def _get_calibrated_events(data, calibrated_sdds, calibrated_scintillators, scintillator_couples):
-    out = {}
-    for quadrant in calibrated_scintillators.keys():
-        quadrant_data = data[(data['QUADID'] == quadrant) &
-                             (data['CHN'].isin(calibrated_scintillators[quadrant].index))]
-        quadrant_data = _insert_xenergy_column(quadrant_data, calibrated_sdds[quadrant])
-
-        x_events = _extract_x_events(quadrant_data)
-        gamma_events = _extract_gamma_events(quadrant_data,
-                                             calibrated_scintillators[quadrant],
-                                             scintillator_couples[quadrant])
-
-        out[quadrant] = (x_events, gamma_events)
-    return out
-
-
-def scalibrate(bins, histograms, cal_df, lines, lout_guess):
+def scalibrate(histograms, cal_df, lines, lout_guess):
     results_fit, results_slo, flagged = {}, {}, {}
     line_keys, line_values = zip(*lines.items())
     for asic in cal_df.keys():
         for ch in cal_df[asic].index:
-            counts = histograms[asic][ch]
+            counts = histograms.counts[asic][ch]
             gain, gain_err, offset = cal_df[asic].loc[ch][['gain', 'gain_err', 'offset']]
             try:
                 guesses = [[lout_lim * PHT_KEV * lv * gain + offset for lout_lim in lout_guess] for lv in line_values]
-                limits = _estimate_peaks_from_guess(bins, counts, guess=guesses)
-                centers, center_errs, *etc = _fit_peaks(bins, counts, limits)
+                limits = _estimate_peaks_from_guess(histograms.bins, counts, guess=guesses)
+                centers, center_errs, *etc = _fit_peaks(histograms.bins, counts, limits)
                 los, lo_errs = _compute_louts(centers, center_errs, gain, gain_err, offset, line_values)
                 lo, lo_err = _do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_lines(los, lo_errs)
             except DetectPeakError:
                 flagged.setdefault(asic, []).append(ch)
             else:
-                results_fit.setdefault(asic, {})[ch] = np.column_stack((centers, center_errs, *etc, *limits.T)).flatten()
+                results_fit.setdefault(asic, {})[ch] = np.column_stack(
+                    (centers, center_errs, *etc, *limits.T)).flatten()
                 results_slo.setdefault(asic, {})[ch] = np.array((lo, lo_err))
     return results_fit, results_slo, flagged
 
 
 def _do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_lines(light_outs, light_outs_errs):
     # in doubt mean
-    return light_outs.mean(), np.sqrt(np.sum(light_outs_errs**2))
+    return light_outs.mean(), np.sqrt(np.sum(light_outs_errs ** 2))
 
 
 _dist_from_intv = (lambda x, lo, hi: abs((x - lo) + (x - hi)))
@@ -128,7 +137,7 @@ def _estimate_peaks_from_guess(bins, counts, guess, limratio=(1, 1)):
     else:
         raise DetectPeakError("candidate peaks are less than lines to fit.")
     lo_r, hi_r = limratio
-    limits = [(bins[int(p - w*lo_r)], bins[int(p + w*hi_r)]) for p, w in zip(peaks, peaks_info['widths'])]
+    limits = [(bins[int(p - w * lo_r)], bins[int(p + w * hi_r)]) for p, w in zip(peaks, peaks_info['widths'])]
     return np.array(limits).reshape(len(peaks), 2)
 
 
@@ -140,23 +149,24 @@ def _compute_louts(centers, center_errs, gain, gain_err, offset, lines):
     return light_outs, light_out_errs
 
 
-def xcalibrate(bins, histograms, lines, onchannels):
+def xcalibrate(histograms, lines, onchannels):
     results_fit, results_cal, flagged = {}, {}, {}
     lines_keys, lines_values = zip(*lines.items())
     for asic in onchannels.keys():
         for ch in onchannels[asic]:
-            counts = histograms[asic][ch]
+            counts = histograms.counts[asic][ch]
             try:
                 if len(lines_values) > 2:
-                    limits = _estimate_peakpos_from_lratio(bins, counts, lines_values)
+                    limits = _estimate_peakpos_from_lratio(histograms.bins, counts, lines_values)
                 else:
                     raise DetectPeakError("not enough lines to calibrate.")
-                centers, center_errs, *etc = _fit_peaks(bins, counts, limits, weights='amplitude')
+                centers, center_errs, *etc = _fit_peaks(histograms.bins, counts, limits, weights='amplitude')
                 gain, gain_err, offset, offset_err, chi2 = _calibrate_chn(centers, center_errs, lines_values)
             except DetectPeakError:
                 flagged.setdefault(asic, []).append(ch)
             else:
-                results_fit.setdefault(asic, {})[ch] = np.column_stack((centers, center_errs, *etc, *limits.T)).flatten()
+                results_fit.setdefault(asic, {})[ch] = np.column_stack(
+                    (centers, center_errs, *etc, *limits.T)).flatten()
                 results_cal.setdefault(asic, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
     return results_fit, results_cal, flagged
 
@@ -190,7 +200,7 @@ def _line_fitter(x, y, limits):
     start, stop = limits
     x_start = np.where(x > start)[0][0]
     x_stop = np.where(x < stop)[0][-1]
-    x_fit = (x[x_start:x_stop + 1][1:] + x[x_start:x_stop + 1][:-1])/2
+    x_fit = (x[x_start:x_stop + 1][1:] + x[x_start:x_stop + 1][:-1]) / 2
     y_fit = y[x_start:x_stop]
     weights = np.sqrt(y_fit)
 
@@ -242,7 +252,7 @@ def _calibrate_chn(centers, center_errs, lines):
     return gain, gain_err, offset, offset_err, chi2
 
 
-def histogram(data, start, nbins, step, nthreads = 1):
+def compute_histogram(data, start, nbins, step, nthreads=1):
     def helper(quad):
         hist_quads = {}
         quad_df = data[data['QUADID'] == quad]
@@ -254,8 +264,8 @@ def histogram(data, start, nbins, step, nthreads = 1):
 
     bins = np.linspace(start, start + nbins * step, nbins + 1)
     results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in 'ABCD')
-    hists = {key: value for key, value, _ in results}
-    return bins, hists
+    counts = {key: value for key, value, _ in results}
+    return histograms_collection(bins, counts)
 
 
 def move_mean(arr, n):
@@ -274,8 +284,8 @@ def add_evtype_tag(data, couples):
     """
     data['CHN'] = data['CHN'] + 1
     qm = data['QUADID'].map({key: 100 ** s2i(key) for key in 'ABCD'})
-    chm_dict = dict(np.concatenate([(couples[key] + 1) * 100**s2i(key) for key in couples.keys()]))
-    chm = data['CHN']*qm
+    chm_dict = dict(np.concatenate([(couples[key] + 1) * 100 ** s2i(key) for key in couples.keys()]))
+    chm = data['CHN'] * qm
     data.insert(loc=3, column='EVTYPE', value=(data
                                                .assign(CHN=chm.map(chm_dict).fillna(chm))
                                                .duplicated(['SID', 'CHN'], keep=False)

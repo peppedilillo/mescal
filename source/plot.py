@@ -30,29 +30,28 @@ def draw_and_save_slo(res_slo, path, nthreads=1):
     return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_slo.keys())
 
 
-def draw_and_save_uncalibrated(xbins, xhists, sbins, shists, path, nthreads=1):
+def draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads=1):
     def helper(quad):
         for ch in range(32):
-            xcounts = xhists[quad][ch]
-            scounts = shists[quad][ch]
-            fig, ax = _uncalibrated(xbins, xcounts, sbins, scounts,
+            fig, ax = _uncalibrated(xhistograms.bins, xhistograms.counts[quad][ch],
+                                    shistograms.bins, shistograms.counts[quad][ch],
                                     figsize=(9, 4.5))
             ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch))
             plt.close(fig)
 
-    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in xhists.keys())
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in xhistograms.counts.keys())
 
 
-def draw_and_save_diagns(bins, hists, res_fit, path, nthreads=1):
+def draw_and_save_diagns(histograms, res_fit, path, nthreads=1):
     def helper(quad):
         for ch in res_fit[quad].index:
-            fig, ax = _diagnostics(bins,
-                                   hists[quad][ch],
-                                  res_fit[quad].loc[ch].loc[:, 'center'],
-                                  res_fit[quad].loc[ch].loc[:, 'amp'],
-                                  res_fit[quad].loc[ch].loc[:, 'fwhm'],
-                                  res_fit[quad].loc[ch].loc[:, ['lim_low', 'lim_high']].values.reshape(2, -1).T,
+            fig, ax = _diagnostics(histograms.bins,
+                                   histograms.counts[quad][ch],
+                                   res_fit[quad].loc[ch].loc[:, 'center'],
+                                   res_fit[quad].loc[ch].loc[:, 'amp'],
+                                   res_fit[quad].loc[ch].loc[:, 'fwhm'],
+                                   res_fit[quad].loc[ch].loc[:, ['lim_low', 'lim_high']].values.reshape(2, -1).T,
                                    figsize=(18, 9))
             ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch), dpi=150)
@@ -61,12 +60,12 @@ def draw_and_save_diagns(bins, hists, res_fit, path, nthreads=1):
     return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_fit.keys())
 
 
-def draw_and_save_channels_xspectra(bins, hists, res_cal, lines:dict, path, nthreads=1):
+def draw_and_save_channels_xspectra(histograms, res_cal, lines:dict, path, nthreads=1):
     def helper(quad):
         for ch in res_cal[quad].index:
-            enbins = (bins - res_cal[quad].loc[ch]['offset']) / res_cal[quad].loc[ch]['gain']
+            enbins = (histograms.bins - res_cal[quad].loc[ch]['offset']) / res_cal[quad].loc[ch]['gain']
             fig, ax = _spectrum(enbins,
-                                hists[quad][ch],
+                                histograms.counts[quad][ch],
                                 lines,
                                 elims=_compute_lims_for_x(lines),
                                 figsize=(9, 4.5))
@@ -77,14 +76,14 @@ def draw_and_save_channels_xspectra(bins, hists, res_cal, lines:dict, path, nthr
     return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
 
 
-def draw_and_save_channels_sspectra(bins, hists, res_cal, res_slo, lines:dict, path, nthreads=1):
+def draw_and_save_channels_sspectra(histograms, res_cal, res_slo, lines: dict, path, nthreads=1):
     def helper(quad):
         for ch in res_slo[quad].index:
-            xenbins = (bins - res_cal[quad].loc[ch]['offset']) / res_cal[quad].loc[ch]['gain']
+            xenbins = (histograms.bins - res_cal[quad].loc[ch]['offset']) / res_cal[quad].loc[ch]['gain']
             enbins = xenbins/res_slo[quad]['light_out'].loc[ch]/PHT_KEV
 
             fig, ax = _spectrum(enbins,
-                                hists[quad][ch],
+                                histograms.counts[quad][ch],
                                 lines,
                                 elims=_compute_lims_for_s(lines),
                                 figsize=(9, 4.5))
@@ -131,9 +130,10 @@ def draw_and_save_lins(res_cal, res_fit, lines, path, nthreads=1):
     def helper(quad):
         for ch in res_cal[quad].index:
             fig, ax = _linearity(*res_cal[quad].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']],
-                                res_fit[quad].loc[ch].loc[:, 'center'],
-                                res_fit[quad].loc[ch].loc[:, 'center_err'],
-                                 lines)
+                                 res_fit[quad].loc[ch].loc[:, 'center'],
+                                 res_fit[quad].loc[ch].loc[:, 'center_err'],
+                                 lines,
+                                 figsize=(7,7))
             ax[0].set_title("Linearity plot - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch))
             plt.close(fig)
@@ -220,22 +220,33 @@ def _linearity(gain, gain_err, offset, offset_err, adcs, adcs_err, lines: dict, 
     measured_energies_err =  np.sqrt((adcs_err**2)*(1/gain)**2 +
                                      (gain_err**2)*((adcs - offset)/gain**2)**2 +
                                      (offset_err**2)*(1/gain)**2)
-    residual = (adcs-offset)/gain - lines
-    res_err = measured_energies_err
-    perc_res = 100 * residual / lines
-    perc_res_err = 100 * res_err / lines
+    residual = gain * lines + offset - adcs
+    res_err = np.sqrt((gain_err ** 2) * (lines ** 2) +
+                      offset_err ** 2 +
+                      adcs_err ** 2)
+    perc_residual = 100 * residual / adcs
+    perc_residual_err = 100 * res_err / adcs
+
+    prediction_discrepancy = (adcs-offset)/gain - lines
+    perc_prediction_discrepancy = 100 * prediction_discrepancy / lines
+    perc_measured_energies_err = 100 * measured_energies_err / lines
 
     margin = (lines[-1] - lines[0]) / 10
     xs = np.linspace(lines[0] - margin, lines[-1] + margin, 10)
 
-    fig, axs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]}, sharex=True, **kwargs)
-    axs[0].errorbar(lines, measured_energies, yerr=measured_energies_err, fmt='o')
-    axs[0].plot(xs, xs)
-    axs[1].errorbar(lines, perc_res, yerr=perc_res_err, fmt='o', capsize=5)
+    fig, axs = plt.subplots(3, 1, gridspec_kw={'height_ratios': [6, 3, 3]}, sharex=True, **kwargs)
+
+    axs[0].errorbar(lines, adcs, yerr=adcs_err, fmt='o')
+    axs[0].plot(xs, gain * xs + offset)
+
+    axs[1].errorbar(lines, perc_residual, yerr=perc_residual_err, fmt='o', capsize=5)
+
+    axs[2].errorbar(lines, perc_prediction_discrepancy, yerr=perc_measured_energies_err, fmt='o', capsize=5)
 
     axs[0].set_ylabel("Measured Energy [keV]")
-    axs[1].set_ylabel("Residuals [%]")
-    axs[1].set_xlabel("Energy [keV]")
+    axs[1].set_ylabel("Residual [%]")
+    axs[2].set_ylabel("Prediction error [%]")
+    axs[2].set_xlabel("Energy [keV]")
     return fig, axs
 
 

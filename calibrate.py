@@ -1,7 +1,9 @@
 from os import cpu_count
 from collections import namedtuple
+
 import pandas as pd
 from pathlib import Path
+
 from source.dataio import get_couples
 from source.dataio import pandas_from
 from source.dataio import infer_onchannels
@@ -9,9 +11,9 @@ from source.dataio import write_report_to_excel
 from source.dataio import write_eventlist_to_fits
 from source.spectra import xcalibrate
 from source.spectra import scalibrate
-from source.spectra import histogram
+from source.spectra import compute_histogram
 from source.spectra import add_evtype_tag
-from source.spectra import make_calibrated_events_list
+from source.spectra import make_events_list
 from source.plot import draw_and_save_diagns
 from source.plot import draw_and_save_channels_xspectra
 from source.plot import draw_and_save_channels_sspectra
@@ -26,13 +28,15 @@ from source.parser import parser
 from source import upaths
 from source import interface
 
-start, stop, step = 15000, 30000, 10
-nbins = int((stop - start) / step)
+
+START, STOP, STEP = 15000, 30000, 10
+NBINS = int((STOP - START) / STEP)
+
 FIT_PARAMS = ["center", "center_err", "fwhm", "fwhm_err", "amp", "amp_err", "lim_low", "lim_high"]
 CAL_PARAMS = ["gain", "gain_err", "offset", "offset_err", "chi2"]
 LO_PARAMS = ['light_out', 'light_out_err']
 
-option = namedtuple('option', ['display','reply', 'action', 'args', 'kwargs'], defaults=[(), {}])
+option = namedtuple('option', ['display', 'reply', 'action', 'args', 'kwargs'], defaults=[(), {}])
 terminate_mescal = option('Goodbye.', 'So soon?', (lambda _: None))
 options = [terminate_mescal]
 
@@ -41,10 +45,10 @@ def get_from(fitspath, use_cache=True):
     cached = upaths.CACHEDIR().joinpath(fitspath.name).with_suffix('.pkl.gz')
     if cached.is_file() and use_cache:
         out = pd.read_pickle(cached)
-        console.log(":white_check_mark: Data were loaded from cache.")
+        console.log(":exclamation_mark: Data were loaded from cache.")
     elif fitspath.is_file():
         out = pandas_from(fitspath)
-        console.log(":white_check_mark: Data loaded.")
+        console.log(":open_book: Data loaded.")
         if use_cache:
             out.to_pickle(cached)
             console.log(":blue_book: Data saved to cache.")
@@ -65,14 +69,6 @@ def merge_flagged_dicts(dx, ds):
     return out
 
 
-def save_event_list_and_plots(data, sdds_calibration, scintillators_lightout, fm1couples, xlines, slines):
-    calibrated_events = make_calibrated_events_list(data, sdds_calibration, scintillators_lightout, fm1couples)
-    write_eventlist_to_fits(calibrated_events, path=upaths.EVLFITS(filepath))
-    draw_and_save_sspectrum(calibrated_events, slines, path=upaths.SSPPLOT(filepath))
-    draw_and_save_xspectrum(calibrated_events, xlines, path=upaths.XSPPLOT(filepath))
-    return True
-
-
 if __name__ == '__main__':
     systhreads = min(4, cpu_count())
     args = parser.parse_args()
@@ -80,7 +76,7 @@ if __name__ == '__main__':
 
     console = interface.boot()
 
-########################################################################################################################
+    ####################################################################################################################
     with console.status("Building dataset.."):
         console.log(":question_mark: Looking for data..")
         filepath = Path(args.filepath_in)
@@ -93,8 +89,9 @@ if __name__ == '__main__':
         filter_events = (lambda df: df[(df['NMULT'] < 2) | ((df['NMULT'] == 2) & (df['EVTYPE'] == 'S'))])
         data = filter_events(data)
         console.log(":white_check_mark: Applied filters.")
-        xbins, xhistograms = histogram(data[data['EVTYPE'] == 'X'], start, nbins, step, nthreads=systhreads)
-        sbins, shistograms = histogram(data[data['EVTYPE'] == 'S'], start, nbins, step, nthreads=systhreads)
+        binning = START, NBINS, STEP
+        xhistograms = compute_histogram(data[data['EVTYPE'] == 'X'], *binning, nthreads=systhreads)
+        shistograms = compute_histogram(data[data['EVTYPE'] == 'S'], *binning, nthreads=systhreads)
         console.log(":white_check_mark: Binned data.")
         onchannels = infer_onchannels(data)
         console.log(":white_check_mark: Found active channels.")
@@ -103,15 +100,13 @@ if __name__ == '__main__':
         to_dfdict = (lambda x, idx: {q: pd.DataFrame(x[q], index=idx).T for q in x.keys()})
 
         if xlines:
-            _xfitdict, _caldict, xflagged = xcalibrate(xbins,
-                                                       xhistograms,
+            _xfitdict, _caldict, xflagged = xcalibrate(xhistograms,
                                                        xlines,
                                                        onchannels)
             xfit_results = to_dfdict(_xfitdict, pd.MultiIndex.from_product((xlines.keys(), FIT_PARAMS,)))
             sdds_calibration = to_dfdict(_caldict, CAL_PARAMS)
             if slines:
-                _sfitdict, _slodict, sflagged = scalibrate(sbins,
-                                                           shistograms,
+                _sfitdict, _slodict, sflagged = scalibrate(shistograms,
                                                            sdds_calibration,
                                                            slines,
                                                            lout_guess=(10., 15.))
@@ -135,16 +130,16 @@ if __name__ == '__main__':
             options.append(option(display="Save uncalibrated plots.",
                                   reply=":sparkles: Saved uncalibrated plots. :sparkles:",
                                   action=draw_and_save_uncalibrated,
-                                  args=(xbins, xhistograms, sbins, shistograms),
+                                  args=(xhistograms, shistograms),
                                   kwargs={'path': upaths.UNCPLOT(filepath),
                                           'nthreads': systhreads}))
         if xfit_results:
             options.append(option(display="Save X fit diagnostic plots.",
                                   reply=":sparkles: Plots saved. :sparkles:",
                                   action=draw_and_save_diagns,
-                                  args=(xbins, xhistograms, xfit_results),
+                                  args=(xhistograms, xfit_results),
                                   kwargs={'path': upaths.XDNPLOT(filepath),
-                                          'nthreads':systhreads}))
+                                          'nthreads': systhreads}))
             options.append(option(display="Save X fit results.",
                                   reply=":sparkles: Fit table saved. :sparkles:",
                                   action=write_report_to_excel,
@@ -160,7 +155,7 @@ if __name__ == '__main__':
             options.append(option(display="Save X channel spectra plots.",
                                   reply=":sparkles: Plots saved. :sparkles:",
                                   action=draw_and_save_channels_xspectra,
-                                  args=(xbins, xhistograms, sdds_calibration, xlines),
+                                  args=(xhistograms, sdds_calibration, xlines),
                                   kwargs={'path': upaths.XCSPLOT(filepath),
                                           'nthreads': systhreads}))
             options.append(option(display="Save X linearity plots.",
@@ -174,7 +169,7 @@ if __name__ == '__main__':
             options.append(option(display="Save S fit diagnostic plots.",
                                   reply=":sparkles: Plots saved. :sparkles:",
                                   action=draw_and_save_diagns,
-                                  args=(sbins, shistograms, sfit_results),
+                                  args=(shistograms, sfit_results),
                                   kwargs={'path': upaths.SDNPLOT(filepath),
                                           'nthreads': systhreads}))
             options.append(option(display="Save S fit results.",
@@ -192,26 +187,30 @@ if __name__ == '__main__':
             options.append(option(display="Save S channel spectra plots.",
                                   reply=":sparkles: Plots saved. :sparkles:",
                                   action=draw_and_save_channels_sspectra,
-                                  args=(sbins, shistograms, sdds_calibration, scintillators_lightout, slines),
+                                  args=(shistograms, sdds_calibration, scintillators_lightout, slines),
                                   kwargs={'path': upaths.SCSPLOT(filepath),
                                           'nthreads': systhreads}))
 
         if sdds_calibration and scintillators_lightout:
-            options.append(option(display="Save calibrated events list and plots.",
-                                  reply=":sparkles: Event list and plots saved. :sparkles:",
-                                  action=save_event_list_and_plots,
-                                  args=(data, sdds_calibration, scintillators_lightout, fm1couples, xlines, slines)))
+            write_eventlist_to_fits_ = (lambda *args: write_eventlist_to_fits(
+                                                        make_events_list(*args,
+                                                                         nthreads=systhreads),
+                                                        upaths.EVLFITS(filepath)))
+            options.append(option(display="Write calibrated events to fits.",
+                                  reply=":sparkles: Event list saved. :sparkles:",
+                                  action=write_eventlist_to_fits_,
+                                  args=(data, sdds_calibration, scintillators_lightout, fm1couples)))
 
-########################################################################################################################
+    ####################################################################################################################
 
     if xflagged or sflagged:
         interface.print_rule(console, "[bold italic]Warning", style='red', align='center')
         flagged = merge_flagged_dicts(xflagged, sflagged)
         console.print(interface.flagged_message(flagged, onchannels))
 
-########################################################################################################################
+    ####################################################################################################################
 
-    interface.print_rule(console, "[italic ]Optional Outputs", align='center')
+    interface.print_rule(console, "[italic]Optional Outputs", align='center')
     console.print(interface.options_message(options))
     while True:
         answer = interface.prompt_execute_option(options)
@@ -226,5 +225,3 @@ if __name__ == '__main__':
     interface.print_rule(console)
 
     goodbye = interface.shutdown(console)
-
-
