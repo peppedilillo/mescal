@@ -1,88 +1,157 @@
+from math import sqrt
+from math import pi
+
 import numpy as np
 import matplotlib.pyplot as plt; plt.style.use('seaborn')
-from joblib import Parallel, delayed
+from joblib import Parallel
+from joblib import delayed
+
+from source.spectra import PHT_KEV
+from assets import radsources
+
+
+def _compute_lims_for_x(lines: dict):
+    if radsources.Am_x60.items() <= lines.items():
+        return 2., 70.
+    return 2., 40.
+
+
+def _compute_lims_for_s(lines: dict):
+    return 20., 1000.
 
 
 def draw_and_save_slo(res_slo, path, nthreads=1):
-    def helper(asic):
-        fig, ax = sloplot(res_slo[asic])
-        ax.set_title("Light output - Quadrant {}".format(asic))
-        fig.savefig(path(asic))
+    def helper(quad):
+        fig, ax = _sloplot(res_slo[quad])
+        ax.set_title("Light output - Quadrant {}".format(quad))
+        fig.savefig(path(quad))
         plt.close(fig)
 
-    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_slo.keys())
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_slo.keys())
 
 
-def draw_and_save_uncalibrated(xbins, xhists, sbins, shists, path, nthreads=1):
-    def helper(asic):
+def draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads=1):
+    def helper(quad):
         for ch in range(32):
-            xcounts = xhists[asic][ch]
-            scounts = shists[asic][ch]
-            fig, ax = uncalibrated(xbins, xcounts, sbins, scounts,
-                                   figsize=(9, 4.5))
-            ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(path(asic, ch))
+            fig, ax = _uncalibrated(xhistograms.bins, xhistograms.counts[quad][ch],
+                                    shistograms.bins, shistograms.counts[quad][ch],
+                                    figsize=(9, 4.5))
+            ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
+            fig.savefig(path(quad, ch))
             plt.close(fig)
 
-    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in xhists.keys())
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in xhistograms.counts.keys())
 
 
-def draw_and_save_diagns(bins, hists, res_fit, path, nthreads=1):
-    def helper(asic):
-        for ch in res_fit[asic].index:
-            fig, ax = diagnostics(bins,
-                                  hists[asic][ch],
-                                  res_fit[asic].loc[ch]['center'],
-                                  res_fit[asic].loc[ch][['lim_low', 'lim_high']].unstack(level=0).values,
-                                  figsize=(9, 4.5))
-            ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(path(asic, ch))
+def draw_and_save_diagns(histograms, res_fit, path, nthreads=1):
+    def helper(quad):
+        for ch in res_fit[quad].index:
+            fig, ax = _diagnostics(histograms.bins,
+                                   histograms.counts[quad][ch],
+                                   res_fit[quad].loc[ch].loc[:, 'center'],
+                                   res_fit[quad].loc[ch].loc[:, 'amp'],
+                                   res_fit[quad].loc[ch].loc[:, 'fwhm'],
+                                   res_fit[quad].loc[ch].loc[:, ['lim_low', 'lim_high']].values.reshape(2, -1).T,
+                                   figsize=(18, 9))
+            ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, quad))
+            fig.savefig(path(quad, ch), dpi=150)
             plt.close(fig)
 
-    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_fit.keys())
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_fit.keys())
 
 
-def draw_and_save_xspectra(bins, hists, res_cal, lines, path, nthreads=1):
-    def helper(asic):
-        for ch in res_cal[asic].index:
-            enbins = (bins - res_cal[asic].loc[ch]['offset']) / res_cal[asic].loc[ch]['gain']
-            fig, ax = spectrum(enbins,
-                               hists[asic][ch],
-                               lines,
-                               elims=(2.0, 40.0),
-                               figsize=(9, 4.5))
-            ax.set_title("Spectra plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(path(asic, ch))
+def draw_and_save_channels_xspectra(histograms, res_cal, lines:dict, path, nthreads=1):
+    def helper(quad):
+        for ch in res_cal[quad].index:
+            enbins = (histograms.bins - res_cal[quad].loc[ch]['offset']) / res_cal[quad].loc[ch]['gain']
+            fig, ax = _spectrum(enbins,
+                                histograms.counts[quad][ch],
+                                lines,
+                                elims=_compute_lims_for_x(lines),
+                                figsize=(9, 4.5))
+            ax.set_title("Spectra plot X - CH{:02d}Q{}".format(ch, quad))
+            fig.savefig(path(quad, ch))
             plt.close(fig)
 
-    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_cal.keys())
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
+
+
+def draw_and_save_channels_sspectra(histograms, res_cal, res_slo, lines: dict, path, nthreads=1):
+    def helper(quad):
+        for ch in res_slo[quad].index:
+            xenbins = (histograms.bins - res_cal[quad].loc[ch]['offset']) / res_cal[quad].loc[ch]['gain']
+            enbins = xenbins/res_slo[quad]['light_out'].loc[ch]/PHT_KEV
+
+            fig, ax = _spectrum(enbins,
+                                histograms.counts[quad][ch],
+                                lines,
+                                elims=_compute_lims_for_s(lines),
+                                figsize=(9, 4.5))
+            ax.set_title("Spectra plot S - CH{:02d}Q{}".format(ch, quad))
+            fig.savefig(path(quad, ch))
+            plt.close(fig)
+
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_slo.keys())
+
+
+def draw_and_save_xspectrum(calibrated_events, lines: dict, path):
+    if not calibrated_events.empty:
+        xevs = calibrated_events[calibrated_events['EVTYPE'] == 'X']
+        xcounts, xbins = np.histogram(xevs['ENERGY'], bins=np.arange(2, 40, 0.05))
+
+        fig, ax = _spectrum(xbins,
+                            xcounts,
+                            lines,
+                            elims=_compute_lims_for_x(lines),
+                            figsize=(9, 4.5))
+        ax.set_title("Spectrum X")
+        fig.savefig(path)
+        plt.close(fig)
+        return True
+
+
+def draw_and_save_sspectrum(calibrated_events, lines: dict, path):
+    if not calibrated_events.empty:
+        sevs = calibrated_events[calibrated_events['EVTYPE'] == 'S']
+        scounts, sbins = np.histogram(sevs['ENERGY'], bins=np.arange(30, 1000, 2))
+
+        fig, ax = _spectrum(sbins,
+                            scounts,
+                            lines,
+                            elims=_compute_lims_for_s(lines),
+                            figsize=(9, 4.5))
+        ax.set_title("Spectrum S")
+        fig.savefig(path)
+        plt.close(fig)
+        return True
 
 
 def draw_and_save_lins(res_cal, res_fit, lines, path, nthreads=1):
-    def helper(asic):
-        for ch in res_cal[asic].index:
-            fig, ax = linearity(*res_cal[asic].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']],
-                                res_fit[asic].loc[ch][['center']].values,
-                                res_fit[asic].loc[ch][['center_err']].values,
-                                lines)
-            ax[0].set_title("Linearity plot - CH{:02d}Q{}".format(ch, asic))
-            fig.savefig(path(asic, ch))
+    def helper(quad):
+        for ch in res_cal[quad].index:
+            fig, ax = _linearity(*res_cal[quad].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']],
+                                 res_fit[quad].loc[ch].loc[:, 'center'],
+                                 res_fit[quad].loc[ch].loc[:, 'center_err'],
+                                 lines,
+                                 figsize=(7,7))
+            ax[0].set_title("Linearity plot - CH{:02d}Q{}".format(ch, quad))
+            fig.savefig(path(quad, ch))
             plt.close(fig)
 
-    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_cal.keys())
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
 
 
 def draw_and_save_qlooks(res_cal, path, nthreads=1):
-    def helper(asic):
-        fig, axs = quicklook(res_cal[asic])
-        axs[0].set_title("Calibration quicklook - Quadrant {}".format(asic))
-        fig.savefig(path(asic))
+    def helper(quad):
+        fig, axs = _quicklook(res_cal[quad])
+        axs[0].set_title("Calibration quicklook - Quadrant {}".format(quad))
+        fig.savefig(path(quad))
         plt.close(fig)
 
-    return Parallel(n_jobs=nthreads)(delayed(helper)(asic) for asic in res_cal.keys())
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
 
 
-def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
+def _uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
     fig, ax = plt.subplots(1, 1, **kwargs)
     ax.step(xbins[:-1], xcounts, label='X events', where='post')
     ax.fill_between(xbins[:-1], xcounts, step="post", alpha=0.2)
@@ -95,22 +164,33 @@ def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
     return fig, ax
 
 
-def diagnostics(bins, counts, centers, limits, **kwargs):
-    colors = [plt.cm.tab10(i) for i in range(len(limits))]
+normal = (lambda x, amp, sigma, x0: amp*np.exp(-(x-x0)**2/(2*sigma**2))/(sigma*sqrt(2*pi)))
 
+
+def _diagnostics(bins, counts, centers, amps, fwhms, limits, **kwargs):
+    low_lims, high_lims = [*zip(*limits)]
+    min_lim, max_lim = min(low_lims) - 500, max(high_lims) + 500
+    start = np.where(bins >= min_lim)[0][0]
+    stop = np.where(bins < max_lim)[0][-1]
+    bins = bins[start:stop + 1]
+    counts = counts[start:stop]
+
+    colors = [plt.cm.tab10(i) for i in range(1, len(limits) + 1)]
     fig, ax = plt.subplots(1, 1, **kwargs)
     ax.step(bins[:-1], counts, where='post')
     ax.fill_between(bins[:-1], counts, step="post", alpha=0.4)
-    for ctr, lims, col in zip(centers, limits, colors):
+    for ctr, amp, fwhm, lims, col in zip(centers, amps, fwhms, limits, colors):
         ax.axvline(ctr, linestyle='dotted')
         ax.axvspan(*lims, color=col, alpha=0.1)
+        xs = np.linspace(*lims, 200)
+        ax.plot(xs, normal(xs, amp, fwhm/2.355, ctr), color=col)
     ax.set_ylim(bottom=0)
     ax.set_ylabel("Counts")
     ax.set_xlabel("ADU")
     return fig, ax
 
 
-def spectrum(enbins, counts, lines: dict, elims=None, **kwargs):
+def _spectrum(enbins, counts, lines: dict={}, elims=None, **kwargs):
     colors = [plt.cm.tab10(i) for i in range(len(lines))]
 
     fig, ax = plt.subplots(**kwargs)
@@ -133,29 +213,44 @@ def spectrum(enbins, counts, lines: dict, elims=None, **kwargs):
     return fig, ax
 
 
-def linearity(gain, gain_err, offset, offset_err, adcs, adcs_err, lines: dict, **kwargs):
-    _, ls = zip(*lines.items())
-    ls = np.array(ls)
-    residual = gain * ls + offset - adcs
-    res_err = np.sqrt((gain_err ** 2) * (ls ** 2) + offset_err ** 2 + adcs_err ** 2)
-    perc_res = 100 * residual / adcs
-    perc_res_err = 100 * res_err / adcs
+def _linearity(gain, gain_err, offset, offset_err, adcs, adcs_err, lines: dict, **kwargs):
+    _, lines = zip(*lines.items())
+    lines = np.array(lines)
+    measured_energies = (adcs - offset)/gain
+    measured_energies_err =  np.sqrt((adcs_err**2)*(1/gain)**2 +
+                                     (gain_err**2)*((adcs - offset)/gain**2)**2 +
+                                     (offset_err**2)*(1/gain)**2)
+    residual = gain * lines + offset - adcs
+    res_err = np.sqrt((gain_err ** 2) * (lines ** 2) +
+                      offset_err ** 2 +
+                      adcs_err ** 2)
+    perc_residual = 100 * residual / adcs
+    perc_residual_err = 100 * res_err / adcs
 
-    margin = (ls[-1] - ls[0]) / 10
-    xs = np.linspace(ls[0] - margin, ls[-1] + margin, 10)
+    prediction_discrepancy = (adcs-offset)/gain - lines
+    perc_prediction_discrepancy = 100 * prediction_discrepancy / lines
+    perc_measured_energies_err = 100 * measured_energies_err / lines
 
-    fig, axs = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]}, sharex=True, tight_layout=True, **kwargs)
-    axs[0].errorbar(ls, adcs, yerr=adcs_err, fmt='o')
+    margin = (lines[-1] - lines[0]) / 10
+    xs = np.linspace(lines[0] - margin, lines[-1] + margin, 10)
+
+    fig, axs = plt.subplots(3, 1, gridspec_kw={'height_ratios': [6, 3, 3]}, sharex=True, **kwargs)
+
+    axs[0].errorbar(lines, adcs, yerr=adcs_err, fmt='o')
     axs[0].plot(xs, gain * xs + offset)
-    axs[1].errorbar(ls, perc_res, yerr=perc_res_err, fmt='o', capsize=5)
 
-    axs[0].set_ylabel("ADU")
-    axs[1].set_ylabel("Residuals [%]")
-    axs[1].set_xlabel("Energy [keV]")
+    axs[1].errorbar(lines, perc_residual, yerr=perc_residual_err, fmt='o', capsize=5)
+
+    axs[2].errorbar(lines, perc_prediction_discrepancy, yerr=perc_measured_energies_err, fmt='o', capsize=5)
+
+    axs[0].set_ylabel("Measured Energy [keV]")
+    axs[1].set_ylabel("Residual [%]")
+    axs[2].set_ylabel("Prediction error [%]")
+    axs[2].set_xlabel("Energy [keV]")
     return fig, axs
 
 
-def quicklook(calres, **kwargs):
+def _quicklook(calres, **kwargs):
     gainpercs = np.percentile(calres['gain'], [30, 70])
     offsetpercs = np.percentile(calres['offset'], [30, 70])
 
@@ -179,10 +274,10 @@ def quicklook(calres, **kwargs):
     return fig, axs
 
 
-def sloplot(res_slo, **kwargs):
+def _sloplot(res_slo, **kwargs):
     x = res_slo.index
-    y = res_slo['light_out'].T.mean()
-    yerr = res_slo['light_out_err'].T.mean()
+    y = res_slo['light_out']
+    yerr = res_slo['light_out_err']
     ypercs = np.percentile(y, [30, 70])
 
     fig, ax = plt.subplots(1,1, **kwargs)

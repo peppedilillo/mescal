@@ -4,16 +4,16 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 from rich.prompt import Confirm
-from rich.progress import track
 from rich.pretty import pprint
+from rich.prompt import IntPrompt
 
 from source.upaths import LOGOPATH
 
 
 hdr_text = Text()\
     .append("Welcome to ", style='italic')\
-    .append("mescal v1.0", style='purple bold')\
-    .append(", a software toolkit to analyze HERMES-TP/SP data.\n", style='italic')
+    .append("mescal v1.0:", style='purple bold')\
+    .append(", a software to analyze HERMES-TP/SP data.\n", style='italic')
 
 
 def boot():
@@ -28,11 +28,6 @@ def boot():
     return console
 
 
-def progress_bar(onchannels, log_to):
-    return {asic: track(onchannels[asic], "Processing ASIC {}..".format(asic), console=log_to)
-            for asic in onchannels.keys()}
-
-
 def df_to_table(df, title):
     table = Table(title=title)
     for i, col in enumerate(df.columns):
@@ -42,7 +37,15 @@ def df_to_table(df, title):
     return table
 
 
-def confirm_prompt(message):
+def flagged_message(flagged, onchannels):
+    message = Text("\nWhile processing data I've found {} channels out of {} "
+                   "for which calibration could not be completed."
+                   .format(sum(len(v) for v in flagged.values()), sum(len(v) for v in onchannels.values())))
+    return message
+
+
+def prompt_display_flagged():
+    message = Text("Display flagged channels? ", style='italic')
     return Confirm.ask(message)
 
 
@@ -51,5 +54,24 @@ def prettyprint(x, **kwargs):
 
 
 def shutdown(console):
-    console.print("\nShutting down, goodbye!\n")
+    console.print("\nShutting down, goodbye! :waving_hand:\n")
     return
+
+
+def options_message(options):
+    line_end = (lambda i: '\n')
+    message = Text.assemble("\nAnything else?\n\n",
+                            *(Text.assemble(("\t{}. ".format(i),"bold magenta"),
+                                            option.display + line_end(i)) for i, option in enumerate(options)))
+    return message
+
+
+def prompt_execute_option(options):
+    message = Text("Select:")
+    choices = [*range(len(options))]
+    return IntPrompt.ask(message, choices=[str(i) for i in choices])
+
+
+def print_rule(console, *args, **kwargs):
+    console.print()
+    console.rule(*args, **kwargs)
