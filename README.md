@@ -2,6 +2,9 @@
 
 Hello and welcome to mescal, your favourite software to analyze HERMES-TP/SP data :).
 
+The packages `lmfit`, `joblib` and `rich` are required to use mescal.
+Mescal CLI is best rendered on modern terminal applications. If you are on windows, try it with the [new Windows terminal](https://link-url-here.org](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701?hl=it-it&gl=IT)!
+
 
 ## calibrate.py
 
