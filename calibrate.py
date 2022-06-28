@@ -76,7 +76,7 @@ if __name__ == '__main__':
     with console.status("Building dataset.."):
         console.log(":question_mark: Looking for data..")
         filepath = Path(args.filepath_in)
-        data = get_from(filepath, use_cache=not args.nocache)
+        data = get_from(filepath, use_cache=args.cache)
 
     with console.status("Preprocessing.."):
         fm1couples = {q: get_couples('fm1', q) for q in 'ABCD'}
