@@ -58,13 +58,16 @@ def SCSDIR(filepath: Path) -> Path:
 def XDNDIR(filepath: Path) -> Path:
     return PLTDIR(filepath).joinpath("diagnostics_x")
 
+
 @create_if_not_exists
 def SDNDIR(filepath: Path) -> Path:
     return PLTDIR(filepath).joinpath("diagnostics_s")
 
+
 @create_if_not_exists
 def FLGDIR(filepath: Path) -> Path:
     return PLTDIR(filepath).joinpath("flagged")
+
 
 @create_if_not_exists
 def UNCDIR(filepath: Path) -> Path:

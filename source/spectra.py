@@ -13,7 +13,6 @@ PHT_KEV = 3.65 / 1000
 histograms_collection = namedtuple('histogram', ['bins', 'counts'])
 
 
-
 def make_events_list(data, calibrated_sdds, calibrated_scintillators, scintillator_couples, nthreads=1):
     columns = ['TIME', 'ENERGY', 'EVTYPE', 'CHN', 'QUADID']
     types = ['float64', 'float32', 'U1', 'int8', 'U1']
@@ -92,10 +91,10 @@ def _insert_xenergy_column(data, calibrated_sdds):
 def scalibrate(histograms, cal_df, lines, lout_guess):
     results_fit, results_slo, flagged = {}, {}, {}
     line_keys, line_values = zip(*lines.items())
-    for asic in cal_df.keys():
-        for ch in cal_df[asic].index:
-            counts = histograms.counts[asic][ch]
-            gain, gain_err, offset = cal_df[asic].loc[ch][['gain', 'gain_err', 'offset']]
+    for quad in cal_df.keys():
+        for ch in cal_df[quad].index:
+            counts = histograms.counts[quad][ch]
+            gain, gain_err, offset = cal_df[quad].loc[ch][['gain', 'gain_err', 'offset']]
             try:
                 guesses = [[lout_lim * PHT_KEV * lv * gain + offset for lout_lim in lout_guess] for lv in line_values]
                 limits = _estimate_peaks_from_guess(histograms.bins, counts, guess=guesses)
@@ -103,11 +102,11 @@ def scalibrate(histograms, cal_df, lines, lout_guess):
                 los, lo_errs = _compute_louts(centers, center_errs, gain, gain_err, offset, line_values)
                 lo, lo_err = _do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_lines(los, lo_errs)
             except DetectPeakError:
-                flagged.setdefault(asic, []).append(ch)
+                flagged.setdefault(quad, []).append(ch)
             else:
-                results_fit.setdefault(asic, {})[ch] = np.column_stack(
+                results_fit.setdefault(quad, {})[ch] = np.column_stack(
                     (centers, center_errs, *etc, *limits.T)).flatten()
-                results_slo.setdefault(asic, {})[ch] = np.array((lo, lo_err))
+                results_slo.setdefault(quad, {})[ch] = np.array((lo, lo_err))
     return results_fit, results_slo, flagged
 
 
@@ -150,9 +149,9 @@ def _compute_louts(centers, center_errs, gain, gain_err, offset, lines):
 def xcalibrate(histograms, lines, channels):
     results_fit, results_cal, flagged = {}, {}, {}
     lines_keys, lines_values = zip(*lines.items())
-    for asic in channels.keys():
-        for ch in channels[asic]:
-            counts = histograms.counts[asic][ch]
+    for quad in channels.keys():
+        for ch in channels[quad]:
+            counts = histograms.counts[quad][ch]
             try:
                 if len(lines_values) > 2:
                     limits = _estimate_peakpos_from_lratio(histograms.bins, counts, lines_values)
@@ -161,11 +160,11 @@ def xcalibrate(histograms, lines, channels):
                 centers, center_errs, *etc = _fit_peaks(histograms.bins, counts, limits, weights='amplitude')
                 gain, gain_err, offset, offset_err, chi2 = _calibrate_chn(centers, center_errs, lines_values)
             except DetectPeakError:
-                flagged.setdefault(asic, []).append(ch)
+                flagged.setdefault(quad, []).append(ch)
             else:
-                results_fit.setdefault(asic, {})[ch] = np.column_stack(
+                results_fit.setdefault(quad, {})[ch] = np.column_stack(
                     (centers, center_errs, *etc, *limits.T)).flatten()
-                results_cal.setdefault(asic, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
+                results_cal.setdefault(quad, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
     return results_fit, results_cal, flagged
 
 

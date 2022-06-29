@@ -16,27 +16,27 @@ def read_report_from_excel(from_path):
     return pd.read_excel(from_path, index_col=0, sheet_name=None)
 
 
-def write_report_to_csv(result_df, path):
-    for quad, df in result_df.items():
-        df.to_csv(path(quad, quad))
-    return True
-
-
-def read_report_from_csv(from_path):
-    pass
-
-
 def write_report_to_fits(result_df, path):
     header = fitsio.PrimaryHDU()
     output = fitsio.HDUList([header])
     for quad in result_df.keys():
-        table_quad = fitsio.BinTableHDU.from_columns(result_df[quad].to_records(), name=quad)
+        table_quad = fitsio.BinTableHDU.from_columns(result_df[quad].to_records(), name="Quadrant " + quad)
         output.append(table_quad)
-    output.writeto(path, overwrite=True)
+    output.writeto(path.with_suffix('.fits'), overwrite=True)
     return True
 
 
 def read_report_from_fits(path):
+    pass
+
+
+def write_report_to_csv(result_df, path):
+    for quad, df in result_df.items():
+        df.to_csv(path.with_name(path.stem + '_quad{}'.format(quad)).with_suffix('.csv'))
+    return True
+
+
+def read_report_from_csv(from_path):
     pass
 
 

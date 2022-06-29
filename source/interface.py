@@ -12,19 +12,17 @@ from source.upaths import LOGOPATH
 
 hdr_text = Text()\
     .append("Welcome to ", style='italic')\
-    .append("mescal ", style='purple bold')\
+    .append("mescal", style='purple bold')\
     .append(", a software to analyze HERMES-TP/SP data.\n", style='italic')
 
 
-def boot():
+def hello():
     console = Console()
     with open(LOGOPATH, 'r') as logo:
         for i, line in enumerate(logo.readlines()):
             console.print(line.strip("\n"), style="bold color({})".format(int(i + 160)), justify='center');
             sleep(0.1)
-    console.print()
-    console.rule(hdr_text)
-    console.print()
+    print_rule(console, hdr_text)
     return console
 
 
@@ -73,5 +71,6 @@ def prompt_user_about(options):
 
 
 def print_rule(console, *args, **kwargs):
+    sleep(0.2)
     console.print()
     console.rule(*args, **kwargs)

@@ -5,11 +5,12 @@ import pandas as pd
 from pathlib import Path
 
 from source.io import pandas_from
-from source.io import write_report_to_excel
 from source.io import write_eventlist_to_fits
+from source.io import write_report_to_excel
 from source.wrangle import get_couples
 from source.wrangle import add_evtype_tag
 from source.wrangle import infer_onchannels
+from source.wrangle import filter_delay
 from source.spectra import xcalibrate
 from source.spectra import scalibrate
 from source.spectra import compute_histogram
@@ -22,14 +23,15 @@ from source.plot import draw_and_save_uncalibrated
 from source.plot import draw_and_save_slo
 from source.plot import draw_and_save_lins
 from source.parser import compile_sources_dicts
+from source.parser import get_writer
 from source.parser import parser
 from source import upaths
 from source import interface
 
-
-START, STOP, STEP = 15000, 30000, 10
+START, STOP, STEP = 15000, 28000, 10
 NBINS = int((STOP - START) / STEP)
 BINNING = (START, NBINS, STEP)
+RETRIGGER_TIME_IN_S = 20 * (10**-6)
 
 FIT_PARAMS = [
     "center",
@@ -59,7 +61,7 @@ options = [terminate_mescal]
 
 
 def run():
-    console = interface.boot()
+    console = interface.hello()
 
     with console.status("Building dataset.."):
         data = get_from(filepath, console, use_cache=args.cache)
@@ -78,7 +80,7 @@ def run():
     if any(flagged):
         warn_about_flagged(flagged, channels, console)
 
-    deal_with_user_asking_for_more(options, console)
+    anything_else(options, console)
 
     goodbye = interface.shutdown(console)
 
@@ -107,9 +109,11 @@ def preprocess(data, detector_couples, console):
     console.log(":white_check_mark: Found active channels.")
     data = add_evtype_tag(data, detector_couples)
     console.log(":white_check_mark: Tagged X and S events.")
-    filter_events = (lambda df: df[(df["NMULT"] < 2) | ((df["NMULT"] == 2) & (df["EVTYPE"] == "S"))])
-    data = filter_events(data)
-    console.log(":white_check_mark: Applied filters.")
+    events_pre_filter = len(data)
+    remove_retrigger_and = (lambda df: filter_delay(df, hold_time=RETRIGGER_TIME_IN_S))
+    spurious_from = (lambda df: df[(df["NMULT"] < 2) | ((df["NMULT"] == 2) & (df["EVTYPE"] == "S"))])
+    data = remove_retrigger_and(spurious_from(data))
+    console.log(":white_check_mark: Filtered out {:.1f}% of the events.".format(100*(events_pre_filter - len(data))/events_pre_filter))
     return data, channels
 
 
@@ -120,7 +124,7 @@ def make_histograms(data, binning, console):
     return xhistograms, shistograms
 
 
-def inspect(calibrations, flagged, console):
+def inspect(fits, calibrations, flagged, console):
     sdds_calibration, scintillators_lightout = calibrations
 
     if not sdds_calibration and not scintillators_lightout:
@@ -200,13 +204,13 @@ def process_results(
             )
         )
         options.append(
-            _write_xfit_report_to_excel(
+            _write_xfit_report(
                 xfit_results, upaths.XFTREPORT(filepath)
             )
         )
 
     if sdds_calibration:
-        write_report_to_excel(
+        write_report(
             sdds_calibration, path=upaths.CALREPORT(filepath)
         )
         console.log(":blue_book: Wrote SDD calibration results.")
@@ -243,13 +247,13 @@ def process_results(
             )
         )
         options.append(
-            _write_sfit_report_to_excel(
+            _write_sfit_report(
                 sfit_results, upaths.SFTREPORT(filepath)
             )
         )
 
     if scintillators_lightout:
-        write_report_to_excel(
+        write_report(
             scintillators_lightout,
             path=upaths.SLOREPORT(filepath)
         )
@@ -341,7 +345,7 @@ def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
     )
 
 
-def _write_xfit_report_to_excel(fit_results, path):
+def _write_xfit_report(fit_results, path):
     return option(
         display="Save X fit results.",
         reply=":sparkles: Fit table saved. :sparkles:",
@@ -351,7 +355,7 @@ def _write_xfit_report_to_excel(fit_results, path):
     )
 
 
-def _write_sfit_report_to_excel(fit_results, path):
+def _write_sfit_report(fit_results, path):
     return option(
         display="Save S fit results.",
         reply=":sparkles: Fit table saved. :sparkles:",
@@ -427,8 +431,6 @@ def _write_eventlist_to_fits(thunk, path):
                   reply=":sparkles: Event list saved. :sparkles:",
                   promise=promise(lambda : write_eventlist_to_fits(thunk(), path)))
 
-    return True
-
 
 def promise(f):
     return [0, f]
@@ -437,15 +439,16 @@ def promise(f):
 def fulfill(opt):
     car, cdr = opt
     if car:
-        print("We already did that..\n")
+        print("We already did that..")
     else:
-        car = 1
+        opt[0] = 1
         return cdr()
 
 
-def deal_with_user_asking_for_more(options, console):
+def anything_else(options, console):
     interface.print_rule(console, "[italic]Optional Outputs", align="center")
     console.print(interface.options_message(options))
+
     while True:
         answer = interface.prompt_user_about(options)
         if answer is terminate_mescal:
@@ -455,7 +458,9 @@ def deal_with_user_asking_for_more(options, console):
             with console.status("Working.."):
                 if fulfill(answer.promise):
                     console.print(answer.reply)
+
     interface.print_rule(console)
+    return True
 
 
 if __name__ == "__main__":
@@ -463,5 +468,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     filepath = Path(args.filepath_in)
     lines = compile_sources_dicts(args.lines)
+    write_report = get_writer(args.fmt)
 
     run()
+
