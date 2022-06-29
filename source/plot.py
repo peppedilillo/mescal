@@ -52,9 +52,9 @@ def draw_and_save_diagns(histograms, res_fit, path, nthreads=1):
                                    res_fit[quad].loc[ch].loc[:, 'amp'],
                                    res_fit[quad].loc[ch].loc[:, 'fwhm'],
                                    res_fit[quad].loc[ch].loc[:, ['lim_low', 'lim_high']].values.reshape(2, -1).T,
-                                   figsize=(18, 9))
+                                   figsize=(9, 4.5))
             ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, quad))
-            fig.savefig(path(quad, ch), dpi=150)
+            fig.savefig(path(quad, ch))
             plt.close(fig)
 
     return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_fit.keys())

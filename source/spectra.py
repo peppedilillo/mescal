@@ -6,14 +6,12 @@ from joblib import Parallel, delayed
 from lmfit.models import GaussianModel
 from lmfit.models import LinearModel
 from scipy.signal import find_peaks
+from source.errors import DetectPeakError
 
 PHT_KEV = 3.65 / 1000
 
 histograms_collection = namedtuple('histogram', ['bins', 'counts'])
 
-
-class DetectPeakError(Exception):
-    """An error while finding peaks."""
 
 
 def make_events_list(data, calibrated_sdds, calibrated_scintillators, scintillator_couples, nthreads=1):
@@ -149,11 +147,11 @@ def _compute_louts(centers, center_errs, gain, gain_err, offset, lines):
     return light_outs, light_out_errs
 
 
-def xcalibrate(histograms, lines, onchannels):
+def xcalibrate(histograms, lines, channels):
     results_fit, results_cal, flagged = {}, {}, {}
     lines_keys, lines_values = zip(*lines.items())
-    for asic in onchannels.keys():
-        for ch in onchannels[asic]:
+    for asic in channels.keys():
+        for ch in channels[asic]:
             counts = histograms.counts[asic][ch]
             try:
                 if len(lines_values) > 2:
@@ -271,25 +269,3 @@ def compute_histogram(data, start, nbins, step, nthreads=1):
 def move_mean(arr, n):
     return pd.Series(arr).rolling(n, center=True).mean().to_numpy()
 
-
-s2i = (lambda quad: "ABCD".find(str.upper(quad)))
-i2s = (lambda n: chr(65 + n))
-
-
-def add_evtype_tag(data, couples):
-    """
-    inplace add event type (X or S) column
-    :param data:
-    :return:
-    """
-    data['CHN'] = data['CHN'] + 1
-    qm = data['QUADID'].map({key: 100 ** s2i(key) for key in 'ABCD'})
-    chm_dict = dict(np.concatenate([(couples[key] + 1) * 100 ** s2i(key) for key in couples.keys()]))
-    chm = data['CHN'] * qm
-    data.insert(loc=3, column='EVTYPE', value=(data
-                                               .assign(CHN=chm.map(chm_dict).fillna(chm))
-                                               .duplicated(['SID', 'CHN'], keep=False)
-                                               .map({False: 'X', True: 'S'})
-                                               .astype('string')))
-    data['CHN'] = data['CHN'] - 1
-    return data

@@ -44,7 +44,7 @@ def flagged_message(flagged, onchannels):
     return message
 
 
-def prompt_display_flagged():
+def prompt_user_flagged():
     message = Text("Display flagged channels? ", style='italic')
     return Confirm.ask(message)
 
@@ -66,10 +66,10 @@ def options_message(options):
     return message
 
 
-def prompt_execute_option(options):
+def prompt_user_about(options):
     message = Text("Select:")
     choices = [*range(len(options))]
-    return IntPrompt.ask(message, choices=[str(i) for i in choices])
+    return options[IntPrompt.ask(message, choices=[str(i) for i in choices])]
 
 
 def print_rule(console, *args, **kwargs):
