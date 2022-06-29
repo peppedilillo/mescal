@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser(description="A toolkit for the analysis and vis
 parser.add_argument("filepath_in",
                     help="input file")
 parser.add_argument("--cache", action="store_true",
-                    help="disable loading and saving from cache.")
+                    help="enable loading and saving from cache.")
 parser.add_argument("-l", "--lines",
                     help="radioactive sources used for calibration."
                          "separated by comma, e.g.:  `-l=Fe,Cd,Cs`."
