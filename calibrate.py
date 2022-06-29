@@ -36,7 +36,7 @@ CAL_PARAMS = ["gain", "gain_err", "offset", "offset_err", "chi2"]
 LO_PARAMS = ['light_out', 'light_out_err']
 
 option = namedtuple('option', ['display', 'reply', 'promise'])
-terminate_mescal = option('Goodbye.', 'So soon?', (lambda _: None))
+terminate_mescal = option('Goodbye.', 'So soon?', lambda _: None)
 options = [terminate_mescal]
 
 
@@ -56,49 +56,49 @@ def fulfill(option):
 def _draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads):
     return option(display="Save uncalibrated plots.",
                   reply=":sparkles: Saved uncalibrated plots. :sparkles:",
-                  promise=promise((lambda : draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads))))
+                  promise=promise(lambda : draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads)))
 
 
 def _draw_and_save_xdiagns(histograms, fit_results, path, nthreads):
     return option(display="Save X fit diagnostic plots.",
                   reply=":sparkles: Plots saved. :sparkles:",
-                  promise=promise((lambda : draw_and_save_diagns(histograms, fit_results, path, nthreads))))
+                  promise=promise(lambda : draw_and_save_diagns(histograms, fit_results, path, nthreads)))
 
 
 def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
     return option(display="Save S fit diagnostic plots.",
                   reply=":sparkles: Plots saved. :sparkles:",
-                  promise=promise((lambda : draw_and_save_diagns(histograms, fit_results, path, nthreads))))
+                  promise=promise(lambda : draw_and_save_diagns(histograms, fit_results, path, nthreads)))
 
 
 def _write_xfit_report_to_excel(fit_results, path):
     return option(display="Save X fit results.",
                   reply=":sparkles: Fit table saved. :sparkles:",
-                  promise=promise((lambda : write_report_to_excel(fit_results, path))))
+                  promise=promise(lambda : write_report_to_excel(fit_results, path)))
 
 
 def _write_sfit_report_to_excel(fit_results, path):
     return option(display="Save S fit results.",
                   reply=":sparkles: Fit table saved. :sparkles:",
-                  promise=promise((lambda : write_report_to_excel(fit_results, path))))
+                  promise=promise(lambda : write_report_to_excel(fit_results, path)))
 
 
 def _draw_and_save_channels_xspectra(xhistograms, sdds_calibration, xlines, path, nthreads):
     return option(display="Save X channel spectra plots.",
                   reply=":sparkles: Plots saved. :sparkles:",
-                  promise=promise((lambda : draw_and_save_channels_xspectra(xhistograms, sdds_calibration, xlines, path, nthreads))))
+                  promise=promise(lambda : draw_and_save_channels_xspectra(xhistograms, sdds_calibration, xlines, path, nthreads)))
 
 
 def _draw_and_save_channels_sspectra(shistograms, sdds_calibration, scintillators_lightout, slines, path, nthreads):
     return option(display="Save S channel spectra plots.",
                   reply=":sparkles: Plots saved. :sparkles:",
-                  promise=promise((lambda : draw_and_save_channels_sspectra(shistograms, sdds_calibration, scintillators_lightout, slines, path, nthreads))))
+                  promise=promise(lambda : draw_and_save_channels_sspectra(shistograms, sdds_calibration, scintillators_lightout, slines, path, nthreads)))
 
 
 def _draw_and_save_lins(sdds_calibration, xfit_results, xlines, path, nthreads):
     return option(display="Save X linearity plots.",
                  reply=":sparkles: Plots saved. :sparkles:",
-                 promise=promise((lambda : draw_and_save_lins(sdds_calibration, xfit_results, xlines, path, nthreads))))
+                 promise=promise(lambda : draw_and_save_lins(sdds_calibration, xfit_results, xlines, path, nthreads)))
 
 
 def _write_eventlist_to_fits(thunk,path):
@@ -110,7 +110,7 @@ def _write_eventlist_to_fits(thunk,path):
     """
     return option(display="Write calibrated events to fits.",
                   reply=":sparkles: Event list saved. :sparkles:",
-                  promise=promise((lambda : write_eventlist_to_fits(thunk(), path))))
+                  promise=promise(lambda : write_eventlist_to_fits(thunk(), path)))
 
 
 
@@ -175,7 +175,7 @@ def inspect(fits, calibrations, flagged, console):
 
 
 def calibrate(xhistograms, shistograms, xlines, slines, channels):
-    to_dfdict = (lambda x, idx: {q: pd.DataFrame(x[q], index=idx).T for q in x.keys()})
+    to_dfdict = lambda x, idx: {q: pd.DataFrame(x[q], index=idx).T for q in x.keys()}
 
     if xlines:
         _xfitdict, _caldict, xflagged = xcalibrate(xhistograms, xlines, channels)
@@ -231,7 +231,7 @@ def process_results(filepath, detector_couples, data, histograms, lines, results
 
     if sdds_calibration and scintillators_lightout:
         options.append(_write_eventlist_to_fits(
-            (lambda: make_events_list(data, sdds_calibration, scintillators_lightout, detector_couples)),
+            lambda: make_events_list(data, sdds_calibration, scintillators_lightout, detector_couples),
             upaths.EVLFITS(filepath)))
     return True
 
