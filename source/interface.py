@@ -12,7 +12,7 @@ from source.upaths import LOGOPATH
 
 hdr_text = Text()\
     .append("Welcome to ", style='italic')\
-    .append("mescal v1.0:", style='purple bold')\
+    .append("mescal ", style='purple bold')\
     .append(", a software to analyze HERMES-TP/SP data.\n", style='italic')
 
 
