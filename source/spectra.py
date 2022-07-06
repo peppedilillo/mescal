@@ -8,6 +8,9 @@ from lmfit.models import LinearModel
 from scipy.signal import find_peaks
 from source.errors import DetectPeakError
 
+MM_WINDOW = 5
+PEAK_PROMINENCE = 10
+PEAK_WIDTH = 4
 PHT_KEV = 3.65 / 1000
 
 histograms_collection = namedtuple('histogram', ['bins', 'counts'])
@@ -127,8 +130,8 @@ def _closest_peaks(guess, peaks, peaks_infos):
 
 
 def _estimate_peaks_from_guess(bins, counts, guess, limratio=(1, 1)):
-    mm = move_mean(counts, 5)
-    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=10, width=5)
+    mm = move_mean(counts, MM_WINDOW)
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=PEAK_PROMINENCE, width=PEAK_WIDTH)
     if len(unfiltered_peaks) >= len(guess):
         peaks, peaks_info = _closest_peaks(guess, unfiltered_peaks, unfiltered_peaks_info)
     else:
@@ -146,8 +149,8 @@ def _compute_louts(centers, center_errs, gain, gain_err, offset, lines):
     return light_outs, light_out_errs
 
 
-def xcalibrate(histograms, lines, channels):
-    results_fit, results_cal, flagged = {}, {}, {}
+def xcalibrate(histograms, lines, channels, results_xfit=None):
+    results_xfit, results_cal, flagged = {}, {}, {}
     lines_keys, lines_values = zip(*lines.items())
     for quad in channels.keys():
         for ch in channels[quad]:
@@ -162,10 +165,10 @@ def xcalibrate(histograms, lines, channels):
             except DetectPeakError:
                 flagged.setdefault(quad, []).append(ch)
             else:
-                results_fit.setdefault(quad, {})[ch] = np.column_stack(
+                results_xfit.setdefault(quad, {})[ch] = np.column_stack(
                     (centers, center_errs, *etc, *limits.T)).flatten()
                 results_cal.setdefault(quad, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
-    return results_fit, results_cal, flagged
+    return results_xfit, results_cal, flagged
 
 
 def _filter_peaks_lratio(lines: list, peaks, peaks_infos):
@@ -176,15 +179,15 @@ def _filter_peaks_lratio(lines: list, peaks, peaks_infos):
     norm_ls = normalize(lines)
     norm_ps = [*map(normalize, peaks_combinations)]
     weights = [*map(weight, combinations(peaks_infos["prominences"], r=len(lines)))]
-    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)) / weights
+    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)) #/ weights
                   , axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
     return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
 
 
 def _estimate_peakpos_from_lratio(bins, counts, lines: list):
-    mm = move_mean(counts, 5)
-    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=20, width=5)
+    mm = move_mean(counts, MM_WINDOW)
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=PEAK_PROMINENCE, width=PEAK_WIDTH)
     if len(unfiltered_peaks) >= len(lines):
         peaks, peaks_info = _filter_peaks_lratio(lines, unfiltered_peaks, unfiltered_peaks_info)
     else:
