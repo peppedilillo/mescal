@@ -55,4 +55,8 @@ def compile_sources_dicts(sources_string):
             slines.update(radsources.s_sources[element])
         else:
             raise SourceNotFoundError("unknown calibration source source.")
+
+    # TODO: this is shit find better solution
+    xlines = {k: v for k, v in sorted(xlines.items(), key=lambda item: item[1])}
+    slines = {k: v for k, v in sorted(slines.items(), key=lambda item: item[1])}
     return xlines, slines
