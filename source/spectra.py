@@ -8,9 +8,16 @@ from lmfit.models import LinearModel
 from scipy.signal import find_peaks
 from source.errors import DetectPeakError
 
-MM_WINDOW = 5
-PEAK_PROMINENCE = 10
-PEAK_WIDTH = 4
+
+XPEAK_PARAMETERS = {'smoothing': 5,
+                   'prominence': 20,
+                   'width': 5}
+
+SPEAK_PARAMETERS = {'smoothing': 5,
+                   'prominence': 20,
+                   'width': 5}
+
+
 PHT_KEV = 3.65 / 1000
 
 histograms_collection = namedtuple('histogram', ['bins', 'counts'])
@@ -129,15 +136,14 @@ def _closest_peaks(guess, peaks, peaks_infos):
     return best_peaks, {key: val[argmin] for key, val in peaks_infos.items()}
 
 
-def _estimate_peaks_from_guess(bins, counts, guess, limratio=(1, 1)):
-    mm = move_mean(counts, MM_WINDOW)
-    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=PEAK_PROMINENCE, width=PEAK_WIDTH)
+def _estimate_peaks_from_guess(bins, counts, guess, parameters=SPEAK_PARAMETERS):
+    mm = move_mean(counts, parameters['smoothing'])
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=parameters['prominence'], width=parameters['width'])
     if len(unfiltered_peaks) >= len(guess):
         peaks, peaks_info = _closest_peaks(guess, unfiltered_peaks, unfiltered_peaks_info)
     else:
         raise DetectPeakError("candidate peaks are less than lines to fit.")
-    lo_r, hi_r = limratio
-    limits = [(bins[int(p - w * lo_r)], bins[int(p + w * hi_r)]) for p, w in zip(peaks, peaks_info['widths'])]
+    limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
     return np.array(limits).reshape(len(peaks), 2)
 
 
@@ -155,19 +161,24 @@ def xcalibrate(histograms, lines, channels, results_xfit=None):
     for quad in channels.keys():
         for ch in channels[quad]:
             counts = histograms.counts[quad][ch]
+
             try:
-                if len(lines_values) > 2:
-                    limits = _estimate_peakpos_from_lratio(histograms.bins, counts, lines_values)
-                else:
-                    raise DetectPeakError("not enough lines to calibrate.")
-                centers, center_errs, *etc = _fit_peaks(histograms.bins, counts, limits, weights='amplitude')
-                gain, gain_err, offset, offset_err, chi2 = _calibrate_chn(centers, center_errs, lines_values)
+                limits = _estimate_peakpos_from_lratio(histograms.bins, counts, lines_values)
             except DetectPeakError:
                 flagged.setdefault(quad, []).append(ch)
-            else:
-                results_xfit.setdefault(quad, {})[ch] = np.column_stack(
-                    (centers, center_errs, *etc, *limits.T)).flatten()
-                results_cal.setdefault(quad, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
+                continue
+
+            centers, center_errs, *etc = _fit_peaks(histograms.bins, counts, limits, weights='amplitude')
+
+            try:
+                gain, gain_err, offset, offset_err, chi2 = _calibrate_chn(centers, center_errs, lines_values)
+            except ValueError:
+                flagged.setdefault(quad, []).append(ch)
+                continue
+
+            results_xfit.setdefault(quad, {})[ch] = np.column_stack(
+                (centers, center_errs, *etc, *limits.T)).flatten()
+            results_cal.setdefault(quad, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
     return results_xfit, results_cal, flagged
 
 
@@ -185,9 +196,11 @@ def _filter_peaks_lratio(lines: list, peaks, peaks_infos):
     return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
 
 
-def _estimate_peakpos_from_lratio(bins, counts, lines: list):
-    mm = move_mean(counts, MM_WINDOW)
-    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=PEAK_PROMINENCE, width=PEAK_WIDTH)
+def _estimate_peakpos_from_lratio(bins, counts, lines: list, parameters=XPEAK_PARAMETERS):
+    if len(lines) < 3:
+        raise DetectPeakError("not enough lines to calibrate.")
+    mm = move_mean(counts, parameters['smoothing'])
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=parameters['prominence'], width=parameters['width'])
     if len(unfiltered_peaks) >= len(lines):
         peaks, peaks_info = _filter_peaks_lratio(lines, unfiltered_peaks, unfiltered_peaks_info)
     else:
