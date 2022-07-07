@@ -18,4 +18,4 @@ To launch `calibrate.py` over a calibration acquisition of 55Fe, 109Cd and 137Cs
 1. Move to the mescal directory.
 2. Launch `python calibrate.py --lines=Fe,Cd,Cs "C:\somepath\acquisition_LV0d5.fits"`
 
-For more informations and options regarding `calibrate.py`, try the helper via `python calibrate.py --helper`.
+For more informations and options regarding `calibrate.py`, try the helper via `python calibrate.py --help`.

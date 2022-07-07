@@ -11,8 +11,8 @@ from source.errors import DetectPeakError
 
 XPEAK_PARAMETERS = {
     'smoothing': 5,
-    'prominence': 5,
-    'width': 5,
+    'prominence': 3,
+    'width': 3,
 }
 
 SPEAK_PARAMETERS = {
@@ -107,12 +107,12 @@ def scalibrate(histograms, cal_df, lines, lout_guess):
     for quad in cal_df.keys():
         for ch in cal_df[quad].index:
             counts = histograms.counts[quad][ch]
-            gain, gain_err, offset = cal_df[quad].loc[ch][['gain', 'gain_err', 'offset']]
+            gain, gain_err, offset, offset_err = cal_df[quad].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']]
             try:
                 guesses = [[lout_lim * PHT_KEV * lv * gain + offset for lout_lim in lout_guess] for lv in line_values]
                 limits = _estimate_peaks_from_guess(histograms.bins, counts, guess=guesses)
                 centers, center_errs, *etc = _fit_peaks(histograms.bins, counts, limits)
-                los, lo_errs = _compute_louts(centers, center_errs, gain, gain_err, offset, line_values)
+                los, lo_errs = _compute_louts(centers, center_errs, gain, gain_err, offset, offset_err, line_values)
                 lo, lo_err = _do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_lines(los, lo_errs)
             except DetectPeakError:
                 flagged.setdefault(quad, []).append(ch)
@@ -150,11 +150,11 @@ def _estimate_peaks_from_guess(bins, counts, guess, parameters=SPEAK_PARAMETERS)
     return np.array(limits).reshape(len(peaks), 2)
 
 
-def _compute_louts(centers, center_errs, gain, gain_err, offset, lines):
+def _compute_louts(centers, center_errs, gain, gain_err, offset, offset_err, lines):
     light_outs = (centers - offset) / gain / PHT_KEV / lines
     light_out_errs = np.sqrt((center_errs / gain) ** 2
                              + (offset_err / gain) ** 2
-                             + ((centers - offset) / gain ** 2) * (gain_err ** 2) / PHT_KEV / lines
+                             + ((centers - offset) / gain ** 2) * (gain_err ** 2)) / PHT_KEV / lines
     return light_outs, light_out_errs
 
 
@@ -193,7 +193,8 @@ def _filter_peaks_lratio(lines: list, peaks, peaks_infos):
     norm_ls = normalize(lines)
     norm_ps = [*map(normalize, peaks_combinations)]
     weights = [*map(weight, combinations(peaks_infos["prominences"], r=len(lines)))]
-    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)) / weights, axis=1)
+    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)) #/ weights
+                  , axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
     return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
 
@@ -201,12 +202,15 @@ def _filter_peaks_lratio(lines: list, peaks, peaks_infos):
 def _estimate_peakpos_from_lratio(bins, counts, lines: list, parameters=XPEAK_PARAMETERS):
     if len(lines) < 3:
         raise DetectPeakError("not enough lines to calibrate.")
+
     mm = move_mean(counts, parameters['smoothing'])
     unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=parameters['prominence'], width=parameters['width'])
+
     if len(unfiltered_peaks) >= len(lines):
         peaks, peaks_info = _filter_peaks_lratio(lines, unfiltered_peaks, unfiltered_peaks_info)
     else:
         raise DetectPeakError("candidate peaks are less than lines to fit.")
+
     limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
     return np.array(limits).reshape(len(peaks), 2)
 
