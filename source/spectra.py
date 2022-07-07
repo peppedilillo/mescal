@@ -141,9 +141,9 @@ def _estimate_peaks_from_guess(bins, counts, guess, limratio=(1, 1)):
 
 def _compute_louts(centers, center_errs, gain, gain_err, offset, lines):
     light_outs = (centers - offset) / gain / PHT_KEV / lines
-    light_out_errs = np.sqrt((center_errs / offset) ** 2
-                             + (gain_err / offset) ** 2
-                             + ((centers - gain) / offset) ** 2) / PHT_KEV / lines
+    light_out_errs = np.sqrt((center_errs / gain) ** 2
+                             + (offset_err / gain) ** 2
+                             + ((centers - offset) / gain) ** 2) / PHT_KEV / lines
     return light_outs, light_out_errs
 
 
