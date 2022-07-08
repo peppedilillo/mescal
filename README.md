@@ -8,7 +8,7 @@ Mescal CLI is best rendered on modern terminal applications. If you are on windo
 
 ## calibrate.py
 
-This script is for calibrating the SDD and scintillators of the HERMES detector. 
+This script is for calibrating the SDDs and scintillators of the HERMES detector. 
 It supposes you have an acquisition of some radioactive sources ready in the standard HERMES 0.5 fits format.
 
 _Example:_

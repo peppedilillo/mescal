@@ -24,7 +24,7 @@ parser.add_argument("--fmt", default='xslx',
 parser.add_argument("-l", "--lines",
                     help="radioactive sources used for calibration. "
                          "separated by comma, e.g.:  `-l=Fe,Cd,Cs`. "
-                         "currently supported sources: Fe, Cd, Cs, Am.")
+                         "currently supported sources: Fe, Cd, Cs.")
 
 
 def get_writer(fmt):
