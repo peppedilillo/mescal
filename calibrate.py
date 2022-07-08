@@ -31,7 +31,7 @@ from source import interface
 START, STOP, STEP = 15000, 28000, 10
 NBINS = int((STOP - START) / STEP)
 BINNING = (START, NBINS, STEP)
-RETRIGGER_TIME_IN_S = 20 * (10**-6)
+RETRIGGER_TIME_IN_S = 50 * (10**-6)
 
 FIT_PARAMS = [
     "center",
@@ -67,12 +67,13 @@ def run():
         data = get_from(filepath, console, use_cache=args.cache)
 
     with console.status("Preprocessing.."):
-        couples = {q: get_couples("fm1", q) for q in "ABCD"}
+        couples = get_couples("fm1")
         data, channels = preprocess(data, couples, console)
         histograms = make_histograms(data, BINNING, console)
 
     with console.status("Calibrating.."):
-        *results, flagged = inspect(*calibrate(*histograms, *lines, channels), console)
+        calibration = calibrate(*histograms, *lines, channels)
+        *results, flagged = inspect(*calibration, console)
 
     with console.status("Writing and drawing.."):
         process_results(filepath, couples, data, histograms, lines, results, options, console)
@@ -126,6 +127,7 @@ def make_histograms(data, binning, console):
 
 def inspect(fits, calibrations, flagged, console):
     sdds_calibration, scintillators_lightout = calibrations
+    flagged = merge_flagged_dicts(*flagged)
 
     if not sdds_calibration and not scintillators_lightout:
         console.log("[bold red] :cross_mark: Calibration failed.")
@@ -136,8 +138,11 @@ def inspect(fits, calibrations, flagged, console):
     return fits, calibrations, flagged
 
 
+def _to_dfdict(x, idx):
+    return {q: pd.DataFrame(x[q], index=idx).T for q in x.keys()}
+
+
 def calibrate(xhistograms, shistograms, xlines, slines, channels):
-    to_dfdict = lambda x, idx: {q: pd.DataFrame(x[q], index=idx).T for q in x.keys()}
 
     if xlines:
         _xfitdict, _caldict, xflagged = xcalibrate(xhistograms, xlines, channels)
@@ -147,8 +152,8 @@ def calibrate(xhistograms, shistograms, xlines, slines, channels):
                 FIT_PARAMS,
             )
         )
-        xfit_results = to_dfdict(_xfitdict, index)
-        sdds_calibration = to_dfdict(_caldict, CAL_PARAMS)
+        xfit_results = _to_dfdict(_xfitdict, index)
+        sdds_calibration = _to_dfdict(_caldict, CAL_PARAMS)
         if slines:
             _sfitdict, _slodict, sflagged = scalibrate(
                 shistograms, sdds_calibration, slines, lout_guess=(10.0, 15.0)
@@ -159,8 +164,8 @@ def calibrate(xhistograms, shistograms, xlines, slines, channels):
                     FIT_PARAMS,
                 )
             )
-            sfit_results = to_dfdict(_sfitdict, index)
-            scintillators_lightout = to_dfdict(_slodict, LO_PARAMS)
+            sfit_results = _to_dfdict(_sfitdict, index)
+            scintillators_lightout = _to_dfdict(_slodict, LO_PARAMS)
         else:
             sfit_results, scintillators_lightout, sflagged = {}, {}, {}
     else:
@@ -305,7 +310,7 @@ def merge_flagged_dicts(dx, ds):
 
 def warn_about_flagged(flagged, channels, console):
     interface.print_rule(console, "[bold italic]Warning", style="red", align="center")
-    console.print(interface.flagged_message(merge_flagged_dicts(*flagged), channels))
+    console.print(interface.flagged_message(flagged, channels))
     return True
 
 
@@ -429,7 +434,7 @@ def _write_eventlist_to_fits(thunk, path):
     """
     return option(display="Write calibrated events to fits.",
                   reply=":sparkles: Event list saved. :sparkles:",
-                  promise=promise(lambda : write_eventlist_to_fits(thunk(), path)))
+                  promise=promise(lambda: write_eventlist_to_fits(thunk(), path)))
 
 
 def promise(f):
@@ -471,4 +476,3 @@ if __name__ == "__main__":
     write_report = get_writer(args.fmt)
 
     run()
-

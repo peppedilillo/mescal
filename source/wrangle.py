@@ -59,6 +59,10 @@ def get_channels(model: str, quad: str):
     return [ch for ch, _ in enumerate(get_qmap(model, quad)) if ch is not detectors.UNBOND]
 
 
-def get_couples(model: str, quad: str):
+def get_quad_couples(model: str, quad: str):
     qmaparr = np.array(get_qmap(model, quad))
     return np.lexsort((qmaparr[:, 0], qmaparr[:, 1])).reshape(16, 2)[1:]
+
+
+def get_couples(model: str):
+    return {q: get_quad_couples(model, q) for q in "ABCD"}

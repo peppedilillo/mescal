@@ -7,12 +7,11 @@ from joblib import Parallel
 from joblib import delayed
 
 from source.spectra import PHT_KEV
-from assets import radsources
 
 
 def _compute_lims_for_x(lines: dict):
-    if radsources.Am_x60.items() <= lines.items():
-        return 2., 70.
+    # if radsources.Am_x60.items() <= lines.items():
+    #    pass
     return 2., 40.
 
 
