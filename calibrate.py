@@ -31,7 +31,7 @@ from source import interface
 START, STOP, STEP = 15000, 28000, 10
 NBINS = int((STOP - START) / STEP)
 BINNING = (START, NBINS, STEP)
-RETRIGGER_TIME_IN_S = 50 * (10**-6)
+RETRIGGER_TIME_IN_S = 20 * (10**-6)
 
 FIT_PARAMS = [
     "center",
