@@ -12,19 +12,17 @@ from source.upaths import LOGOPATH
 
 hdr_text = Text()\
     .append("Welcome to ", style='italic')\
-    .append("mescal v1.0:", style='purple bold')\
+    .append("mescal", style='purple bold')\
     .append(", a software to analyze HERMES-TP/SP data.\n", style='italic')
 
 
-def boot():
+def hello():
     console = Console()
     with open(LOGOPATH, 'r') as logo:
         for i, line in enumerate(logo.readlines()):
             console.print(line.strip("\n"), style="bold color({})".format(int(i + 160)), justify='center');
             sleep(0.1)
-    console.print()
-    console.rule(hdr_text)
-    console.print()
+    print_rule(console, hdr_text)
     return console
 
 
@@ -44,7 +42,7 @@ def flagged_message(flagged, onchannels):
     return message
 
 
-def prompt_display_flagged():
+def prompt_user_flagged():
     message = Text("Display flagged channels? ", style='italic')
     return Confirm.ask(message)
 
@@ -66,12 +64,13 @@ def options_message(options):
     return message
 
 
-def prompt_execute_option(options):
+def prompt_user_about(options):
     message = Text("Select:")
     choices = [*range(len(options))]
-    return IntPrompt.ask(message, choices=[str(i) for i in choices])
+    return options[IntPrompt.ask(message, choices=[str(i) for i in choices])]
 
 
 def print_rule(console, *args, **kwargs):
+    sleep(0.2)
     console.print()
     console.rule(*args, **kwargs)

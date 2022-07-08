@@ -7,12 +7,11 @@ from joblib import Parallel
 from joblib import delayed
 
 from source.spectra import PHT_KEV
-from assets import radsources
 
 
 def _compute_lims_for_x(lines: dict):
-    if radsources.Am_x60.items() <= lines.items():
-        return 2., 70.
+    # if radsources.Am_x60.items() <= lines.items():
+    #    pass
     return 2., 40.
 
 
@@ -52,9 +51,9 @@ def draw_and_save_diagns(histograms, res_fit, path, nthreads=1):
                                    res_fit[quad].loc[ch].loc[:, 'amp'],
                                    res_fit[quad].loc[ch].loc[:, 'fwhm'],
                                    res_fit[quad].loc[ch].loc[:, ['lim_low', 'lim_high']].values.reshape(2, -1).T,
-                                   figsize=(18, 9))
+                                   figsize=(9, 4.5))
             ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, quad))
-            fig.savefig(path(quad, ch), dpi=150)
+            fig.savefig(path(quad, ch))
             plt.close(fig)
 
     return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_fit.keys())
@@ -153,10 +152,10 @@ def draw_and_save_qlooks(res_cal, path, nthreads=1):
 
 def _uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
     fig, ax = plt.subplots(1, 1, **kwargs)
-    ax.step(xbins[:-1], xcounts, label='X events', where='post')
-    ax.fill_between(xbins[:-1], xcounts, step="post", alpha=0.2)
     ax.step(sbins[:-1], scounts, color='tomato', label='S events', where='post')
     ax.fill_between(sbins[:-1], scounts, step="post", alpha=0.2, color='tomato')
+    ax.step(xbins[:-1], xcounts, label='X events', where='post')
+    ax.fill_between(xbins[:-1], xcounts, step="post", alpha=0.2)
     ax.set_ylim(bottom=0)
     ax.set_ylabel("Counts")
     ax.set_xlabel("ADU")
@@ -169,11 +168,10 @@ normal = (lambda x, amp, sigma, x0: amp*np.exp(-(x-x0)**2/(2*sigma**2))/(sigma*s
 
 def _diagnostics(bins, counts, centers, amps, fwhms, limits, **kwargs):
     low_lims, high_lims = [*zip(*limits)]
-    min_lim, max_lim = min(low_lims) - 500, max(high_lims) + 500
-    start = np.where(bins >= min_lim)[0][0]
-    stop = np.where(bins < max_lim)[0][-1]
-    bins = bins[start:stop + 1]
-    counts = counts[start:stop]
+    min_xlim, max_xlim = min(low_lims) - 500, max(high_lims) + 500
+    start = np.where(bins >= min_xlim)[0][0]
+    stop = np.where(bins < max_xlim)[0][-1]
+    min_ylim, max_ylim = 0, max(counts[start:stop])*1.1
 
     colors = [plt.cm.tab10(i) for i in range(1, len(limits) + 1)]
     fig, ax = plt.subplots(1, 1, **kwargs)
@@ -184,7 +182,8 @@ def _diagnostics(bins, counts, centers, amps, fwhms, limits, **kwargs):
         ax.axvspan(*lims, color=col, alpha=0.1)
         xs = np.linspace(*lims, 200)
         ax.plot(xs, normal(xs, amp, fwhm/2.355, ctr), color=col)
-    ax.set_ylim(bottom=0)
+    ax.set_xlim((min_xlim, max_xlim))
+    ax.set_ylim((min_ylim, max_ylim))
     ax.set_ylabel("Counts")
     ax.set_xlabel("ADU")
     return fig, ax

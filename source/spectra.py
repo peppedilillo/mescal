@@ -6,14 +6,12 @@ from joblib import Parallel, delayed
 from lmfit.models import GaussianModel
 from lmfit.models import LinearModel
 from scipy.signal import find_peaks
+from source.errors import DetectPeakError
+
 
 PHT_KEV = 3.65 / 1000
 
 histograms_collection = namedtuple('histogram', ['bins', 'counts'])
-
-
-class DetectPeakError(Exception):
-    """An error while finding peaks."""
 
 
 def make_events_list(data, calibrated_sdds, calibrated_scintillators, scintillator_couples, nthreads=1):
@@ -94,22 +92,24 @@ def _insert_xenergy_column(data, calibrated_sdds):
 def scalibrate(histograms, cal_df, lines, lout_guess):
     results_fit, results_slo, flagged = {}, {}, {}
     line_keys, line_values = zip(*lines.items())
-    for asic in cal_df.keys():
-        for ch in cal_df[asic].index:
-            counts = histograms.counts[asic][ch]
-            gain, gain_err, offset = cal_df[asic].loc[ch][['gain', 'gain_err', 'offset']]
+
+    bins = histograms.bins
+    for quad in cal_df.keys():
+        for ch in cal_df[quad].index:
+            counts = histograms.counts[quad][ch]
+            gain, gain_err, offset, offset_err = cal_df[quad].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']]
             try:
                 guesses = [[lout_lim * PHT_KEV * lv * gain + offset for lout_lim in lout_guess] for lv in line_values]
-                limits = _estimate_peaks_from_guess(histograms.bins, counts, guess=guesses)
-                centers, center_errs, *etc = _fit_peaks(histograms.bins, counts, limits)
-                los, lo_errs = _compute_louts(centers, center_errs, gain, gain_err, offset, line_values)
+                limits = _estimate_peaks_from_guess(bins, counts, guess=guesses)
+                centers, center_errs, *etc = _fit_peaks(bins, counts, limits)
+                los, lo_errs = _compute_louts(centers, center_errs, gain, gain_err, offset, offset_err, line_values)
                 lo, lo_err = _do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_lines(los, lo_errs)
             except DetectPeakError:
-                flagged.setdefault(asic, []).append(ch)
+                flagged.setdefault(quad, []).append(ch)
             else:
-                results_fit.setdefault(asic, {})[ch] = np.column_stack(
+                results_fit.setdefault(quad, {})[ch] = np.column_stack(
                     (centers, center_errs, *etc, *limits.T)).flatten()
-                results_slo.setdefault(asic, {})[ch] = np.array((lo, lo_err))
+                results_slo.setdefault(quad, {})[ch] = np.array((lo, lo_err))
     return results_fit, results_slo, flagged
 
 
@@ -118,7 +118,7 @@ def _do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_lines(light
     return light_outs.mean(), np.sqrt(np.sum(light_outs_errs ** 2))
 
 
-_dist_from_intv = (lambda x, lo, hi: abs((x - lo) + (x - hi)))
+def _dist_from_intv(x, lo, hi): return abs((x - lo) + (x - hi))
 
 
 def _closest_peaks(guess, peaks, peaks_infos):
@@ -129,46 +129,84 @@ def _closest_peaks(guess, peaks, peaks_infos):
     return best_peaks, {key: val[argmin] for key, val in peaks_infos.items()}
 
 
-def _estimate_peaks_from_guess(bins, counts, guess, limratio=(1, 1)):
-    mm = move_mean(counts, 5)
-    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=10, width=5)
+def _estimate_peaks_from_guess(bins, counts, guess):
+    window_len = 10
+    prominence = 20
+    width = 5
+
+    mm = move_mean(counts, window_len)
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=prominence, width=width)
     if len(unfiltered_peaks) >= len(guess):
         peaks, peaks_info = _closest_peaks(guess, unfiltered_peaks, unfiltered_peaks_info)
     else:
         raise DetectPeakError("candidate peaks are less than lines to fit.")
-    lo_r, hi_r = limratio
-    limits = [(bins[int(p - w * lo_r)], bins[int(p + w * hi_r)]) for p, w in zip(peaks, peaks_info['widths'])]
+    limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
     return np.array(limits).reshape(len(peaks), 2)
 
 
-def _compute_louts(centers, center_errs, gain, gain_err, offset, lines):
+def _compute_louts(centers, center_errs, gain, gain_err, offset, offset_err, lines):
     light_outs = (centers - offset) / gain / PHT_KEV / lines
     light_out_errs = np.sqrt((center_errs / gain) ** 2
                              + (offset_err / gain) ** 2
-                             + ((centers - offset) / gain ** 2) * (gain_err ** 2) / PHT_KEV / lines
+                             + ((centers - offset) / gain ** 2) * (gain_err ** 2)) / PHT_KEV / lines
     return light_outs, light_out_errs
 
 
-def xcalibrate(histograms, lines, onchannels):
-    results_fit, results_cal, flagged = {}, {}, {}
+def xcalibrate(histograms, lines, channels, default_calibration=None):
+    results_xfit, results_cal, flagged = {}, {}, {}
     lines_keys, lines_values = zip(*lines.items())
-    for asic in onchannels.keys():
-        for ch in onchannels[asic]:
-            counts = histograms.counts[asic][ch]
+
+    for quad in channels.keys():
+        for ch in channels[quad]:
+            bins = histograms.bins
+            counts = histograms.counts[quad][ch]
+
             try:
-                if len(lines_values) > 2:
-                    limits = _estimate_peakpos_from_lratio(histograms.bins, counts, lines_values)
-                else:
-                    raise DetectPeakError("not enough lines to calibrate.")
-                centers, center_errs, *etc = _fit_peaks(histograms.bins, counts, limits, weights='amplitude')
-                gain, gain_err, offset, offset_err, chi2 = _calibrate_chn(centers, center_errs, lines_values)
+                def packaged_calib(): return default_calibration[quad].iloc[ch]
+                limits = _find_peaks_limits(bins, counts, lines_values, packaged_calib)
             except DetectPeakError:
-                flagged.setdefault(asic, []).append(ch)
-            else:
-                results_fit.setdefault(asic, {})[ch] = np.column_stack(
-                    (centers, center_errs, *etc, *limits.T)).flatten()
-                results_cal.setdefault(asic, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
-    return results_fit, results_cal, flagged
+                flagged.setdefault(quad, []).append(ch)
+                continue
+
+            centers, center_errs, *etc = _fit_peaks(bins, counts, limits, weights='amplitude')
+
+            try:
+                gain, gain_err, offset, offset_err, chi2 = _calibrate_chn(centers, center_errs, lines_values)
+            except ValueError:
+                flagged.setdefault(quad, []).append(ch)
+                continue
+
+            results_xfit.setdefault(quad, {})[ch] = np.column_stack(
+                (centers, center_errs, *etc, *limits.T)).flatten()
+            results_cal.setdefault(quad, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
+    return results_xfit, results_cal, flagged
+
+
+def _find_peaks_limits(bins, counts, lines_values, unpack_calibration):
+    try:
+        channel_calib = unpack_calibration()
+    except TypeError:
+        limits = _estimate_from_lratio(bins, counts, lines_values)
+    else:
+        pass
+    return limits
+
+
+def _estimate_from_lratio(bins, counts, lines: list):
+    window_len = 5
+    prominence = 20
+    width = 5
+
+    if len(lines) < 3:
+        raise DetectPeakError("not enough lines to calibrate.")
+    mm = move_mean(counts, window_len)
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=prominence, width=width)
+    if len(unfiltered_peaks) >= len(lines):
+        peaks, peaks_info = _filter_peaks_lratio(lines, unfiltered_peaks, unfiltered_peaks_info)
+    else:
+        raise DetectPeakError("candidate peaks are less than lines to fit.")
+    limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
+    return np.array(limits).reshape(len(peaks), 2)
 
 
 def _filter_peaks_lratio(lines: list, peaks, peaks_infos):
@@ -183,17 +221,6 @@ def _filter_peaks_lratio(lines: list, peaks, peaks_infos):
                   , axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
     return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
-
-
-def _estimate_peakpos_from_lratio(bins, counts, lines: list):
-    mm = move_mean(counts, 5)
-    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=20, width=5)
-    if len(unfiltered_peaks) >= len(lines):
-        peaks, peaks_info = _filter_peaks_lratio(lines, unfiltered_peaks, unfiltered_peaks_info)
-    else:
-        raise DetectPeakError("candidate peaks are less than lines to fit.")
-    limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
-    return np.array(limits).reshape(len(peaks), 2)
 
 
 def _line_fitter(x, y, limits):
@@ -271,25 +298,3 @@ def compute_histogram(data, start, nbins, step, nthreads=1):
 def move_mean(arr, n):
     return pd.Series(arr).rolling(n, center=True).mean().to_numpy()
 
-
-s2i = (lambda quad: "ABCD".find(str.upper(quad)))
-i2s = (lambda n: chr(65 + n))
-
-
-def add_evtype_tag(data, couples):
-    """
-    inplace add event type (X or S) column
-    :param data:
-    :return:
-    """
-    data['CHN'] = data['CHN'] + 1
-    qm = data['QUADID'].map({key: 100 ** s2i(key) for key in 'ABCD'})
-    chm_dict = dict(np.concatenate([(couples[key] + 1) * 100 ** s2i(key) for key in couples.keys()]))
-    chm = data['CHN'] * qm
-    data.insert(loc=3, column='EVTYPE', value=(data
-                                               .assign(CHN=chm.map(chm_dict).fillna(chm))
-                                               .duplicated(['SID', 'CHN'], keep=False)
-                                               .map({False: 'X', True: 'S'})
-                                               .astype('string')))
-    data['CHN'] = data['CHN'] - 1
-    return data
