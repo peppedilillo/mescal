@@ -4,10 +4,7 @@ from source.io import write_report_to_excel
 from source.io import write_report_to_fits
 from source.io import write_report_to_csv
 from source.errors import FormatNotSupportedError
-
-
-class SourceNotFoundError(Exception):
-    """An error while parsing calib sources."""
+from source.errors import SourceNotFoundError
 
 
 parser = argparse.ArgumentParser(description="A script to automatically calibrate HERMES-TP/SP "

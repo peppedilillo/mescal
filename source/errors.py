@@ -5,5 +5,10 @@ class UnknownModelError(Exception):
 class DetectPeakError(Exception):
     """An error while finding peaks."""
 
+
 class FormatNotSupportedError(Exception):
     """An error while asking for unsupported writing formats."""
+
+
+class SourceNotFoundError(Exception):
+    """An error while parsing calib sources."""

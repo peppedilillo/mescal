@@ -28,10 +28,11 @@ from source.parser import parser
 from source import upaths
 from source import interface
 
+
 START, STOP, STEP = 15000, 28000, 10
 NBINS = int((STOP - START) / STEP)
 BINNING = (START, NBINS, STEP)
-RETRIGGER_TIME_IN_S = 20 * (10**-6)
+RETRIGGER_TIME_IN_S = 50 * (10**-6)
 
 FIT_PARAMS = [
     "center",
@@ -145,7 +146,7 @@ def _to_dfdict(x, idx):
 def calibrate(xhistograms, shistograms, xlines, slines, channels):
 
     if xlines:
-        _xfitdict, _caldict, xflagged = xcalibrate(xhistograms, xlines, channels)
+        _xfitdict, _caldict, xflagged = xcalibrate(xhistograms, xlines, channels, calibration_hint)
         index = pd.MultiIndex.from_product(
             (
                 xlines.keys(),
@@ -475,4 +476,7 @@ if __name__ == "__main__":
     lines = compile_sources_dicts(args.lines)
     write_report = get_writer(args.fmt)
 
+    from source.io import read_report_from_excel
+    cal_hint = Path(r"D:\Dropbox\Progetti\mescal\Hermes-Cal-SW\assets\default_calibrations\fm1\20220616_55Fe109Cd137Cs_m20deg_thr105_LV0d5\report_cal.xlsx")
+    calibration_hint = read_report_from_excel(cal_hint)
     run()

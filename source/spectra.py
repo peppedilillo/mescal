@@ -158,11 +158,12 @@ def xcalibrate(histograms, lines, channels, default_calibration=None):
 
     for quad in channels.keys():
         for ch in channels[quad]:
+            print(quad,ch)
             bins = histograms.bins
             counts = histograms.counts[quad][ch]
 
             try:
-                def packaged_calib(): return default_calibration[quad].iloc[ch]
+                def packaged_calib(): return default_calibration[quad].loc[ch]
                 limits = _find_peaks_limits(bins, counts, lines_values, packaged_calib)
             except DetectPeakError:
                 flagged.setdefault(quad, []).append(ch)
@@ -171,7 +172,7 @@ def xcalibrate(histograms, lines, channels, default_calibration=None):
             centers, center_errs, *etc = _fit_peaks(bins, counts, limits, weights='amplitude')
 
             try:
-                gain, gain_err, offset, offset_err, chi2 = _calibrate_chn(centers, center_errs, lines_values)
+                gain, gain_err, offset, offset_err, chi2 = _calibrate_chn(centers, lines_values, weights=center_errs)
             except ValueError:
                 flagged.setdefault(quad, []).append(ch)
                 continue
@@ -186,25 +187,66 @@ def _find_peaks_limits(bins, counts, lines_values, unpack_calibration):
     try:
         channel_calib = unpack_calibration()
     except TypeError:
-        limits = _estimate_from_lratio(bins, counts, lines_values)
+        return _lims_from_lines_ratio(bins, counts, lines_values)
+    except KeyError:
+        raise DetectPeakError("no calibration for queried channel")
     else:
-        pass
-    return limits
+        return _lims_from_existing_calib(bins, counts, lines_values, channel_calib)
 
 
-def _estimate_from_lratio(bins, counts, lines: list):
+def _lims_from_existing_calib(bins, counts, lines, channel_calib):
     window_len = 5
-    prominence = 20
     width = 5
+    prominence = 3
+    distance = 5
+    low_en_thr = 0.0  # keV
+
+    energies = (bins - channel_calib['offset'])/ channel_calib['gain']
+    (inf_bin, *_), = np.where(energies > low_en_thr)
+    smoothed_counts = move_mean(counts, window_len)
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(
+        smoothed_counts,
+        prominence=prominence,
+        width=width,
+        distance=distance,
+    )
+    if len(unfiltered_peaks) < len(lines):
+        raise DetectPeakError("candidate peaks are less than lines to fit.")
+    enfiltered_peaks, enfiltered_peaks_info = _filter_peaks_low_energy(inf_bin, unfiltered_peaks, unfiltered_peaks_info)
+    peaks, peaks_info = _filter_peaks_proximity(lines, energies, enfiltered_peaks, enfiltered_peaks_info)
+    limits = [(bins[int(p - w)], bins[int(p + w)])
+              for p, w in zip(peaks, peaks_info['widths'])]
+    return np.array(limits).reshape(len(peaks), 2)
+
+
+def _filter_peaks_proximity(lines: list, energies, peaks, peaks_infos):
+    peaks_combinations = [*combinations(peaks, r=len(lines))]
+    enpeaks_combinations = np.take(energies, peaks_combinations)
+    loss = np.sum(np.square(enpeaks_combinations - np.array(lines)), axis=1)
+    filtered_peaks = peaks_combinations[np.argmin(loss)]
+    filtered_peaks_info = {key: val[np.isin(peaks, filtered_peaks)] for key, val in peaks_infos.items()}
+    return filtered_peaks, filtered_peaks_info
+
+
+def _filter_peaks_low_energy(lim_bin, peaks, peaks_infos):
+    filtered_peaks = peaks[np.where(peaks > lim_bin)]
+    filtered_peaks_info = {key: val[np.isin(peaks, filtered_peaks)] for key, val in peaks_infos.items()}
+    return filtered_peaks, filtered_peaks_info
+
+
+def _lims_from_lines_ratio(bins, counts, lines: list):
+    window_len = 5
+    prominence = 100
+    width = 5
+    distance = 10
 
     if len(lines) < 3:
         raise DetectPeakError("not enough lines to calibrate.")
     mm = move_mean(counts, window_len)
-    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=prominence, width=width)
-    if len(unfiltered_peaks) >= len(lines):
-        peaks, peaks_info = _filter_peaks_lratio(lines, unfiltered_peaks, unfiltered_peaks_info)
-    else:
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=prominence, width=width, distance=distance)
+    if len(unfiltered_peaks) < len(lines):
         raise DetectPeakError("candidate peaks are less than lines to fit.")
+    peaks, peaks_info = _filter_peaks_lratio(lines, unfiltered_peaks, unfiltered_peaks_info)
     limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
     return np.array(limits).reshape(len(peaks), 2)
 
@@ -217,10 +259,11 @@ def _filter_peaks_lratio(lines: list, peaks, peaks_infos):
     norm_ls = normalize(lines)
     norm_ps = [*map(normalize, peaks_combinations)]
     weights = [*map(weight, combinations(peaks_infos["prominences"], r=len(lines)))]
-    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)) / weights
+    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)) / np.square(weights)
                   , axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
-    return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
+    best_peaks_info = {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
+    return best_peaks, best_peaks_info
 
 
 def _line_fitter(x, y, limits):
@@ -265,10 +308,10 @@ def _fit_peaks(x, y, limits, weights=None):
     return centers, center_errs, fwhms, fwhm_errs, amps, amp_errs
 
 
-def _calibrate_chn(centers, center_errs, lines):
+def _calibrate_chn(centers, lines, weights=None):
     lmod = LinearModel()
     pars = lmod.guess(centers, x=lines)
-    resultlin = lmod.fit(centers, pars, x=lines, weights=center_errs)
+    resultlin = lmod.fit(centers, pars, x=lines, weights=weights)
 
     chi2 = resultlin.redchi
     gain = resultlin.params['slope'].value
