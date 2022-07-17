@@ -28,6 +28,7 @@ def make_events_list(data, calibrated_sdds, calibrated_scintillators, scintillat
 
     for quadrant in disorganized_events.keys():
         x_events, gamma_events = disorganized_events[quadrant]
+
         xtimes, xenergies, xchannels = x_events.T
         xquadrants = np.array([quadrant] * len(x_events))
         xevtypes = np.array(['X'] * len(x_events))
