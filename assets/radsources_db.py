@@ -32,7 +32,7 @@ Am_x60 = {
 }
 
 Cs = {
-    'Cs 662 keV': Decay(661.6, -2., +1.),
+    'Cs 662 keV': Decay(661.6, -2., +2.),
 }
 
 x_sources = {

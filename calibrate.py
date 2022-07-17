@@ -31,8 +31,9 @@ from source import interface
 
 START, STOP, STEP = 15000, 28000, 10
 NBINS = int((STOP - START) / STEP)
-BINNING = (START, NBINS, STEP)
-RETRIGGER_TIME_IN_S = 50 * (10**-6)
+END = START + NBINS*STEP
+BINNING = (START, END, NBINS)
+RETRIGGER_TIME_IN_S = 20 * (10**-6)
 
 FIT_PARAMS = [
     "center",
@@ -73,11 +74,11 @@ def run():
         histograms = make_histograms(data, BINNING, console)
 
     with console.status("Calibrating.."):
-        calibration = calibrate(*histograms, *lines, channels)
+        calibration = calibrate(*histograms, *radsources, channels)
         *results, flagged = inspect(*calibration, console)
 
     with console.status("Writing and drawing.."):
-        process_results(filepath, couples, data, histograms, lines, results, options, console)
+        process_results(filepath, couples, data, histograms, radsources, results, options, console)
 
     if any(flagged):
         warn_about_flagged(flagged, channels, console)
@@ -143,25 +144,25 @@ def _to_dfdict(x, idx):
     return {q: pd.DataFrame(x[q], index=idx).T for q in x.keys()}
 
 
-def calibrate(xhistograms, shistograms, xlines, slines, channels):
+def calibrate(xhistograms, shistograms, xradsources, sradsources, channels):
 
-    if xlines:
-        _xfitdict, _caldict, xflagged = xcalibrate(xhistograms, xlines, channels, calibration_hint)
+    if xradsources:
+        _xfitdict, _caldict, xflagged = xcalibrate(xhistograms, xradsources, channels, calibration_hint)
         index = pd.MultiIndex.from_product(
             (
-                xlines.keys(),
+                xradsources.keys(),
                 FIT_PARAMS,
             )
         )
         xfit_results = _to_dfdict(_xfitdict, index)
         sdds_calibration = _to_dfdict(_caldict, CAL_PARAMS)
-        if slines:
+        if sradsources:
             _sfitdict, _slodict, sflagged = scalibrate(
-                shistograms, sdds_calibration, slines, lout_guess=(10.0, 15.0)
+                shistograms, sdds_calibration, sradsources, lout_guess=(10.0, 15.0)
             )
             index = pd.MultiIndex.from_product(
                 (
-                    slines.keys(),
+                    sradsources.keys(),
                     FIT_PARAMS,
                 )
             )
@@ -185,13 +186,13 @@ def process_results(
     detector_couples,
     data,
     histograms,
-    lines,
+    radsources,
     results,
     options,
     console,
 ):
     xhistograms, shistograms = histograms
-    xlines, slines = lines
+    xradsources, sradsources = radsources
     (xfit_results, sfit_results), (
         sdds_calibration,
         scintillators_lightout,
@@ -231,7 +232,7 @@ def process_results(
             _draw_and_save_channels_xspectra(
                 xhistograms,
                 sdds_calibration,
-                xlines,
+                xradsources,
                 upaths.XCSPLOT(filepath),
                 systhreads,
             )
@@ -240,7 +241,7 @@ def process_results(
             _draw_and_save_lins(
                 sdds_calibration,
                 xfit_results,
-                xlines,
+                xradsources,
                 upaths.LINPLOT(filepath),
                 systhreads,
             )
@@ -276,7 +277,7 @@ def process_results(
                 shistograms,
                 sdds_calibration,
                 scintillators_lightout,
-                slines,
+                sradsources,
                 upaths.SCSPLOT(filepath),
                 systhreads,
             )
@@ -372,14 +373,14 @@ def _write_sfit_report(fit_results, path):
 
 
 def _draw_and_save_channels_xspectra(
-    xhistograms, sdds_calibration, xlines, path, nthreads
+    xhistograms, sdds_calibration, xradsources, path, nthreads
 ):
     return option(
         display="Save X channel spectra plots.",
         reply=":sparkles: Plots saved. :sparkles:",
         promise=promise(
             lambda: draw_and_save_channels_xspectra(
-                xhistograms, sdds_calibration, xlines, path, nthreads
+                xhistograms, sdds_calibration, xradsources, path, nthreads
             )
         ),
     )
@@ -389,7 +390,7 @@ def _draw_and_save_channels_sspectra(
     shistograms,
     sdds_calibration,
     scintillators_lightout,
-    slines,
+    sradsources,
     path,
     nthreads,
 ):
@@ -401,7 +402,7 @@ def _draw_and_save_channels_sspectra(
                 shistograms,
                 sdds_calibration,
                 scintillators_lightout,
-                slines,
+                sradsources,
                 path,
                 nthreads,
             )
@@ -410,14 +411,14 @@ def _draw_and_save_channels_sspectra(
 
 
 def _draw_and_save_lins(
-    sdds_calibration, xfit_results, xlines, path, nthreads
+    sdds_calibration, xfit_results, xradsources, path, nthreads
 ):
     return option(
         display="Save X linearity plots.",
         reply=":sparkles: Plots saved. :sparkles:",
         promise=promise(
             lambda: draw_and_save_lins(
-                sdds_calibration, xfit_results, xlines, path, nthreads
+                sdds_calibration, xfit_results, xradsources, path, nthreads
             )
         ),
     )
@@ -475,7 +476,7 @@ if __name__ == "__main__":
     systhreads = min(4, cpu_count())
     args = parser.parse_args()
     filepath = Path(args.filepath_in)
-    lines = compile_sources_dicts(args.lines)
+    radsources = compile_sources_dicts(args.rs)
     write_report = get_writer(args.fmt)
 
     from source.io import read_report_from_excel
