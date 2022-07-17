@@ -445,7 +445,7 @@ def promise(f):
 def fulfill(opt):
     car, cdr = opt
     if car:
-        print("We already did that..")
+        pass
     else:
         opt[0] = 1
         return cdr()
@@ -464,6 +464,8 @@ def anything_else(options, console):
             with console.status("Working.."):
                 if fulfill(answer.promise):
                     console.print(answer.reply)
+                else:
+                    console.print("[red]We already did that..")
 
     interface.print_rule(console)
     return True
@@ -477,6 +479,6 @@ if __name__ == "__main__":
     write_report = get_writer(args.fmt)
 
     from source.io import read_report_from_excel
-    cal_hint = Path(r"D:\Dropbox\Progetti\mescal\Hermes-Cal-SW\assets\default_calibrations\fm1\20220616_55Fe109Cd137Cs_m20deg_thr105_LV0d5\report_cal.xlsx")
+    cal_hint = Path(r".\assets\default_calibrations\fm1\20220622_55Fe109Cd137Cs_20deg_thr105_LV0d5\report_cal.xlsx")
     calibration_hint = read_report_from_excel(cal_hint)
     run()

@@ -125,7 +125,7 @@ def draw_and_save_sspectrum(calibrated_events, lines: dict, path):
         return True
 
 
-def draw_and_save_lins(res_cal, res_fit, lines, path, nthreads=1):
+def draw_and_save_lins(res_cal, res_fit, lines: dict, path, nthreads=1):
     def helper(quad):
         for ch in res_cal[quad].index:
             fig, ax = _linearity(*res_cal[quad].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']],
@@ -189,7 +189,9 @@ def _diagnostics(bins, counts, centers, amps, fwhms, limits, **kwargs):
     return fig, ax
 
 
-def _spectrum(enbins, counts, lines: dict={}, elims=None, **kwargs):
+def _spectrum(enbins, counts, lines: dict, elims=None, **kwargs):
+    line_keys = lines.keys()
+    line_values = [l.energy for l in lines.values()]
     colors = [plt.cm.tab10(i) for i in range(len(lines))]
 
     fig, ax = plt.subplots(**kwargs)
@@ -203,8 +205,8 @@ def _spectrum(enbins, counts, lines: dict={}, elims=None, **kwargs):
         xs, ys = enbins[:-1], counts
     ax.step(xs, ys, where='post')
     ax.fill_between(xs, ys, step="post", alpha=0.4)
-    for (lines_keys, lines_values), col in zip(lines.items(), colors):
-        ax.axvline(lines_values, linestyle="dashed", color=col, label=lines_keys)
+    for key, value, col in zip(line_keys, line_values, colors):
+        ax.axvline(value, linestyle="dashed", color=col, label=key)
     ax.set_ylim(bottom=0)
     ax.set_xlabel('Energy [keV]')
     ax.set_ylabel('Counts')
@@ -213,35 +215,29 @@ def _spectrum(enbins, counts, lines: dict={}, elims=None, **kwargs):
 
 
 def _linearity(gain, gain_err, offset, offset_err, adcs, adcs_err, lines: dict, **kwargs):
-    _, lines = zip(*lines.items())
-    lines = np.array(lines)
-    measured_energies = (adcs - offset)/gain
+    line_values = np.array([l.energy for l in lines.values()])
     measured_energies_err =  np.sqrt((adcs_err**2)*(1/gain)**2 +
                                      (gain_err**2)*((adcs - offset)/gain**2)**2 +
                                      (offset_err**2)*(1/gain)**2)
-    residual = gain * lines + offset - adcs
-    res_err = np.sqrt((gain_err ** 2) * (lines ** 2) +
+    residual = gain * line_values + offset - adcs
+    res_err = np.sqrt((gain_err ** 2) * (line_values ** 2) +
                       offset_err ** 2 +
                       adcs_err ** 2)
     perc_residual = 100 * residual / adcs
     perc_residual_err = 100 * res_err / adcs
 
-    prediction_discrepancy = (adcs-offset)/gain - lines
-    perc_prediction_discrepancy = 100 * prediction_discrepancy / lines
-    perc_measured_energies_err = 100 * measured_energies_err / lines
+    prediction_discrepancy = (adcs-offset)/gain - line_values
+    perc_prediction_discrepancy = 100 * prediction_discrepancy / line_values
+    perc_measured_energies_err = 100 * measured_energies_err / line_values
 
-    margin = (lines[-1] - lines[0]) / 10
-    xs = np.linspace(lines[0] - margin, lines[-1] + margin, 10)
+    margin = (line_values[-1] - line_values[0]) / 10
+    xs = np.linspace(line_values[0] - margin, line_values[-1] + margin, 10)
 
     fig, axs = plt.subplots(3, 1, gridspec_kw={'height_ratios': [6, 3, 3]}, sharex=True, **kwargs)
-
-    axs[0].errorbar(lines, adcs, yerr=adcs_err, fmt='o')
+    axs[0].errorbar(line_values, adcs, yerr=adcs_err, fmt='o')
     axs[0].plot(xs, gain * xs + offset)
-
-    axs[1].errorbar(lines, perc_residual, yerr=perc_residual_err, fmt='o', capsize=5)
-
-    axs[2].errorbar(lines, perc_prediction_discrepancy, yerr=perc_measured_energies_err, fmt='o', capsize=5)
-
+    axs[1].errorbar(line_values, perc_residual, yerr=perc_residual_err, fmt='o', capsize=5)
+    axs[2].errorbar(line_values, perc_prediction_discrepancy, yerr=perc_measured_energies_err, fmt='o', capsize=5)
     axs[0].set_ylabel("Measured Energy [keV]")
     axs[1].set_ylabel("Residual [%]")
     axs[2].set_ylabel("Prediction error [%]")

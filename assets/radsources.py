@@ -1,34 +1,38 @@
+from collections import namedtuple
+
+Decay = namedtuple('Decay', ['energy', 'low_lim', 'hi_lim'])
+
 Fe = {
-    'Fe 5.9 keV': 5.90,
+    'Fe 5.9 keV': Decay(5.90, -2., +1.),
 }
 
 Fe_kbeta = {
-    'Fe 5.9 keV': 5.90,
-    'Fe 6.4 keV': 6.49,
+    'Fe 5.9 keV': Decay(5.90, -2., +1.),
+    'Fe 6.4 keV': Decay(6.49, -1., +2.),
 }
 
 Cd = {
-    'Cd 22.1 keV': 22.16,
-    'Cd 24.9 keV': 24.94,
+    'Cd 22.1 keV': Decay(22.16, -1., + 2.),
+    'Cd 24.9 keV': Decay(24.94, -2., + 1.),
 }
 
 Am = {
-    'Am 13.9 keV': 13.9,
-    'Am 17.7 keV': 17.7,
-    'Am 20.7 keV': 20.7,
-    'Am 26.3 keV': 26.3,
+    'Am 13.9 keV': Decay(13.9, -2., +2.),
+    'Am 17.7 keV': Decay(17.7, -2., +2.),
+    'Am 20.7 keV': Decay(20.7, -2., +2.),
+    'Am 26.3 keV': Decay(26.3, -2., +2.),
 }
 
 Am_x60 = {
-    'Am 13.9 keV': 13.9,
-    'Am 17.7 keV': 17.7,
-    'Am 20.7 keV': 20.7,
-    'Am 26.3 keV': 26.3,
-    'Am 59.5 keV': 59.5,
+    'Am 13.9 keV': Decay(13.9, -2., +2.),
+    'Am 17.7 keV': Decay(17.7, -2., +2.),
+    'Am 20.7 keV': Decay(20.7, -2., +2.),
+    'Am 26.3 keV': Decay(26.3, -2., +2.),
+    'Am 59.5 keV': Decay(59.5, -2., +2.),
 }
 
 Cs = {
-    'Cs 662 keV': 661.6,
+    'Cs 662 keV': Decay(661.6, -2., +1.),
 }
 
 x_sources = {

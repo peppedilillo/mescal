@@ -6,9 +6,10 @@ paths here defined will work across different os.
 
 from pathlib import Path
 
+
 prjpath = Path(__file__).parent.parent
 
-ASTDIR = prjpath.joinpath("assets")
+ASSETDIR = prjpath.joinpath("assets")
 
 
 def create_if_not_exists(func):
@@ -74,7 +75,7 @@ def UNCDIR(filepath: Path) -> Path:
     return PLTDIR(filepath).joinpath("uncalibrated")
 
 
-LOGOPATH = ASTDIR.joinpath("logo.txt")
+LOGOPATH = ASSETDIR.joinpath("logo.txt")
 
 EVLFITS = (lambda filepath: RESDIR(filepath).joinpath("event_list.fits"))
 
