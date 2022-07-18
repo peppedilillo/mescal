@@ -1,20 +1,26 @@
+import argparse
 from os import cpu_count
 from collections import namedtuple
 
 import pandas as pd
 from pathlib import Path
 
+from source import upaths
+from source import interface
 from source.io import pandas_from
+from source.io import get_writer
 from source.io import write_eventlist_to_fits
 from source.io import write_report_to_excel
 from source.wrangle import get_couples
 from source.wrangle import add_evtype_tag
 from source.wrangle import infer_onchannels
 from source.wrangle import filter_delay
+from source.wrangle import filter_spurious
 from source.spectra import xcalibrate
 from source.spectra import scalibrate
 from source.spectra import compute_histogram
 from source.spectra import make_events_list
+from source.inventory import fetch_default_sdd_calibration
 from source.plot import draw_and_save_diagns
 from source.plot import draw_and_save_channels_xspectra
 from source.plot import draw_and_save_channels_sspectra
@@ -22,11 +28,7 @@ from source.plot import draw_and_save_qlooks
 from source.plot import draw_and_save_uncalibrated
 from source.plot import draw_and_save_slo
 from source.plot import draw_and_save_lins
-from source.parser import compile_sources_dicts
-from source.parser import get_writer
-from source.parser import parser
-from source import upaths
-from source import interface
+from source.inventory import compile_sources_dicts
 
 
 START, STOP, STEP = 15000, 28000, 10
@@ -34,6 +36,7 @@ NBINS = int((STOP - START) / STEP)
 END = START + NBINS*STEP
 BINNING = (START, END, NBINS)
 RETRIGGER_TIME_IN_S = 20 * (10**-6)
+
 
 FIT_PARAMS = [
     "center",
@@ -57,16 +60,47 @@ LO_PARAMS = [
     "light_out_err"
 ]
 
+
 option = namedtuple("option", ["display", "reply", "promise"])
 terminate_mescal = option("Exit mescal.", "So soon?", lambda _: None)
 options = [terminate_mescal]
 
 
+description = "A script to automatically calibrate HERMES-TP/SP "\
+              "acquisitions of known radioactive sources."
+parser = argparse.ArgumentParser(description=description)
+
+parser.add_argument("radsources",
+                    help="radioactive sources used for calibration. "
+                         "separated by comma, e.g.:  `-l=Fe,Cd,Cs`. "
+                         "currently supported sources: Fe, Cd, Cs.")
+parser.add_argument("filepath",
+                    help="input acquisition file in standard 0.5 fits format.")
+parser.add_argument("--cache",
+                    action="store_true",
+                    help="enables loading and saving from cache.")
+parser.add_argument("--fmt",
+                    default='xslx',
+                    help="set output format for calibration tables. "
+                         "supported formats: xslx, csv, fits. "
+                         "defaults to xslx.")
+parser.add_argument("--m", "--model",
+                    default='fm1',
+                    help="hermes flight model to calibrate. "
+                         "supported models: fm1. "
+                         "defaults to fm1.")
+parser.add_argument("--t", "--temp", "--temperature",
+                    type=float, default=20.,
+                    help="acquisition temperature in celsius degree. "
+                         "defaults to 20.0C")
+
+
 def run():
+
     console = interface.hello()
 
     with console.status("Building dataset.."):
-        data = get_from(filepath, console, use_cache=args.cache)
+        data = get_from(filepath, console, use_cache=if_requested)
 
     with console.status("Preprocessing.."):
         couples = get_couples("fm1")
@@ -107,16 +141,19 @@ def get_from(fitspath, console, use_cache=True):
     return out
 
 
+def filter_retrigger(df):
+    return filter_delay(df, hold_time=RETRIGGER_TIME_IN_S)
+
+
 def preprocess(data, detector_couples, console):
     channels = infer_onchannels(data)
     console.log(":white_check_mark: Found active channels.")
     data = add_evtype_tag(data, detector_couples)
     console.log(":white_check_mark: Tagged X and S events.")
     events_pre_filter = len(data)
-    remove_retrigger_and = (lambda df: filter_delay(df, hold_time=RETRIGGER_TIME_IN_S))
-    spurious_from = (lambda df: df[(df["NMULT"] < 2) | ((df["NMULT"] == 2) & (df["EVTYPE"] == "S"))])
-    data = remove_retrigger_and(spurious_from(data))
-    console.log(":white_check_mark: Filtered out {:.1f}% of the events.".format(100*(events_pre_filter - len(data))/events_pre_filter))
+    data = filter_retrigger(filter_spurious(data))
+    filtered_percentual = 100*(events_pre_filter - len(data))/events_pre_filter
+    console.log(":white_check_mark: Filtered out {:.1f}% of the events.".format(filtered_percentual))
     return data, channels
 
 
@@ -473,13 +510,14 @@ def anything_else(options, console):
 
 
 if __name__ == "__main__":
-    systhreads = min(4, cpu_count())
     args = parser.parse_args()
-    filepath = Path(args.filepath_in)
-    radsources = compile_sources_dicts(args.rs)
+    if_requested = args.cache
+    filepath = Path(args.filepath)
+    radsources = compile_sources_dicts(args.radsources.upper().split(","))
     write_report = get_writer(args.fmt)
+    model = args.m
+    temperature = args.t
+    calibration_hint = fetch_default_sdd_calibration(model, temperature)
+    systhreads = min(4, cpu_count())
 
-    from source.io import read_report_from_excel
-    cal_hint = Path(r".\assets\default_calibrations\fm1\20220622_55Fe109Cd137Cs_20deg_thr105_LV0d5\report_cal.xlsx")
-    calibration_hint = read_report_from_excel(cal_hint)
     run()

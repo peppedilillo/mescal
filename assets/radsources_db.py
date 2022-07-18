@@ -34,15 +34,3 @@ Am_x60 = {
 Cs = {
     'Cs 662 keV': Decay(661.6, -2., +2.),
 }
-
-x_sources = {
-    'FE': Fe,
-    'FE_KBETA': Fe_kbeta,
-    'CD': Cd,
-    'AM': Am,
-    'AM_X60': Am_x60,
-}
-
-s_sources = {
-    'CS': Cs,
-}

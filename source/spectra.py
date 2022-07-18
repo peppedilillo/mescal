@@ -277,7 +277,6 @@ def _lims_from_existing_calib(bins, counts, radsources: list, channel_calib):
     peaks, peaks_info = _filter_peaks_proximity(
         radsources,
         energies,
-        bins,
         enfiltered_peaks,
         enfiltered_peaks_info,
     )
@@ -286,7 +285,7 @@ def _lims_from_existing_calib(bins, counts, radsources: list, channel_calib):
     return limits
 
 
-def _filter_peaks_proximity(radsources: list, energies, bins, peaks, peaks_infos):
+def _filter_peaks_proximity(radsources: list, energies, peaks, peaks_infos):
     peaks_combinations = [*combinations(peaks, r=len(radsources))]
     enpeaks_combinations = np.take(energies, peaks_combinations)
     loss = np.sum(np.square(enpeaks_combinations - np.array(radsources)), axis=1)

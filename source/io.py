@@ -3,6 +3,18 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from astropy.io import fits as fitsio
+from source.errors import FormatNotSupportedError
+
+
+def get_writer(fmt):
+    if fmt == 'xslx':
+        return write_report_to_excel
+    elif fmt == 'fits':
+        return write_report_to_fits
+    elif fmt == 'csv':
+        return write_report_to_csv
+    else:
+        raise FormatNotSupportedError("write format not supported")
 
 
 def write_report_to_excel(result_df, path):

@@ -12,3 +12,7 @@ class FormatNotSupportedError(Exception):
 
 class SourceNotFoundError(Exception):
     """An error while parsing calib sources."""
+
+
+class CalibrationNotFoundError(Exception):
+    """An error when querying for unavailable default calibrations."""
