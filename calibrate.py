@@ -40,7 +40,6 @@ description = (
 )
 parser = argparse.ArgumentParser(description=description)
 
-
 parser.add_argument(
     "filepath",
     help="input acquisition file in standard 0.5 fits format.",

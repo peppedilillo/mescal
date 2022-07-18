@@ -224,14 +224,10 @@ def calibrate(xhistograms, shistograms, xradsources, sradsources, channels):
             channels,
             calibration_hint,
         )
-        index = pd.MultiIndex.from_product(
-            (
-                xradsources.keys(),
-                FIT_PARAMS,
-            )
-        )
+        index = pd.MultiIndex.from_product((xradsources.keys(), FIT_PARAMS))
         xfit_results = _to_dfdict(_xfitdict, index)
         sdds_calibration = _to_dfdict(_caldict, CAL_PARAMS)
+
         if sradsources:
             _sfitdict, _slodict, sflagged = scalibrate(
                 shistograms,
@@ -239,16 +235,13 @@ def calibrate(xhistograms, shistograms, xradsources, sradsources, channels):
                 sradsources,
                 lout_guess=(10.0, 15.0),
             )
-            index = pd.MultiIndex.from_product(
-                (
-                    sradsources.keys(),
-                    FIT_PARAMS,
-                )
-            )
+            index = pd.MultiIndex.from_product((sradsources.keys(), FIT_PARAMS))
             sfit_results = _to_dfdict(_sfitdict, index)
             scintillators_lightout = _to_dfdict(_slodict, LO_PARAMS)
+
         else:
             sfit_results, scintillators_lightout, sflagged = {}, {}, {}
+
     else:
         xfit_results, sdds_calibration, xflagged = {}, {}, {}
         sfit_results, scintillators_lightout, sflagged = {}, {}, {}
