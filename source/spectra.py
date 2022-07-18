@@ -14,7 +14,7 @@ PHT_KEV = 3.65 / 1000
 histograms_collection = namedtuple('histogram', ['bins', 'counts'])
 
 
-def make_events_list(data, calibrated_sdds, calibrated_scintillators, scintillator_couples, nthreads=1):
+def make_events_list(data, calibrated_sdds, calibrated_scintillators, scintillator_couples, nthreads=1,):
     columns = ['TIME', 'ENERGY', 'EVTYPE', 'CHN', 'QUADID']
     types = ['float64', 'float32', 'U1', 'int8', 'U1']
     dtypes = {col: tp for col, tp in zip(columns, types)}
@@ -25,16 +25,26 @@ def make_events_list(data, calibrated_sdds, calibrated_scintillators, scintillat
                                                  calibrated_scintillators,
                                                  scintillator_couples,
                                                  nthreads=nthreads)
+
     for quadrant in disorganized_events.keys():
         x_events, gamma_events = disorganized_events[quadrant]
-        xtimes, xenergies, xchannels, xquadrants, xevtypes = (*x_events.T,
-                                                              np.array([quadrant] * len(x_events)),
-                                                              np.array(['X'] * len(x_events)))
-        stimes, senergies, schannels, squadrants, sevtypes = (*gamma_events.T,
-                                                              np.array([quadrant] * len(gamma_events)),
-                                                              np.array(['S'] * len(gamma_events)))
-        x_array = np.rec.fromarrays([xtimes, xenergies, xevtypes, xchannels, xquadrants], dtype=[*dtypes.items()])
-        s_array = np.rec.fromarrays([stimes, senergies, sevtypes, schannels, squadrants], dtype=[*dtypes.items()])
+
+        xtimes, xenergies, xchannels = x_events.T
+        xquadrants = np.array([quadrant] * len(x_events))
+        xevtypes = np.array(['X'] * len(x_events))
+
+        stimes, senergies, schannels = gamma_events.T
+        squadrants = np.array([quadrant] * len(gamma_events))
+        sevtypes = np.array(['S'] * len(gamma_events))
+
+        x_array = np.rec.fromarrays(
+            [xtimes, xenergies, xevtypes, xchannels, xquadrants],
+            dtype=[*dtypes.items()]
+        )
+        s_array = np.rec.fromarrays(
+            [stimes, senergies, sevtypes, schannels, squadrants],
+            dtype=[*dtypes.items()]
+        )
         container = np.hstack((container, x_array, s_array))
     out = pd.DataFrame(container).sort_values('TIME').reset_index(drop=True)
     return out
@@ -89,31 +99,60 @@ def _insert_xenergy_column(data, calibrated_sdds):
     return data
 
 
-def scalibrate(histograms, cal_df, lines, lout_guess):
+def scalibrate(histograms, cal_df, radsources, lout_guess):
     results_fit, results_slo, flagged = {}, {}, {}
-    line_keys, line_values = zip(*lines.items())
+    radsources_energies = [l.energy for l in radsources.values()]
 
     bins = histograms.bins
     for quad in cal_df.keys():
         for ch in cal_df[quad].index:
             counts = histograms.counts[quad][ch]
-            gain, gain_err, offset, offset_err = cal_df[quad].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']]
+            gain = cal_df[quad].loc[ch]['gain']
+            gain_err = cal_df[quad].loc[ch]['gain_err']
+            offset = cal_df[quad].loc[ch]['offset']
+            offset_err = cal_df[quad].loc[ch]['offset_err']
+
             try:
-                guesses = [[lout_lim * PHT_KEV * lv * gain + offset for lout_lim in lout_guess] for lv in line_values]
-                limits = _estimate_peaks_from_guess(bins, counts, guess=guesses)
-                centers, center_errs, *etc = _fit_peaks(bins, counts, limits)
-                los, lo_errs = _compute_louts(centers, center_errs, gain, gain_err, offset, offset_err, line_values)
-                lo, lo_err = _do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_lines(los, lo_errs)
+                guesses = [[lout_lim * PHT_KEV * lv * gain + offset
+                            for lout_lim in lout_guess]
+                           for lv in radsources_energies]
+
+                limits = _estimate_peaks_from_guess(
+                    bins,
+                    counts,
+                    guess=guesses,
+                )
+
+                intervals, (centers, center_errs, *etc) = _fit_radsources_peaks(
+                    bins,
+                    counts,
+                    limits,
+                    radsources,
+                )
+                int_inf, int_sup = zip(*intervals)
+
+                los, lo_errs = _compute_louts(
+                    centers,
+                    center_errs,
+                    gain,
+                    gain_err,
+                    offset,
+                    offset_err,
+                    radsources_energies,
+                )
+                lo, lo_err = _do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_radsources(los, lo_errs)
+
             except DetectPeakError:
                 flagged.setdefault(quad, []).append(ch)
             else:
+                intervals = np.array(intervals).reshape(len(radsources), 2)
                 results_fit.setdefault(quad, {})[ch] = np.column_stack(
-                    (centers, center_errs, *etc, *limits.T)).flatten()
+                    (centers, center_errs, *etc, int_inf, int_sup)).flatten()
                 results_slo.setdefault(quad, {})[ch] = np.array((lo, lo_err))
     return results_fit, results_slo, flagged
 
 
-def _do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_lines(light_outs, light_outs_errs):
+def _do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_radsources(light_outs, light_outs_errs):
     # in doubt mean
     return light_outs.mean(), np.sqrt(np.sum(light_outs_errs ** 2))
 
@@ -122,39 +161,42 @@ def _dist_from_intv(x, lo, hi): return abs((x - lo) + (x - hi))
 
 
 def _closest_peaks(guess, peaks, peaks_infos):
-    peaks_dist_from_guess = [[_dist_from_intv(peak, guess_lo, guess_hi) for peak in peaks]
+    peaks_dist_from_guess = [[_dist_from_intv(peak, guess_lo, guess_hi)
+                              for peak in peaks]
                              for guess_lo, guess_hi in guess]
     argmin = np.argmin(peaks_dist_from_guess, axis=1)
     best_peaks = peaks[argmin]
-    return best_peaks, {key: val[argmin] for key, val in peaks_infos.items()}
+    best_peaks_infos = {key: val[argmin] for key, val in peaks_infos.items()}
+    return best_peaks, best_peaks_infos
 
 
 def _estimate_peaks_from_guess(bins, counts, guess):
     window_len = 10
-    prominence = 20
+    prominence = 10
     width = 5
 
     mm = move_mean(counts, window_len)
-    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=prominence, width=width)
-    if len(unfiltered_peaks) >= len(guess):
-        peaks, peaks_info = _closest_peaks(guess, unfiltered_peaks, unfiltered_peaks_info)
+    many_peaks, many_peaks_info = find_peaks(mm, prominence=prominence, width=width)
+    if len(many_peaks) >= len(guess):
+        peaks, peaks_info = _closest_peaks(guess, many_peaks, many_peaks_info)
     else:
-        raise DetectPeakError("candidate peaks are less than lines to fit.")
-    limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
-    return np.array(limits).reshape(len(peaks), 2)
+        raise DetectPeakError("candidate peaks are less than sources to fit.")
+    limits = [(bins[int(p - w)], bins[int(p + w)])
+              for p, w in zip(peaks, peaks_info['widths'])]
+    return limits
 
 
-def _compute_louts(centers, center_errs, gain, gain_err, offset, offset_err, lines):
-    light_outs = (centers - offset) / gain / PHT_KEV / lines
+def _compute_louts(centers, center_errs, gain, gain_err, offset, offset_err, radsources: list):
+    light_outs = (centers - offset) / gain / PHT_KEV / radsources
     light_out_errs = np.sqrt((center_errs / gain) ** 2
                              + (offset_err / gain) ** 2
-                             + ((centers - offset) / gain ** 2) * (gain_err ** 2)) / PHT_KEV / lines
+                             + ((centers - offset) / gain ** 2) * (gain_err ** 2)) / PHT_KEV / radsources
     return light_outs, light_out_errs
 
 
-def xcalibrate(histograms, lines, channels, default_calibration=None):
+def xcalibrate(histograms, radsources, channels, default_calibration=None):
     results_xfit, results_cal, flagged = {}, {}, {}
-    lines_keys, lines_values = zip(*lines.items())
+    radsources_energies = [l.energy for l in radsources.values()]
 
     for quad in channels.keys():
         for ch in channels[quad]:
@@ -162,68 +204,145 @@ def xcalibrate(histograms, lines, channels, default_calibration=None):
             counts = histograms.counts[quad][ch]
 
             try:
-                def packaged_calib(): return default_calibration[quad].iloc[ch]
-                limits = _find_peaks_limits(bins, counts, lines_values, packaged_calib)
+                def packaged_calib(): return default_calibration[quad].loc[ch]
+                limits = _find_peaks_limits(
+                    bins,
+                    counts,
+                    radsources_energies,
+                    packaged_calib,
+                )
             except DetectPeakError:
                 flagged.setdefault(quad, []).append(ch)
                 continue
 
-            centers, center_errs, *etc = _fit_peaks(bins, counts, limits, weights='amplitude')
+            intervals, fit_results = _fit_radsources_peaks(
+                bins,
+                counts,
+                limits,
+                radsources,
+            )
+            centers, center_errs, *etc = fit_results
+            int_inf, int_sup = zip(*intervals)
 
             try:
-                gain, gain_err, offset, offset_err, chi2 = _calibrate_chn(centers, center_errs, lines_values)
+                cal_results = _calibrate_chn(
+                    centers,
+                    radsources_energies,
+                    weights=center_errs,
+                )
             except ValueError:
                 flagged.setdefault(quad, []).append(ch)
                 continue
 
             results_xfit.setdefault(quad, {})[ch] = np.column_stack(
-                (centers, center_errs, *etc, *limits.T)).flatten()
-            results_cal.setdefault(quad, {})[ch] = np.array((gain, gain_err, offset, offset_err, chi2))
+                (*fit_results, int_inf, int_sup)).flatten()
+            results_cal.setdefault(quad, {})[ch] = np.array(cal_results)
     return results_xfit, results_cal, flagged
 
 
-def _find_peaks_limits(bins, counts, lines_values, unpack_calibration):
+def _find_peaks_limits(bins, counts, radsources: list, unpack_calibration):
     try:
         channel_calib = unpack_calibration()
     except TypeError:
-        limits = _estimate_from_lratio(bins, counts, lines_values)
+        return _lims_from_decays_ratio(bins, counts, radsources)
+    except KeyError:
+        raise DetectPeakError("no calibration for queried channel")
     else:
-        pass
+        return _lims_from_existing_calib(bins, counts, radsources, channel_calib)
+
+
+def _lims_from_existing_calib(bins, counts, radsources: list, channel_calib):
+    window_len = 5
+    width = 5
+    prominence = 5
+    distance = 5
+    low_en_thr = 1.0  # keV
+
+    energies = (bins - channel_calib['offset'])/ channel_calib['gain']
+    (inf_bin, *_), = np.where(energies > low_en_thr)
+    smoothed_counts = move_mean(counts, window_len)
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(
+        smoothed_counts,
+        prominence=prominence,
+        width=width,
+        distance=distance,
+    )
+    enfiltered_peaks, enfiltered_peaks_info = _filter_peaks_low_energy(
+        inf_bin,
+        unfiltered_peaks,
+        unfiltered_peaks_info,
+    )
+    if len(enfiltered_peaks) < len(radsources):
+        raise DetectPeakError("candidate peaks are less than radsources to fit.")
+    peaks, peaks_info = _filter_peaks_proximity(
+        radsources,
+        energies,
+        enfiltered_peaks,
+        enfiltered_peaks_info,
+    )
+    limits = [(bins[int(p - w)], bins[int(p + w)])
+              for p, w in zip(peaks, peaks_info['widths'])]
     return limits
 
 
-def _estimate_from_lratio(bins, counts, lines: list):
+def _filter_peaks_proximity(radsources: list, energies, peaks, peaks_infos):
+    peaks_combinations = [*combinations(peaks, r=len(radsources))]
+    enpeaks_combinations = np.take(energies, peaks_combinations)
+    loss = np.sum(np.square(enpeaks_combinations - np.array(radsources)), axis=1)
+    filtered_peaks = peaks_combinations[np.argmin(loss)]
+    filtered_peaks_info = {key: val[np.isin(peaks, filtered_peaks)]
+                           for key, val in peaks_infos.items()}
+    return filtered_peaks, filtered_peaks_info
+
+
+def _filter_peaks_low_energy(lim_bin, peaks, peaks_infos):
+    filtered_peaks = peaks[np.where(peaks > lim_bin)]
+    filtered_peaks_info = {key: val[np.isin(peaks, filtered_peaks)]
+                           for key, val in peaks_infos.items()}
+    return filtered_peaks, filtered_peaks_info
+
+
+def _lims_from_decays_ratio(bins, counts, radsources: list):
     window_len = 5
-    prominence = 20
+    prominence = 100
     width = 5
+    distance = 10
 
-    if len(lines) < 3:
-        raise DetectPeakError("not enough lines to calibrate.")
+    if len(radsources) < 3:
+        raise DetectPeakError("not enough radsources to calibrate.")
     mm = move_mean(counts, window_len)
-    unfiltered_peaks, unfiltered_peaks_info = find_peaks(mm, prominence=prominence, width=width)
-    if len(unfiltered_peaks) >= len(lines):
-        peaks, peaks_info = _filter_peaks_lratio(lines, unfiltered_peaks, unfiltered_peaks_info)
-    else:
-        raise DetectPeakError("candidate peaks are less than lines to fit.")
-    limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(peaks, peaks_info['widths'])]
-    return np.array(limits).reshape(len(peaks), 2)
+    unfiltered_peaks, unfiltered_peaks_info = find_peaks(
+        mm,
+        prominence=prominence,
+        width=width,
+        distance=distance,
+    )
+    if len(unfiltered_peaks) < len(radsources):
+        raise DetectPeakError("candidate peaks are less than radsources to fit.")
+    peaks, peaks_info = _filter_peaks_lratio(radsources, unfiltered_peaks, unfiltered_peaks_info)
+    limits = [(bins[int(p - w)], bins[int(p + w)])
+              for p, w in zip(peaks, peaks_info['widths'])]
+    return limits
 
 
-def _filter_peaks_lratio(lines: list, peaks, peaks_infos):
+def _filter_peaks_lratio(radsources: list, peaks, peaks_infos):
     normalize = (lambda x: [(x[i + 1] - x[i]) / (x[-1] - x[0]) for i in range(len(x) - 1)])
     weight = (lambda x: [x[i + 1] * x[i] for i in range(len(x) - 1)])
 
-    peaks_combinations = [*combinations(peaks, r=len(lines))]
-    norm_ls = normalize(lines)
+    peaks_combinations = [*combinations(peaks, r=len(radsources))]
+    proms_combinations = combinations(peaks_infos["prominences"], r=len(radsources))
+    norm_ls = normalize(radsources)
     norm_ps = [*map(normalize, peaks_combinations)]
-    weights = [*map(weight, combinations(peaks_infos["prominences"], r=len(lines)))]
-    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)) / weights
+    weights = [*map(weight, proms_combinations)]
+    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls))
+                  / np.square(weights)
                   , axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
-    return best_peaks, {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
+    best_peaks_info = {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
+    return best_peaks, best_peaks_info
 
 
-def _line_fitter(x, y, limits):
+def _peak_fitter(x, y, limits):
     start, stop = limits
     x_start = np.where(x > start)[0][0]
     x_stop = np.where(x < stop)[0][-1]
@@ -244,7 +363,16 @@ def _line_fitter(x, y, limits):
     return result, start, stop, x_fine, fitting_curve
 
 
-def _fit_peaks(x, y, limits, weights=None):
+def _fit_radsources_peaks(x, y, limits, radsources):
+    centers, _, fwhms, _, *_ = _fit_peaks(x, y, limits)
+    sigmas = fwhms/2.35
+    lower, upper = zip(*[(rs.low_lim, rs.hi_lim) for rs in radsources.values()])
+    intervals = [*zip(centers + sigmas*lower, centers + sigmas*upper)]
+    fit_results = _fit_peaks(x, y, intervals)
+    return intervals, fit_results
+
+
+def _fit_peaks(x, y, limits):
     n_peaks = len(limits)
     centers = np.zeros(n_peaks)
     center_errs = np.zeros(n_peaks)
@@ -254,7 +382,7 @@ def _fit_peaks(x, y, limits, weights=None):
     amp_errs = np.zeros(n_peaks)
 
     for i in range(n_peaks):
-        result, start, stop, x_fine, fitting_curve = _line_fitter(x, y, limits[i])
+        result, start, stop, x_fine, fitting_curve = _peak_fitter(x, y, limits[i])
         centers[i] = result.params['center'].value
         center_errs[i] = result.params['center'].stderr
         fwhms[i] = result.params['fwhm'].value
@@ -265,10 +393,10 @@ def _fit_peaks(x, y, limits, weights=None):
     return centers, center_errs, fwhms, fwhm_errs, amps, amp_errs
 
 
-def _calibrate_chn(centers, center_errs, lines):
+def _calibrate_chn(centers, radsources: list, weights=None):
     lmod = LinearModel()
-    pars = lmod.guess(centers, x=lines)
-    resultlin = lmod.fit(centers, pars, x=lines, weights=center_errs)
+    pars = lmod.guess(centers, x=radsources)
+    resultlin = lmod.fit(centers, pars, x=radsources, weights=weights)
 
     chi2 = resultlin.redchi
     gain = resultlin.params['slope'].value
@@ -279,17 +407,17 @@ def _calibrate_chn(centers, center_errs, lines):
     return gain, gain_err, offset, offset_err, chi2
 
 
-def compute_histogram(data, start, nbins, step, nthreads=1):
+def compute_histogram(data, start, end, nbins, nthreads=1):
     def helper(quad):
         hist_quads = {}
         quad_df = data[data['QUADID'] == quad]
         for ch in range(32):
-            ch_data = quad_df[(quad_df['CHN'] == ch)]
-            counts, bins = np.histogram(ch_data['ADC'], range=(start, start + nbins * step), bins=nbins)
+            adcs = quad_df[(quad_df['CHN'] == ch)]['ADC']
+            counts, bins = np.histogram(adcs, range=(start, end), bins=nbins)
             hist_quads[ch] = counts
         return quad, hist_quads, bins
 
-    bins = np.linspace(start, start + nbins * step, nbins + 1)
+    bins = np.linspace(start, end, nbins + 1)
     results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in 'ABCD')
     counts = {key: value for key, value, _ in results}
     return histograms_collection(bins, counts)

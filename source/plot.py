@@ -9,13 +9,11 @@ from joblib import delayed
 from source.spectra import PHT_KEV
 
 
-def _compute_lims_for_x(lines: dict):
-    # if radsources.Am_x60.items() <= lines.items():
-    #    pass
+def _compute_lims_for_x(radsources: dict):
     return 2., 40.
 
 
-def _compute_lims_for_s(lines: dict):
+def _compute_lims_for_s(radsources: dict):
     return 20., 1000.
 
 
@@ -51,7 +49,7 @@ def draw_and_save_diagns(histograms, res_fit, path, nthreads=1):
                                    res_fit[quad].loc[ch].loc[:, 'amp'],
                                    res_fit[quad].loc[ch].loc[:, 'fwhm'],
                                    res_fit[quad].loc[ch].loc[:, ['lim_low', 'lim_high']].values.reshape(2, -1).T,
-                                   figsize=(9, 4.5))
+                                   figsize=(9, 4.5), dpi=150)
             ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch))
             plt.close(fig)
@@ -59,14 +57,14 @@ def draw_and_save_diagns(histograms, res_fit, path, nthreads=1):
     return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_fit.keys())
 
 
-def draw_and_save_channels_xspectra(histograms, res_cal, lines:dict, path, nthreads=1):
+def draw_and_save_channels_xspectra(histograms, res_cal, radsources:dict, path, nthreads=1):
     def helper(quad):
         for ch in res_cal[quad].index:
             enbins = (histograms.bins - res_cal[quad].loc[ch]['offset']) / res_cal[quad].loc[ch]['gain']
             fig, ax = _spectrum(enbins,
                                 histograms.counts[quad][ch],
-                                lines,
-                                elims=_compute_lims_for_x(lines),
+                                radsources,
+                                elims=_compute_lims_for_x(radsources),
                                 figsize=(9, 4.5))
             ax.set_title("Spectra plot X - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch))
@@ -75,7 +73,7 @@ def draw_and_save_channels_xspectra(histograms, res_cal, lines:dict, path, nthre
     return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
 
 
-def draw_and_save_channels_sspectra(histograms, res_cal, res_slo, lines: dict, path, nthreads=1):
+def draw_and_save_channels_sspectra(histograms, res_cal, res_slo, radsources: dict, path, nthreads=1):
     def helper(quad):
         for ch in res_slo[quad].index:
             xenbins = (histograms.bins - res_cal[quad].loc[ch]['offset']) / res_cal[quad].loc[ch]['gain']
@@ -83,8 +81,8 @@ def draw_and_save_channels_sspectra(histograms, res_cal, res_slo, lines: dict, p
 
             fig, ax = _spectrum(enbins,
                                 histograms.counts[quad][ch],
-                                lines,
-                                elims=_compute_lims_for_s(lines),
+                                radsources,
+                                elims=_compute_lims_for_s(radsources),
                                 figsize=(9, 4.5))
             ax.set_title("Spectra plot S - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch))
@@ -93,15 +91,15 @@ def draw_and_save_channels_sspectra(histograms, res_cal, res_slo, lines: dict, p
     return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_slo.keys())
 
 
-def draw_and_save_xspectrum(calibrated_events, lines: dict, path):
+def draw_and_save_xspectrum(calibrated_events, radsources: dict, path):
     if not calibrated_events.empty:
         xevs = calibrated_events[calibrated_events['EVTYPE'] == 'X']
         xcounts, xbins = np.histogram(xevs['ENERGY'], bins=np.arange(2, 40, 0.05))
 
         fig, ax = _spectrum(xbins,
                             xcounts,
-                            lines,
-                            elims=_compute_lims_for_x(lines),
+                            radsources,
+                            elims=_compute_lims_for_x(radsources),
                             figsize=(9, 4.5))
         ax.set_title("Spectrum X")
         fig.savefig(path)
@@ -109,15 +107,15 @@ def draw_and_save_xspectrum(calibrated_events, lines: dict, path):
         return True
 
 
-def draw_and_save_sspectrum(calibrated_events, lines: dict, path):
+def draw_and_save_sspectrum(calibrated_events, radsources: dict, path):
     if not calibrated_events.empty:
         sevs = calibrated_events[calibrated_events['EVTYPE'] == 'S']
         scounts, sbins = np.histogram(sevs['ENERGY'], bins=np.arange(30, 1000, 2))
 
         fig, ax = _spectrum(sbins,
                             scounts,
-                            lines,
-                            elims=_compute_lims_for_s(lines),
+                            radsources,
+                            elims=_compute_lims_for_s(radsources),
                             figsize=(9, 4.5))
         ax.set_title("Spectrum S")
         fig.savefig(path)
@@ -125,13 +123,13 @@ def draw_and_save_sspectrum(calibrated_events, lines: dict, path):
         return True
 
 
-def draw_and_save_lins(res_cal, res_fit, lines, path, nthreads=1):
+def draw_and_save_lins(res_cal, res_fit, radsources: dict, path, nthreads=1):
     def helper(quad):
         for ch in res_cal[quad].index:
             fig, ax = _linearity(*res_cal[quad].loc[ch][['gain', 'gain_err', 'offset', 'offset_err']],
                                  res_fit[quad].loc[ch].loc[:, 'center'],
                                  res_fit[quad].loc[ch].loc[:, 'center_err'],
-                                 lines,
+                                 radsources,
                                  figsize=(7,7))
             ax[0].set_title("Linearity plot - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch))
@@ -189,8 +187,10 @@ def _diagnostics(bins, counts, centers, amps, fwhms, limits, **kwargs):
     return fig, ax
 
 
-def _spectrum(enbins, counts, lines: dict={}, elims=None, **kwargs):
-    colors = [plt.cm.tab10(i) for i in range(len(lines))]
+def _spectrum(enbins, counts, radsources: dict, elims=None, **kwargs):
+    radsources_keys = radsources.keys()
+    radsources_energies = [l.energy for l in radsources.values()]
+    colors = [plt.cm.tab10(i) for i in range(len(radsources))]
 
     fig, ax = plt.subplots(**kwargs)
     if elims:
@@ -203,45 +203,39 @@ def _spectrum(enbins, counts, lines: dict={}, elims=None, **kwargs):
         xs, ys = enbins[:-1], counts
     ax.step(xs, ys, where='post')
     ax.fill_between(xs, ys, step="post", alpha=0.4)
-    for (lines_keys, lines_values), col in zip(lines.items(), colors):
-        ax.axvline(lines_values, linestyle="dashed", color=col, label=lines_keys)
+    for key, value, col in zip(radsources_keys, radsources_energies, colors):
+        ax.axvline(value, linestyle="dashed", color=col, label=key)
+        ax.legend(loc="upper right")
     ax.set_ylim(bottom=0)
     ax.set_xlabel('Energy [keV]')
     ax.set_ylabel('Counts')
-    ax.legend(loc="upper right")
     return fig, ax
 
 
-def _linearity(gain, gain_err, offset, offset_err, adcs, adcs_err, lines: dict, **kwargs):
-    _, lines = zip(*lines.items())
-    lines = np.array(lines)
-    measured_energies = (adcs - offset)/gain
+def _linearity(gain, gain_err, offset, offset_err, adcs, adcs_err, radsources: dict, **kwargs):
+    radsources_energies = np.array([l.energy for l in radsources.values()])
     measured_energies_err =  np.sqrt((adcs_err**2)*(1/gain)**2 +
                                      (gain_err**2)*((adcs - offset)/gain**2)**2 +
                                      (offset_err**2)*(1/gain)**2)
-    residual = gain * lines + offset - adcs
-    res_err = np.sqrt((gain_err ** 2) * (lines ** 2) +
+    residual = gain * radsources_energies + offset - adcs
+    res_err = np.sqrt((gain_err ** 2) * (radsources_energies ** 2) +
                       offset_err ** 2 +
                       adcs_err ** 2)
     perc_residual = 100 * residual / adcs
     perc_residual_err = 100 * res_err / adcs
 
-    prediction_discrepancy = (adcs-offset)/gain - lines
-    perc_prediction_discrepancy = 100 * prediction_discrepancy / lines
-    perc_measured_energies_err = 100 * measured_energies_err / lines
+    prediction_discrepancy = (adcs-offset)/gain - radsources_energies
+    perc_prediction_discrepancy = 100 * prediction_discrepancy / radsources_energies
+    perc_measured_energies_err = 100 * measured_energies_err / radsources_energies
 
-    margin = (lines[-1] - lines[0]) / 10
-    xs = np.linspace(lines[0] - margin, lines[-1] + margin, 10)
+    margin = (radsources_energies[-1] - radsources_energies[0]) / 10
+    xs = np.linspace(radsources_energies[0] - margin, radsources_energies[-1] + margin, 10)
 
     fig, axs = plt.subplots(3, 1, gridspec_kw={'height_ratios': [6, 3, 3]}, sharex=True, **kwargs)
-
-    axs[0].errorbar(lines, adcs, yerr=adcs_err, fmt='o')
+    axs[0].errorbar(radsources_energies, adcs, yerr=adcs_err, fmt='o')
     axs[0].plot(xs, gain * xs + offset)
-
-    axs[1].errorbar(lines, perc_residual, yerr=perc_residual_err, fmt='o', capsize=5)
-
-    axs[2].errorbar(lines, perc_prediction_discrepancy, yerr=perc_measured_energies_err, fmt='o', capsize=5)
-
+    axs[1].errorbar(radsources_energies, perc_residual, yerr=perc_residual_err, fmt='o', capsize=5)
+    axs[2].errorbar(radsources_energies, perc_prediction_discrepancy, yerr=perc_measured_energies_err, fmt='o', capsize=5)
     axs[0].set_ylabel("Measured Energy [keV]")
     axs[1].set_ylabel("Residual [%]")
     axs[2].set_ylabel("Prediction error [%]")
