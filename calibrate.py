@@ -24,7 +24,7 @@ from source.plot import draw_and_save_uncalibrated
 
 START, STOP, STEP = 15000, 28000, 10
 NBINS = int((STOP - START) / STEP)
-END = START + NBINS*STEP
+END = START + NBINS * STEP
 BINNING = (START, END, NBINS)
 RETRIGGER_TIME_IN_S = 20 * (10**-6)
 
@@ -34,22 +34,32 @@ terminate_mescal = option("Exit mescal.", "So soon?", lambda _: None)
 options = [terminate_mescal]
 
 
-description = "A script to automatically calibrate HERMES-TP/SP "\
-              "based on previous calibrations."
+description = (
+    "A script to automatically calibrate HERMES-TP/SP "
+    "based on previous calibrations."
+)
 parser = argparse.ArgumentParser(description=description)
 
-
-parser.add_argument("filepath",
-                    help="input acquisition file in standard 0.5 fits format.")
-parser.add_argument("--m", "--model",
-                    default='fm1',
-                    help="hermes flight model to calibrate. "
-                         "supported models: fm1. "
-                         "defaults to fm1.")
-parser.add_argument("--t", "--temp", "--temperature",
-                    type=float, default=20.,
-                    help="acquisition temperature in celsius degree. "
-                         "defaults to 20.0C")
+parser.add_argument(
+    "filepath",
+    help="input acquisition file in standard 0.5 fits format.",
+)
+parser.add_argument(
+    "--m",
+    "--model",
+    default="fm1",
+    help="hermes flight model to calibrate. "
+    "supported models: fm1. "
+    "defaults to fm1.",
+)
+parser.add_argument(
+    "--t",
+    "--temp",
+    "--temperature",
+    type=float,
+    default=20.0,
+    help="acquisition temperature in celsius degree. " "defaults to 20.0C",
+)
 
 
 def run():
@@ -66,7 +76,15 @@ def run():
 
     with console.status("Writing calibrated event list.."):
         calibrations = sdds_calibration, scintillators_lightout
-        process_results(filepath, couples, data, histograms, calibrations, options, console)
+        process_results(
+            filepath,
+            couples,
+            data,
+            histograms,
+            calibrations,
+            options,
+            console,
+        )
 
     anything_else(options, console)
 
@@ -96,8 +114,12 @@ def preprocess(data, detector_couples, console):
     console.log(":white_check_mark: Tagged X and S events.")
     events_pre_filter = len(data)
     data = filter_retrigger(filter_spurious(data))
-    filtered_percentual = 100*(events_pre_filter - len(data))/events_pre_filter
-    console.log(":white_check_mark: Filtered out {:.1f}% of the events.".format(filtered_percentual))
+    filtered_percentual = 100 * (events_pre_filter - len(data)) / events_pre_filter
+    console.log(
+        ":white_check_mark: Filtered out {:.1f}% of the events.".format(
+            filtered_percentual
+        )
+    )
     return data, channels
 
 
@@ -108,9 +130,7 @@ def make_histograms(data, binning, console):
         nthreads=systhreads,
     )
     shistograms = compute_histogram(
-        data[data["EVTYPE"] == "S"],
-        *binning,
-        nthreads=systhreads
+        data[data["EVTYPE"] == "S"], *binning, nthreads=systhreads
     )
     console.log(":white_check_mark: Binned data.")
     return xhistograms, shistograms
@@ -179,7 +199,10 @@ def _draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads):
         reply=":sparkles: Saved uncalibrated plots. :sparkles:",
         promise=promise(
             lambda: draw_and_save_uncalibrated(
-                xhistograms, shistograms, path, nthreads
+                xhistograms,
+                shistograms,
+                path,
+                nthreads,
             )
         ),
     )
@@ -193,7 +216,11 @@ def _draw_and_save_channels_xspectra(
         reply=":sparkles: Plots saved. :sparkles:",
         promise=promise(
             lambda: draw_and_save_channels_xspectra(
-                xhistograms, sdds_calibration, xradsources, path, nthreads
+                xhistograms,
+                sdds_calibration,
+                xradsources,
+                path,
+                nthreads,
             )
         ),
     )

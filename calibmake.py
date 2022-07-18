@@ -33,7 +33,7 @@ from source.plot import draw_and_save_lins
 
 START, STOP, STEP = 15000, 28000, 10
 NBINS = int((STOP - START) / STEP)
-END = START + NBINS*STEP
+END = START + NBINS * STEP
 BINNING = (START, END, NBINS)
 RETRIGGER_TIME_IN_S = 20 * (10**-6)
 
@@ -46,18 +46,18 @@ FIT_PARAMS = [
     "amp",
     "amp_err",
     "lim_low",
-    "lim_high"
+    "lim_high",
 ]
 CAL_PARAMS = [
     "gain",
     "gain_err",
     "offset",
     "offset_err",
-    "chi2"
+    "chi2",
 ]
 LO_PARAMS = [
     "light_out",
-    "light_out_err"
+    "light_out_err",
 ]
 
 
@@ -66,33 +66,50 @@ terminate_mescal = option("Exit mescal.", "So soon?", lambda _: None)
 options = [terminate_mescal]
 
 
-description = "A script to automatically calibrate HERMES-TP/SP "\
-              "acquisitions of known radioactive sources."
+description = (
+    "A script to automatically calibrate HERMES-TP/SP "
+    "acquisitions of known radioactive sources."
+)
 parser = argparse.ArgumentParser(description=description)
 
-parser.add_argument("radsources",
-                    help="radioactive sources used for calibration. "
-                         "separated by comma, e.g.:  `-l=Fe,Cd,Cs`. "
-                         "currently supported sources: Fe, Cd, Cs.")
-parser.add_argument("filepath",
-                    help="input acquisition file in standard 0.5 fits format.")
-parser.add_argument("--cache",
-                    action="store_true",
-                    help="enables loading and saving from cache.")
-parser.add_argument("--fmt",
-                    default='xslx',
-                    help="set output format for calibration tables. "
-                         "supported formats: xslx, csv, fits. "
-                         "defaults to xslx.")
-parser.add_argument("--m", "--model",
-                    default='fm1',
-                    help="hermes flight model to calibrate. "
-                         "supported models: fm1. "
-                         "defaults to fm1.")
-parser.add_argument("--t", "--temp", "--temperature",
-                    type=float, default=20.,
-                    help="acquisition temperature in celsius degree. "
-                         "defaults to 20.0C")
+parser.add_argument(
+    "radsources",
+    help="radioactive sources used for calibration. "
+    "separated by comma, e.g.:  `-l=Fe,Cd,Cs`. "
+    "currently supported sources: Fe, Cd, Cs.",
+)
+parser.add_argument(
+    "filepath",
+    help="input acquisition file in standard 0.5 fits format.",
+)
+parser.add_argument(
+    "--cache",
+    action="store_true",
+    help="enables loading and saving from cache.",
+)
+parser.add_argument(
+    "--fmt",
+    default="xslx",
+    help="set output format for calibration tables. "
+    "supported formats: xslx, csv, fits. "
+    "defaults to xslx.",
+)
+parser.add_argument(
+    "--m",
+    "--model",
+    default="fm1",
+    help="hermes flight model to calibrate. "
+    "supported models: fm1. "
+    "defaults to fm1.",
+)
+parser.add_argument(
+    "--t",
+    "--temp",
+    "--temperature",
+    type=float,
+    default=20.0,
+    help="acquisition temperature in celsius degree. defaults to 20.0C",
+)
 
 
 def run():
@@ -112,7 +129,16 @@ def run():
         *results, flagged = inspect(*calibration, console)
 
     with console.status("Writing and drawing.."):
-        process_results(filepath, couples, data, histograms, radsources, results, options, console)
+        process_results(
+            filepath,
+            couples,
+            data,
+            histograms,
+            radsources,
+            results,
+            options,
+            console,
+        )
 
     if any(flagged):
         warn_about_flagged(flagged, channels, console)
@@ -152,14 +178,22 @@ def preprocess(data, detector_couples, console):
     console.log(":white_check_mark: Tagged X and S events.")
     events_pre_filter = len(data)
     data = filter_retrigger(filter_spurious(data))
-    filtered_percentual = 100*(events_pre_filter - len(data))/events_pre_filter
-    console.log(":white_check_mark: Filtered out {:.1f}% of the events.".format(filtered_percentual))
+    filtered_percentual = 100 * (events_pre_filter - len(data)) / events_pre_filter
+    console.log(
+        ":white_check_mark: Filtered out {:.1f}% of the events.".format(
+            filtered_percentual
+        )
+    )
     return data, channels
 
 
 def make_histograms(data, binning, console):
-    xhistograms = compute_histogram(data[data["EVTYPE"] == "X"], *binning, nthreads=systhreads)
-    shistograms = compute_histogram(data[data["EVTYPE"] == "S"], *binning, nthreads=systhreads)
+    xhistograms = compute_histogram(
+        data[data["EVTYPE"] == "X"], *binning, nthreads=systhreads
+    )
+    shistograms = compute_histogram(
+        data[data["EVTYPE"] == "S"], *binning, nthreads=systhreads
+    )
     console.log(":white_check_mark: Binned data.")
     return xhistograms, shistograms
 
@@ -184,29 +218,30 @@ def _to_dfdict(x, idx):
 def calibrate(xhistograms, shistograms, xradsources, sradsources, channels):
 
     if xradsources:
-        _xfitdict, _caldict, xflagged = xcalibrate(xhistograms, xradsources, channels, calibration_hint)
-        index = pd.MultiIndex.from_product(
-            (
-                xradsources.keys(),
-                FIT_PARAMS,
-            )
+        _xfitdict, _caldict, xflagged = xcalibrate(
+            xhistograms,
+            xradsources,
+            channels,
+            calibration_hint,
         )
+        index = pd.MultiIndex.from_product((xradsources.keys(), FIT_PARAMS))
         xfit_results = _to_dfdict(_xfitdict, index)
         sdds_calibration = _to_dfdict(_caldict, CAL_PARAMS)
+
         if sradsources:
             _sfitdict, _slodict, sflagged = scalibrate(
-                shistograms, sdds_calibration, sradsources, lout_guess=(10.0, 15.0)
+                shistograms,
+                sdds_calibration,
+                sradsources,
+                lout_guess=(10.0, 15.0),
             )
-            index = pd.MultiIndex.from_product(
-                (
-                    sradsources.keys(),
-                    FIT_PARAMS,
-                )
-            )
+            index = pd.MultiIndex.from_product((sradsources.keys(), FIT_PARAMS))
             sfit_results = _to_dfdict(_sfitdict, index)
             scintillators_lightout = _to_dfdict(_slodict, LO_PARAMS)
+
         else:
             sfit_results, scintillators_lightout, sflagged = {}, {}, {}
+
     else:
         xfit_results, sdds_calibration, xflagged = {}, {}, {}
         sfit_results, scintillators_lightout, sflagged = {}, {}, {}
@@ -238,26 +273,35 @@ def process_results(
     if True:
         options.append(
             _draw_and_save_uncalibrated(
-                xhistograms, shistograms, upaths.UNCPLOT(filepath), systhreads
+                xhistograms,
+                shistograms,
+                upaths.UNCPLOT(filepath),
+                systhreads,
             )
         )
     if xfit_results:
         options.append(
             _draw_and_save_xdiagns(
-                xhistograms, xfit_results, upaths.XDNPLOT(filepath), systhreads
+                xhistograms,
+                xfit_results,
+                upaths.XDNPLOT(filepath),
+                systhreads,
             )
         )
         options.append(
             _write_xfit_report(
-                xfit_results, upaths.XFTREPORT(filepath)
+                xfit_results,
+                upaths.XFTREPORT(filepath),
             )
         )
 
     if sdds_calibration:
         write_report(
-            sdds_calibration, path=upaths.CALREPORT(filepath)
+            sdds_calibration,
+            path=upaths.CALREPORT(filepath),
         )
         console.log(":blue_book: Wrote SDD calibration results.")
+
         draw_and_save_qlooks(
             sdds_calibration,
             path=upaths.QLKPLOT(filepath),
@@ -287,21 +331,26 @@ def process_results(
     if sfit_results:
         options.append(
             _draw_and_save_sdiagns(
-                shistograms, sfit_results, upaths.SDNPLOT(filepath), systhreads
+                shistograms,
+                sfit_results,
+                upaths.SDNPLOT(filepath),
+                systhreads,
             )
         )
         options.append(
             _write_sfit_report(
-                sfit_results, upaths.SFTREPORT(filepath)
+                sfit_results,
+                upaths.SFTREPORT(filepath),
             )
         )
 
     if scintillators_lightout:
         write_report(
             scintillators_lightout,
-            path=upaths.SLOREPORT(filepath)
+            path=upaths.SLOREPORT(filepath),
         )
         console.log(":blue_book: Wrote scintillators calibration results.")
+
         draw_and_save_slo(
             scintillators_lightout,
             path=upaths.SLOPLOT(filepath),
@@ -336,8 +385,8 @@ def process_results(
 
 
 def merge_flagged_dicts(dx, ds):
-    fs = (lambda x, l: (*x, "s") if x[0] in l else x)
-    fx = (lambda x, l: (*x, "x") if x[0] in l else x)
+    fs = lambda x, l: (*x, "s") if x[0] in l else x
+    fx = lambda x, l: (*x, "x") if x[0] in l else x
 
     out = {}
     for key in "ABCD":
@@ -359,7 +408,10 @@ def _draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads):
         reply=":sparkles: Saved uncalibrated plots. :sparkles:",
         promise=promise(
             lambda: draw_and_save_uncalibrated(
-                xhistograms, shistograms, path, nthreads
+                xhistograms,
+                shistograms,
+                path,
+                nthreads,
             )
         ),
     )
@@ -371,7 +423,10 @@ def _draw_and_save_xdiagns(histograms, fit_results, path, nthreads):
         reply=":sparkles: Plots saved. :sparkles:",
         promise=promise(
             lambda: draw_and_save_diagns(
-                histograms, fit_results, path, nthreads
+                histograms,
+                fit_results,
+                path,
+                nthreads,
             )
         ),
     )
@@ -383,7 +438,10 @@ def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
         reply=":sparkles: Plots saved. :sparkles:",
         promise=promise(
             lambda: draw_and_save_diagns(
-                histograms, fit_results, path, nthreads
+                histograms,
+                fit_results,
+                path,
+                nthreads,
             )
         ),
     )
@@ -394,7 +452,10 @@ def _write_xfit_report(fit_results, path):
         display="Save X fit results.",
         reply=":sparkles: Fit table saved. :sparkles:",
         promise=promise(
-            lambda: write_report_to_excel(fit_results, path)
+            lambda: write_report_to_excel(
+                fit_results,
+                path,
+            )
         ),
     )
 
@@ -404,7 +465,10 @@ def _write_sfit_report(fit_results, path):
         display="Save S fit results.",
         reply=":sparkles: Fit table saved. :sparkles:",
         promise=promise(
-            lambda: write_report_to_excel(fit_results, path)
+            lambda: write_report_to_excel(
+                fit_results,
+                path,
+            )
         ),
     )
 
@@ -417,7 +481,11 @@ def _draw_and_save_channels_xspectra(
         reply=":sparkles: Plots saved. :sparkles:",
         promise=promise(
             lambda: draw_and_save_channels_xspectra(
-                xhistograms, sdds_calibration, xradsources, path, nthreads
+                xhistograms,
+                sdds_calibration,
+                xradsources,
+                path,
+                nthreads,
             )
         ),
     )
@@ -447,15 +515,17 @@ def _draw_and_save_channels_sspectra(
     )
 
 
-def _draw_and_save_lins(
-    sdds_calibration, xfit_results, xradsources, path, nthreads
-):
+def _draw_and_save_lins(sdds_calibration, xfit_results, xradsources, path, nthreads):
     return option(
         display="Save X linearity plots.",
         reply=":sparkles: Plots saved. :sparkles:",
         promise=promise(
             lambda: draw_and_save_lins(
-                sdds_calibration, xfit_results, xradsources, path, nthreads
+                sdds_calibration,
+                xfit_results,
+                xradsources,
+                path,
+                nthreads,
             )
         ),
     )
@@ -471,9 +541,16 @@ def _write_eventlist_to_fits(thunk, path):
                                       detector_couples)),
             upaths.EVLFITS(filepath))
     """
-    return option(display="Write calibrated events to fits.",
-                  reply=":sparkles: Event list saved. :sparkles:",
-                  promise=promise(lambda: write_eventlist_to_fits(thunk(), path)))
+    return option(
+        display="Write calibrated events to fits.",
+        reply=":sparkles: Event list saved. :sparkles:",
+        promise=promise(
+            lambda: write_eventlist_to_fits(
+                thunk(),
+                path,
+            )
+        ),
+    )
 
 
 def promise(f):
