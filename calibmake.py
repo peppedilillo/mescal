@@ -21,6 +21,7 @@ from source.spectra import scalibrate
 from source.spectra import compute_histogram
 from source.spectra import make_events_list
 from source.inventory import fetch_default_sdd_calibration
+from source.inventory import compile_sources_dicts
 from source.plot import draw_and_save_diagns
 from source.plot import draw_and_save_channels_xspectra
 from source.plot import draw_and_save_channels_sspectra
@@ -28,7 +29,6 @@ from source.plot import draw_and_save_qlooks
 from source.plot import draw_and_save_uncalibrated
 from source.plot import draw_and_save_slo
 from source.plot import draw_and_save_lins
-from source.inventory import compile_sources_dicts
 
 
 START, STOP, STEP = 15000, 28000, 10
@@ -103,7 +103,7 @@ def run():
         data = get_from(filepath, console, use_cache=if_requested)
 
     with console.status("Preprocessing.."):
-        couples = get_couples("fm1")
+        couples = get_couples(model)
         data, channels = preprocess(data, couples, console)
         histograms = make_histograms(data, BINNING, console)
 

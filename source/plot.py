@@ -205,10 +205,10 @@ def _spectrum(enbins, counts, radsources: dict, elims=None, **kwargs):
     ax.fill_between(xs, ys, step="post", alpha=0.4)
     for key, value, col in zip(radsources_keys, radsources_energies, colors):
         ax.axvline(value, linestyle="dashed", color=col, label=key)
+        ax.legend(loc="upper right")
     ax.set_ylim(bottom=0)
     ax.set_xlabel('Energy [keV]')
     ax.set_ylabel('Counts')
-    ax.legend(loc="upper right")
     return fig, ax
 
 
