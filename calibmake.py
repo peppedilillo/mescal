@@ -588,6 +588,8 @@ def anything_else(options, console):
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    if args.t and not args.m:
+        parser.error("ERROR")
     if_requested = args.cache
     filepath = Path(args.filepath)
     radsources = compile_sources_dicts(args.radsources.upper().split(","))

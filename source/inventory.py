@@ -13,7 +13,7 @@ from source.upaths import FM1Tp00CAL
 from source.upaths import FM1Tp00SLO
 from source.upaths import FM1Tp20CAL
 from source.upaths import FM1Tp20SLO
-from source.errors import UnknownModelError
+from source.errors import ModelNotFoundError
 from source.errors import CalibrationNotFoundError
 from source.errors import SourceNotFoundError
 from source.io import read_report_from_excel
@@ -30,27 +30,33 @@ GAMMA_SOURCES = {
     'CS': Cs,
 }
 
+# models for which a detector map is available
 AVAILABLE_MODELS = [
     'fm1',
 ]
 
-AVAILABLE_TEMP = {
-    'fm1': [-20, -10, 0, 20],
-}
-
-AVAILABLE_SDD_CALIBS = {
+SDD_CALIBS = {
     ('fm1', -20): FM1Tm20CAL,
     ('fm1', -10): FM1Tm10CAL,
     ('fm1', 0):   FM1Tp00CAL,
     ('fm1', +20): FM1Tp20CAL,
 }
 
-AVAILABLE_SLO_CALIBS = {
+SLO_CALIBS = {
     ('fm1', -20): FM1Tm20SLO,
     ('fm1', -10): FM1Tm10SLO,
     ('fm1', 0):   FM1Tp00SLO,
     ('fm1', +20): FM1Tp20SLO,
 }
+
+
+def available_temps(model, calibs):
+    available_temps_ = [temp
+                        for available_model, temp in calibs.keys()
+                        if model == available_model]
+    if not available_temps_:
+        raise CalibrationNotFoundError("no calibration for queried model")
+    return available_temps_
 
 
 def compile_sources_dicts(sources: list):
@@ -71,31 +77,31 @@ def compile_sources_dicts(sources: list):
 
 def fetch_default_sdd_calibration(model, temp):
     if model in AVAILABLE_MODELS:
-        nearest_available_temperature = min(AVAILABLE_TEMP[model],
+        nearest_available_temperature = min(available_temps(model, SDD_CALIBS),
                                             key=lambda x: abs(x - temp))
-        calibration_path = AVAILABLE_SDD_CALIBS[(model, nearest_available_temperature)]
+        calibration_path = SDD_CALIBS[(model, nearest_available_temperature)]
         calibration_df = read_report_from_excel(calibration_path)
         return calibration_df
     else:
-        raise CalibrationNotFoundError("model not available.")
+        raise ModelNotFoundError("model not available.")
 
 
 def fetch_default_slo_calibration(model, temp):
     if model in AVAILABLE_MODELS:
-        nearest_available_temperature = min(AVAILABLE_TEMP[model],
+        nearest_available_temperature = min(available_temps(model, SLO_CALIBS),
                                             key=lambda x: abs(x - temp))
-        calibration_path = AVAILABLE_SLO_CALIBS[(model, nearest_available_temperature)]
+        calibration_path = SLO_CALIBS[(model, nearest_available_temperature)]
         calibration_df = read_report_from_excel(calibration_path)
         return calibration_df
     else:
-        raise CalibrationNotFoundError("model not available.")
+        raise ModelNotFoundError("model not available.")
 
 
 def get_quadrant_map(model: str, quad: str, arr_borders: bool = True):
     if model == 'fm1':
         detector_map = detectors.fm1
     else:
-        raise UnknownModelError("unknown model.")
+        raise ModelNotFoundError("model not available.")
 
     if quad in ['A', 'B', 'C', 'D']:
         arr = detector_map[quad]
