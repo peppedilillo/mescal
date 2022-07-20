@@ -2,10 +2,6 @@ class ModelNotFoundError(Exception):
     """An error when querying an unsupported detector."""
 
 
-class DetectPeakError(Exception):
-    """An error while finding peaks."""
-
-
 class FormatNotSupportedError(Exception):
     """An error while asking for unsupported writing formats."""
 
@@ -14,5 +10,17 @@ class SourceNotFoundError(Exception):
     """An error while parsing calib sources."""
 
 
-class CalibrationNotFoundError(Exception):
-    """An error when querying for unavailable default calibrations."""
+class DetectPeakError(Exception):
+    """An error while finding peaks."""
+
+
+class PoorFitError(Exception):
+    """An when trying to fit a bad peak."""
+
+
+class FailedFitError(Exception):
+    """An error when fitting fails."""
+
+
+class FailedCalibrationError(Exception):
+    """An error when fitting fails."""

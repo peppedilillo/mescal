@@ -33,7 +33,7 @@ def filter_delay(data, hold_time):
     return data.drop(data.index[data['TIME'].isin(bad_events)]).reset_index()
 
 
-def infer_onchannels(data: pd.DataFrame):
+def infer_onchannels(data):
     out = {}
     for quad in 'ABCD':
         onchs = np.unique(data[data['QUADID'] == quad]['CHN'])
@@ -42,10 +42,10 @@ def infer_onchannels(data: pd.DataFrame):
     return out
 
 
-def get_quad_couples(model: str, quad: str):
-    qmaparr = np.array(get_quadrant_map(model, quad))
+def get_quad_couples(quad):
+    qmaparr = np.array(get_quadrant_map(quad))
     return np.lexsort((qmaparr[:, 0], qmaparr[:, 1])).reshape(16, 2)[1:]
 
 
-def get_couples(model: str):
-    return {q: get_quad_couples(model, q) for q in "ABCD"}
+def get_couples():
+    return {q: get_quad_couples(q) for q in "ABCD"}

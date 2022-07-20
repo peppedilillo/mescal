@@ -10,6 +10,8 @@ from source.spectra import PHT_KEV
 
 
 def _compute_lims_for_x(radsources: dict):
+    if max([r.energy for r in radsources.values()]) > 40:
+        return 2., 70.
     return 2., 40.
 
 

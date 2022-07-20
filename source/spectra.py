@@ -7,7 +7,8 @@ from lmfit.models import GaussianModel
 from lmfit.models import LinearModel
 from scipy.signal import find_peaks
 from source.errors import DetectPeakError
-
+from source.errors import FailedFitError
+import warnings
 
 PHT_KEV = 3.65 / 1000
 
@@ -50,10 +51,32 @@ def make_events_list(data, calibrated_sdds, calibrated_scintillators, scintillat
     return out
 
 
+def _get_coupled_channels(channels, couples):
+    """
+    Returns a subset of channels filtered of the "widow" channels
+
+    Args:
+        channels: a list of channels
+        couples: a list of channels couples (e.g., two elements lists or tuples)
+
+    Returns:
+        a list  of channels.
+    """
+    coupled_channels = []
+    for couple in couples:
+        if all([channel in channels for channel in couple]):
+            coupled_channels += [ch for ch in couple]
+    return coupled_channels
+
+
 def _get_calibrated_events(data, calibrated_sdds, calibrated_scintillators, scintillator_couples, nthreads=1):
     def helper(quadrant):
+        couples = scintillator_couples[quadrant]
+        calibrated_channels = calibrated_scintillators[quadrant].index
+        coupled_channels = _get_coupled_channels(calibrated_channels, couples)
+
         quadrant_data = data[(data['QUADID'] == quadrant) &
-                             (data['CHN'].isin(calibrated_scintillators[quadrant].index))]
+                             (data['CHN'].isin(coupled_channels))]
         quadrant_data = _insert_xenergy_column(quadrant_data, calibrated_sdds[quadrant])
 
         x_events = _extract_x_events(quadrant_data)
@@ -74,13 +97,12 @@ def _extract_gamma_events(quadrant_data, calibrated_scintillators, scintillator_
                                                      .fillna(scintillator_events['CHN']))
     simultaneous_scintillator_events = scintillator_events.groupby(['TIME', 'CHN'])
     times, channels = np.array([*simultaneous_scintillator_events.groups.keys()]).T
-    companion_channels = pd.Series(channels) \
-        .map({v: k for k, v in dict(scintillator_couples).items()}).values
+    companion_channels = pd.Series(channels).map({v: k for k, v in dict(scintillator_couples).items()}).values
     xenergy_sum = simultaneous_scintillator_events.sum()['XENS'].values
-    scintillator_light_outputs = calibrated_scintillators['light_out'].loc[channels].values + \
-                                 calibrated_scintillators['light_out'].loc[companion_channels].values
+    light_output_sum = calibrated_scintillators['light_out'].loc[channels].values + \
+                       calibrated_scintillators['light_out'].loc[companion_channels].values
 
-    gamma_energies = xenergy_sum / scintillator_light_outputs / PHT_KEV
+    gamma_energies = xenergy_sum / light_output_sum / PHT_KEV
     return np.column_stack((times, gamma_energies, channels))
 
 
@@ -122,13 +144,18 @@ def scalibrate(histograms, cal_df, radsources, lout_guess):
                     counts,
                     guess=guesses,
                 )
+                try:
+                    intervals, (centers, center_errs, *etc) = _fit_radsources_peaks(
+                        bins,
+                        counts,
+                        limits,
+                        radsources,
+                    )
+                except FailedFitError:
+                    warnings.warn("scalibrate: failed fit for channel {}{}.".format(quad, ch))
+                    flagged.setdefault(quad, []).append(ch)
+                    continue
 
-                intervals, (centers, center_errs, *etc) = _fit_radsources_peaks(
-                    bins,
-                    counts,
-                    limits,
-                    radsources,
-                )
                 int_inf, int_sup = zip(*intervals)
 
                 los, lo_errs = _compute_louts(
@@ -171,8 +198,8 @@ def _closest_peaks(guess, peaks, peaks_infos):
 
 
 def _estimate_peaks_from_guess(bins, counts, guess):
-    window_len = 10
-    prominence = 10
+    window_len = 5
+    prominence = 5
     width = 5
 
     mm = move_mean(counts, window_len)
@@ -203,8 +230,8 @@ def xcalibrate(histograms, radsources, channels, default_calibration=None):
             bins = histograms.bins
             counts = histograms.counts[quad][ch]
 
+            def packaged_calib(): return default_calibration[quad].loc[ch]
             try:
-                def packaged_calib(): return default_calibration[quad].loc[ch]
                 limits = _find_peaks_limits(
                     bins,
                     counts,
@@ -215,12 +242,18 @@ def xcalibrate(histograms, radsources, channels, default_calibration=None):
                 flagged.setdefault(quad, []).append(ch)
                 continue
 
-            intervals, fit_results = _fit_radsources_peaks(
-                bins,
-                counts,
-                limits,
-                radsources,
-            )
+            try:
+                intervals, fit_results = _fit_radsources_peaks(
+                    bins,
+                    counts,
+                    limits,
+                    radsources,
+                )
+            except FailedFitError:
+                warnings.warn("xcalibrate: failed fit for channel {}{}.".format(quad, ch))
+                flagged.setdefault(quad, []).append(ch)
+                continue
+
             centers, center_errs, *etc = fit_results
             int_inf, int_sup = zip(*intervals)
 
@@ -230,7 +263,8 @@ def xcalibrate(histograms, radsources, channels, default_calibration=None):
                     radsources_energies,
                     weights=center_errs,
                 )
-            except ValueError:
+            except FailedFitError:
+                warnings.warn("xcalibrate: failed calibration of channel {}{}.".format(quad, ch))
                 flagged.setdefault(quad, []).append(ch)
                 continue
 
@@ -245,8 +279,6 @@ def _find_peaks_limits(bins, counts, radsources: list, unpack_calibration):
         channel_calib = unpack_calibration()
     except TypeError:
         return _lims_from_decays_ratio(bins, counts, radsources)
-    except KeyError:
-        raise DetectPeakError("no calibration for queried channel")
     else:
         return _lims_from_existing_calib(bins, counts, radsources, channel_calib)
 
@@ -304,7 +336,7 @@ def _filter_peaks_low_energy(lim_bin, peaks, peaks_infos):
 
 def _lims_from_decays_ratio(bins, counts, radsources: list):
     window_len = 5
-    prominence = 100
+    prominence = 10
     width = 5
     distance = 10
 
@@ -335,32 +367,11 @@ def _filter_peaks_lratio(radsources: list, peaks, peaks_infos):
     norm_ps = [*map(normalize, peaks_combinations)]
     weights = [*map(weight, proms_combinations)]
     loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls))
-                  / np.square(weights)
+                  #/ np.square(weights)
                   , axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
     best_peaks_info = {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
     return best_peaks, best_peaks_info
-
-
-def _peak_fitter(x, y, limits):
-    start, stop = limits
-    x_start = np.where(x > start)[0][0]
-    x_stop = np.where(x < stop)[0][-1]
-    x_fit = (x[x_start:x_stop + 1][1:] + x[x_start:x_stop + 1][:-1]) / 2
-    y_fit = y[x_start:x_stop]
-    weights = np.sqrt(y_fit)
-
-    mod = GaussianModel()
-    pars = mod.guess(y_fit, x=x_fit)
-
-    result = mod.fit(y_fit, pars, x=x_fit, weights=weights)
-    x_fine = np.linspace(x[0], x[-1], len(x) * 100)
-    fitting_curve = mod.eval(x=x_fine,
-                             amplitude=result.best_values['amplitude'],
-                             center=result.best_values['center'],
-                             sigma=result.best_values['sigma'])
-
-    return result, start, stop, x_fine, fitting_curve
 
 
 def _fit_radsources_peaks(x, y, limits, radsources):
@@ -382,7 +393,8 @@ def _fit_peaks(x, y, limits):
     amp_errs = np.zeros(n_peaks)
 
     for i in range(n_peaks):
-        result, start, stop, x_fine, fitting_curve = _peak_fitter(x, y, limits[i])
+        low_lim, hi_lim = limits[i]
+        result, start, stop, x_fine, fitting_curve = _peak_fitter(x, y, (low_lim, hi_lim))
         centers[i] = result.params['center'].value
         center_errs[i] = result.params['center'].stderr
         fwhms[i] = result.params['fwhm'].value
@@ -390,13 +402,42 @@ def _fit_peaks(x, y, limits):
         amps[i] = result.params['amplitude'].value
         amp_errs[i] = result.params['amplitude'].stderr
 
+        if not (low_lim < centers[i] < hi_lim):
+            raise FailedFitError("peaks limits do not contain fit center")
     return centers, center_errs, fwhms, fwhm_errs, amps, amp_errs
+
+
+def _peak_fitter(x, y, limits):
+    start, stop = limits
+    x_start = np.where(x >= start)[0][0]
+    x_stop = np.where(x < stop)[0][-1]
+    x_fit = (x[x_start:x_stop + 1][1:] + x[x_start:x_stop + 1][:-1]) / 2
+    y_fit = y[x_start:x_stop]
+    weights = np.sqrt(y_fit)
+
+    mod = GaussianModel()
+    pars = mod.guess(y_fit, x=x_fit)
+
+    try:
+        result = mod.fit(y_fit, pars, x=x_fit, weights=weights)
+    except TypeError:
+        raise FailedFitError("peak fitter error.")
+    x_fine = np.linspace(x[0], x[-1], len(x) * 100)
+    fitting_curve = mod.eval(x=x_fine,
+                             amplitude=result.best_values['amplitude'],
+                             center=result.best_values['center'],
+                             sigma=result.best_values['sigma'])
+
+    return result, start, stop, x_fine, fitting_curve
 
 
 def _calibrate_chn(centers, radsources: list, weights=None):
     lmod = LinearModel()
     pars = lmod.guess(centers, x=radsources)
-    resultlin = lmod.fit(centers, pars, x=radsources, weights=weights)
+    try:
+        resultlin = lmod.fit(centers, pars, x=radsources, weights=weights)
+    except ValueError:
+        raise FailedCalibrationError("linear fitter error")
 
     chi2 = resultlin.redchi
     gain = resultlin.params['slope'].value
