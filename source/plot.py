@@ -10,7 +10,7 @@ from source.spectra import PHT_KEV
 
 
 def _compute_lims_for_x(radsources: dict):
-    if max([r.energy for r in radsources.values()]) > 40:
+    if radsources and max([r.energy for r in radsources.values()]) > 40:
         return 2., 70.
     return 2., 40.
 
@@ -59,7 +59,7 @@ def draw_and_save_diagns(histograms, res_fit, path, nthreads=1):
     return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_fit.keys())
 
 
-def draw_and_save_channels_xspectra(histograms, res_cal, radsources:dict, path, nthreads=1):
+def draw_and_save_channels_xspectra(histograms, res_cal, radsources: dict, path, nthreads=1):
     def helper(quad):
         for ch in res_cal[quad].index:
             enbins = (histograms.bins - res_cal[quad].loc[ch]['offset']) / res_cal[quad].loc[ch]['gain']

@@ -22,5 +22,13 @@ class FailedFitError(Exception):
     """An error when fitting fails."""
 
 
-class FailedCalibrationError(Exception):
-    """An error when fitting fails."""
+def warn_failed_peak_fit(quad, ch):
+    return "failed channel {}{:02d} peak fit.".format(quad, ch)
+
+
+def warn_failed_linearity_fit(quad, ch):
+    return "failed channel {}{:02d} linearity fit.".format(quad, ch)
+
+
+def warn_failed_peak_detection(quad, ch):
+    return "failed channel {}{:02d} peak detection".format(quad, ch)

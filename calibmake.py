@@ -4,6 +4,7 @@ from collections import namedtuple
 
 import pandas as pd
 from pathlib import Path
+import logging
 
 from source import upaths
 from source import interface
@@ -118,6 +119,7 @@ peak_hints_args.add_argument(
 )
 
 
+
 def run(args):
 
     console = interface.hello()
@@ -159,6 +161,16 @@ def run(args):
 
     goodbye = interface.shutdown(console)
 
+    return True
+
+
+def log_to(filepath):
+    logging.basicConfig(
+        filename=filepath,
+        level=logging.INFO,
+        format = "[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
+        "%(levelname)s: %(message)s"
+    )
     return True
 
 
@@ -618,8 +630,10 @@ def anything_else(options, console):
     return True
 
 
+
 if __name__ == "__main__":
     systhreads = min(4, cpu_count())
     args = parse_args()
+    log_to(upaths.LOGFILE(args.filepath))
 
     run(args)

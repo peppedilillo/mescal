@@ -8,7 +8,10 @@ from lmfit.models import LinearModel
 from scipy.signal import find_peaks
 from source.errors import DetectPeakError
 from source.errors import FailedFitError
-import warnings
+from source.errors import warn_failed_peak_detection
+from source.errors import warn_failed_linearity_fit
+from source.errors import warn_failed_peak_fit
+import logging
 
 PHT_KEV = 3.65 / 1000
 
@@ -91,19 +94,26 @@ def _get_calibrated_events(data, calibrated_sdds, calibrated_scintillators, scin
 
 
 def _extract_gamma_events(quadrant_data, calibrated_scintillators, scintillator_couples):
-    scintillator_events = quadrant_data[quadrant_data['EVTYPE'] == 'S']
-    scintillator_events = scintillator_events.assign(CHN=scintillator_events['CHN']
-                                                     .map(dict(scintillator_couples))
-                                                     .fillna(scintillator_events['CHN']))
-    simultaneous_scintillator_events = scintillator_events.groupby(['TIME', 'CHN'])
-    times, channels = np.array([*simultaneous_scintillator_events.groups.keys()]).T
-    companion_channels = pd.Series(channels).map({v: k for k, v in dict(scintillator_couples).items()}).values
-    xenergy_sum = simultaneous_scintillator_events.sum()['XENS'].values
-    light_output_sum = calibrated_scintillators['light_out'].loc[channels].values + \
-                       calibrated_scintillators['light_out'].loc[companion_channels].values
+    gamma_events = quadrant_data[quadrant_data['EVTYPE'] == 'S']
 
+    channels = gamma_events['CHN']
+    companion_to_chn = dict(scintillator_couples)
+    same_value_if_coupled = gamma_events['CHN'].map(companion_to_chn).fillna(channels)
+    gamma_events = gamma_events.assign(CHN=same_value_if_coupled)
+
+    simultaneous_scintillator_events = gamma_events.groupby(['TIME', 'CHN'])
+    times, channels = np.array([*simultaneous_scintillator_events.groups.keys()]).T
+
+    channel_to_companion = {v: k for k, v in dict(scintillator_couples).items()}
+    companion_channels = pd.Series(channels).map(channel_to_companion).values
+    xenergy_sum = simultaneous_scintillator_events.sum()['XENS'].values
+    channels_lo = calibrated_scintillators['light_out'].loc[channels].values
+    companions_lo = calibrated_scintillators['light_out'].loc[companion_channels].values
+
+    light_output_sum = channels_lo + companions_lo
     gamma_energies = xenergy_sum / light_output_sum / PHT_KEV
-    return np.column_stack((times, gamma_energies, channels))
+    calibrated_gamma_events = np.column_stack((times, gamma_energies, channels))
+    return calibrated_gamma_events
 
 
 def _extract_x_events(quadrant_data):
@@ -134,52 +144,54 @@ def scalibrate(histograms, cal_df, radsources, lout_guess):
             offset = cal_df[quad].loc[ch]['offset']
             offset_err = cal_df[quad].loc[ch]['offset_err']
 
-            try:
-                guesses = [[lout_lim * PHT_KEV * lv * gain + offset
-                            for lout_lim in lout_guess]
-                           for lv in radsources_energies]
+            guesses = [[lout_lim * PHT_KEV * lv * gain + offset
+                        for lout_lim in lout_guess]
+                       for lv in radsources_energies]
 
+            try:
                 limits = _estimate_peaks_from_guess(
                     bins,
                     counts,
                     guess=guesses,
                 )
-                try:
-                    intervals, (centers, center_errs, *etc) = _fit_radsources_peaks(
-                        bins,
-                        counts,
-                        limits,
-                        radsources,
-                    )
-                except FailedFitError:
-                    warnings.warn("scalibrate: failed fit for channel {}{}.".format(quad, ch))
-                    flagged.setdefault(quad, []).append(ch)
-                    continue
-
-                int_inf, int_sup = zip(*intervals)
-
-                los, lo_errs = _compute_louts(
-                    centers,
-                    center_errs,
-                    gain,
-                    gain_err,
-                    offset,
-                    offset_err,
-                    radsources_energies,
-                )
-                lo, lo_err = _do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_radsources(los, lo_errs)
-
             except DetectPeakError:
+                message = warn_failed_peak_detection(quad, ch)
+                logging.warning(message)
                 flagged.setdefault(quad, []).append(ch)
-            else:
-                intervals = np.array(intervals).reshape(len(radsources), 2)
-                results_fit.setdefault(quad, {})[ch] = np.column_stack(
-                    (centers, center_errs, *etc, int_inf, int_sup)).flatten()
-                results_slo.setdefault(quad, {})[ch] = np.array((lo, lo_err))
+                continue
+
+            try:
+                intervals, (centers, center_errs, *etc) = _fit_radsources_peaks(
+                    bins,
+                    counts,
+                    limits,
+                    radsources,
+                )
+            except FailedFitError:
+                message = warn_failed_peak_fit(quad, ch)
+                logging.warning(message)
+                flagged.setdefault(quad, []).append(ch)
+                continue
+
+            los, lo_errs = _compute_louts(
+                centers,
+                center_errs,
+                gain,
+                gain_err,
+                offset,
+                offset_err,
+                radsources_energies,
+            )
+            lo, lo_err = deal_with_multiple_gamma_decays(los, lo_errs)
+
+            int_inf, int_sup = zip(*intervals)
+            results_fit.setdefault(quad, {})[ch] = np.column_stack(
+                (centers, center_errs, *etc, int_inf, int_sup)).flatten()
+            results_slo.setdefault(quad, {})[ch] = np.array((lo, lo_err))
     return results_fit, results_slo, flagged
 
 
-def _do_something_to_deal_with_the_fact_that_you_may_have_many_gamma_radsources(light_outs, light_outs_errs):
+def deal_with_multiple_gamma_decays(light_outs, light_outs_errs):
     # in doubt mean
     return light_outs.mean(), np.sqrt(np.sum(light_outs_errs ** 2))
 
@@ -198,9 +210,9 @@ def _closest_peaks(guess, peaks, peaks_infos):
 
 
 def _estimate_peaks_from_guess(bins, counts, guess):
-    window_len = 5
+    window_len = 20
     prominence = 5
-    width = 5
+    width = 20
 
     mm = move_mean(counts, window_len)
     many_peaks, many_peaks_info = find_peaks(mm, prominence=prominence, width=width)
@@ -239,6 +251,8 @@ def xcalibrate(histograms, radsources, channels, default_calibration=None):
                     packaged_calib,
                 )
             except DetectPeakError:
+                message = warn_failed_peak_detection(quad, ch)
+                logging.warning(message)
                 flagged.setdefault(quad, []).append(ch)
                 continue
 
@@ -250,7 +264,8 @@ def xcalibrate(histograms, radsources, channels, default_calibration=None):
                     radsources,
                 )
             except FailedFitError:
-                warnings.warn("xcalibrate: failed fit for channel {}{}.".format(quad, ch))
+                meassage = warn_failed_peak_fit(quad,ch)
+                logging.warning(meassage)
                 flagged.setdefault(quad, []).append(ch)
                 continue
 
@@ -264,7 +279,8 @@ def xcalibrate(histograms, radsources, channels, default_calibration=None):
                     weights=center_errs,
                 )
             except FailedFitError:
-                warnings.warn("xcalibrate: failed calibration of channel {}{}.".format(quad, ch))
+                message = warn_failed_linearity_fit(quad, ch)
+                logging.warning(message)
                 flagged.setdefault(quad, []).append(ch)
                 continue
 
@@ -437,7 +453,7 @@ def _calibrate_chn(centers, radsources: list, weights=None):
     try:
         resultlin = lmod.fit(centers, pars, x=radsources, weights=weights)
     except ValueError:
-        raise FailedCalibrationError("linear fitter error")
+        raise FailedFitError("linear fitter error")
 
     chi2 = resultlin.redchi
     gain = resultlin.params['slope'].value
