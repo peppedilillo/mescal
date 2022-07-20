@@ -4,6 +4,7 @@ from collections import namedtuple
 
 import pandas as pd
 from pathlib import Path
+import logging
 
 from source import upaths
 from source import interface
@@ -21,7 +22,7 @@ from source.spectra import scalibrate
 from source.spectra import compute_histogram
 from source.spectra import make_events_list
 from source.inventory import fetch_default_sdd_calibration
-from source.inventory import compile_sources_dicts
+from source.inventory import radsources_dicts
 from source.plot import draw_and_save_diagns
 from source.plot import draw_and_save_channels_xspectra
 from source.plot import draw_and_save_channels_sspectra
@@ -29,7 +30,7 @@ from source.plot import draw_and_save_qlooks
 from source.plot import draw_and_save_uncalibrated
 from source.plot import draw_and_save_slo
 from source.plot import draw_and_save_lins
-
+from source.errors import ModelNotFoundError
 
 START, STOP, STEP = 15000, 28000, 10
 NBINS = int((STOP - START) / STEP)
@@ -94,49 +95,62 @@ parser.add_argument(
     "supported formats: xslx, csv, fits. "
     "defaults to xslx.",
 )
-parser.add_argument(
-    "--m",
+peak_hints_args = parser.add_argument_group(
+    "detection hints",
+    "to obtain more accurate peak detections a temperature "
+    "and a detector model arguments can be specified. "
+    "calibrate.py will search through a collection "
+    "of established results to get hints "
+    "on where to look for a peak. ",
+)
+peak_hints_args.add_argument(
     "--model",
-    default="fm1",
+    "--m",
     help="hermes flight model to calibrate. "
     "supported models: fm1. "
-    "defaults to fm1.",
 )
-parser.add_argument(
-    "--t",
-    "--temp",
+peak_hints_args.add_argument(
     "--temperature",
+    "--temp",
+    "--t",
     type=float,
-    default=20.0,
-    help="acquisition temperature in celsius degree. defaults to 20.0C",
+    help="acquisition temperature in celsius degree. "
+    "requires the use of the --model argument",
 )
 
 
-def run():
+
+def run(args):
 
     console = interface.hello()
 
-    with console.status("Building dataset.."):
-        data = get_from(filepath, console, use_cache=if_requested)
+    with console.status("Initializing.."):
+        data = get_from(args.filepath, console, use_cache=args.cache)
+        try:
+            hint = fetch_hint(args.model, args.temperature, console)
+        except ModelNotFoundError:
+            hint = None
+        radsources = radsources_dicts(radsources_list(args.radsources))
+        couples = get_couples()
 
     with console.status("Preprocessing.."):
-        couples = get_couples(model)
         data, channels = preprocess(data, couples, console)
         histograms = make_histograms(data, BINNING, console)
 
     with console.status("Calibrating.."):
-        calibration = calibrate(*histograms, *radsources, channels)
+        calibration = calibrate(*histograms, *radsources, channels, hint)
         *results, flagged = inspect(*calibration, console)
 
     with console.status("Writing and drawing.."):
         process_results(
-            filepath,
+            args.filepath,
             couples,
             data,
             histograms,
             radsources,
             results,
             options,
+            args.fmt,
             console,
         )
 
@@ -150,7 +164,36 @@ def run():
     return True
 
 
-def get_from(fitspath, console, use_cache=True):
+def log_to(filepath):
+    logging.basicConfig(
+        filename=filepath,
+        level=logging.INFO,
+        format = "[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
+        "%(levelname)s: %(message)s"
+    )
+    return True
+
+
+def parse_args():
+    args = parser.parse_args()
+    args.filepath = Path(args.filepath)
+    if (args.model is None) and args.temperature:
+        parser.error("if a temperature arguments is specified "
+                     "a model argument must be specified too ")
+    return args
+
+
+def radsources_list(radsources_string):
+    return radsources_string.upper().split(",")
+
+
+def fetch_hint(model, temperature, console):
+    hint, key = fetch_default_sdd_calibration(model, temperature)
+    console.log(":open_book: Loaded detection hints for {}@{}°C.".format(*key))
+    return hint
+
+
+def get_from(fitspath: Path, console, use_cache=True):
     console.log(":question_mark: Looking for data..")
     cached = upaths.CACHEDIR().joinpath(fitspath.name).with_suffix(".pkl.gz")
     if cached.is_file() and use_cache:
@@ -215,14 +258,13 @@ def _to_dfdict(x, idx):
     return {q: pd.DataFrame(x[q], index=idx).T for q in x.keys()}
 
 
-def calibrate(xhistograms, shistograms, xradsources, sradsources, channels):
-
+def calibrate(xhistograms, shistograms, xradsources, sradsources, channels, hint):
     if xradsources:
         _xfitdict, _caldict, xflagged = xcalibrate(
             xhistograms,
             xradsources,
             channels,
-            calibration_hint,
+            hint,
         )
         index = pd.MultiIndex.from_product((xradsources.keys(), FIT_PARAMS))
         xfit_results = _to_dfdict(_xfitdict, index)
@@ -261,6 +303,7 @@ def process_results(
     radsources,
     results,
     options,
+    fmt,
     console,
 ):
     xhistograms, shistograms = histograms
@@ -269,6 +312,7 @@ def process_results(
         sdds_calibration,
         scintillators_lightout,
     ) = results
+    write_report = get_writer(fmt)
 
     if True:
         options.append(
@@ -586,15 +630,10 @@ def anything_else(options, console):
     return True
 
 
-if __name__ == "__main__":
-    args = parser.parse_args()
-    if_requested = args.cache
-    filepath = Path(args.filepath)
-    radsources = compile_sources_dicts(args.radsources.upper().split(","))
-    write_report = get_writer(args.fmt)
-    model = args.m
-    temperature = args.t
-    calibration_hint = fetch_default_sdd_calibration(model, temperature)
-    systhreads = min(4, cpu_count())
 
-    run()
+if __name__ == "__main__":
+    systhreads = min(4, cpu_count())
+    args = parse_args()
+    log_to(upaths.LOGFILE(args.filepath))
+
+    run(args)

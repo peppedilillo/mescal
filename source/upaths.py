@@ -83,8 +83,8 @@ def SDNDIR(filepath: Path) -> Path:
 
 
 @create_if_not_exists
-def FLGDIR(filepath: Path) -> Path:
-    return PLTDIR(filepath).joinpath("flagged")
+def TMSDIR(filepath: Path) -> Path:
+    return PLTDIR(filepath).joinpath("timechns")
 
 
 @create_if_not_exists
@@ -93,6 +93,7 @@ def UNCDIR(filepath: Path) -> Path:
 
 
 EVLFITS = (lambda filepath: RESDIR(filepath).joinpath("event_list.fits"))
+LOGFILE = (lambda filepath: RESDIR(filepath).joinpath("log.txt"))
 
 XFTREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_xfit.xlsx"))
 SFTREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_sfit.xlsx"))
@@ -108,5 +109,5 @@ XCSPLOT = (lambda filepath: (lambda quad, ch: XCSDIR(filepath).joinpath("spectra
 SCSPLOT = (lambda filepath: (lambda quad, ch: SCSDIR(filepath).joinpath("spectra_s_quad{}_ch{:02d}.png".format(quad, ch))))
 XDNPLOT = (lambda filepath: (lambda quad, ch: XDNDIR(filepath).joinpath("diagnostic_x_quad{}_ch{:02d}.png".format(quad, ch))))
 SDNPLOT = (lambda filepath: (lambda quad, ch: SDNDIR(filepath).joinpath("diagnostic_s_quad{}_ch{:02d}.png".format(quad, ch))))
-FLGPLOT = (lambda filepath: (lambda quad, ch: FLGDIR(filepath).joinpath("flagged_quad{}_ch{:02d}.png".format(quad, ch))))
 UNCPLOT = (lambda filepath: (lambda quad, ch: UNCDIR(filepath).joinpath("uncalibrated_quad{}_ch{:02d}.png".format(quad, ch))))
+TMSPLOT = (lambda filepath: (lambda quad, ch: TMSDIR(filepath).joinpath("timeseries_quad{}_ch{:02d}.png".format(quad, ch))))

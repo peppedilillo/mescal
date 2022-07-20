@@ -70,7 +70,7 @@ def run():
         data = get_from(filepath, console)
 
     with console.status("Preprocessing.."):
-        couples = get_couples(model)
+        couples = get_couples()
         data, _ = preprocess(data, couples, console)
         histograms = make_histograms(data, BINNING, console)
 
@@ -187,6 +187,7 @@ def process_results(
             sdds_calibration,
             scintillators_lightout,
             detector_couples,
+            systhreads,
         )
         write_eventlist_to_fits(event_list, upaths.EVLFITS(filepath))
         console.log(":blue_book: Wrote calibrated event list.")
@@ -288,8 +289,8 @@ if __name__ == "__main__":
     filepath = Path(args.filepath)
     model = args.m
     temperature = args.t
-    sdds_calibration = fetch_default_sdd_calibration(model, temperature)
-    scintillators_lightout = fetch_default_slo_calibration(model, temperature)
+    sdds_calibration, _ = fetch_default_sdd_calibration(model, temperature)
+    scintillators_lightout, _ = fetch_default_slo_calibration(model, temperature)
     systhreads = min(4, cpu_count())
 
     run()
