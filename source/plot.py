@@ -2,6 +2,7 @@ from math import sqrt
 from math import pi
 
 import numpy as np
+import matplotlib; matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt; plt.style.use('seaborn')
 from joblib import Parallel
 from joblib import delayed
@@ -93,6 +94,12 @@ def draw_and_save_channels_sspectra(histograms, res_cal, res_slo, radsources: di
     return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_slo.keys())
 
 
+def draw_and_save_spectrum(calibrated_events, xradsources: dict, sradsources: dict, xpath, spath):
+    draw_and_save_xspectrum(calibrated_events, xradsources, xpath)
+    draw_and_save_sspectrum(calibrated_events, sradsources, spath)
+    return True
+
+
 def draw_and_save_xspectrum(calibrated_events, radsources: dict, path):
     if not calibrated_events.empty:
         xevs = calibrated_events[calibrated_events['EVTYPE'] == 'X']
@@ -102,7 +109,8 @@ def draw_and_save_xspectrum(calibrated_events, radsources: dict, path):
                             xcounts,
                             radsources,
                             elims=_compute_lims_for_x(radsources),
-                            figsize=(9, 4.5))
+                            figsize=(9, 4.5),
+                            dpi=150)
         ax.set_title("Spectrum X")
         fig.savefig(path)
         plt.close(fig)
@@ -118,7 +126,8 @@ def draw_and_save_sspectrum(calibrated_events, radsources: dict, path):
                             scounts,
                             radsources,
                             elims=_compute_lims_for_s(radsources),
-                            figsize=(9, 4.5))
+                            figsize=(9, 4.5),
+                            dpi=150)
         ax.set_title("Spectrum S")
         fig.savefig(path)
         plt.close(fig)

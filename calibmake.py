@@ -30,7 +30,9 @@ from source.plot import draw_and_save_qlooks
 from source.plot import draw_and_save_uncalibrated
 from source.plot import draw_and_save_slo
 from source.plot import draw_and_save_lins
+from source.plot import draw_and_save_spectrum
 from source.errors import ModelNotFoundError
+
 
 START, STOP, STEP = 15000, 28000, 10
 NBINS = int((STOP - START) / STEP)
@@ -417,7 +419,6 @@ def process_results(
             path=upaths.SLOREPORT(filepath),
         )
         console.log(":blue_book: Wrote scintillators calibration results.")
-
         draw_and_save_slo(
             scintillators_lightout,
             path=upaths.SLOPLOT(filepath),
@@ -441,6 +442,15 @@ def process_results(
             _write_eventlist_to_fits(
                 lambda: get_eventlist(eventlist_promise),
                 upaths.EVLFITS(filepath),
+            )
+        )
+        options.append(
+            _draw_and_save_spectra(
+                lambda: get_eventlist(eventlist_promise),
+                xradsources,
+                sradsources,
+                upaths.XSPPLOT(filepath),
+                upaths.SSPPLOT(filepath),
             )
         )
     return True
@@ -494,14 +504,15 @@ def _draw_and_save_xdiagns(histograms, fit_results, path, nthreads):
     )
 
 
-def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
+def _draw_and_save_lins(sdds_calibration, xfit_results, xradsources, path, nthreads):
     return option(
-        display="Save S fit diagnostic plots.",
+        display="Save X linearity plots.",
         reply=":sparkles: Plots saved. :sparkles:",
         promise=promise(
-            lambda: draw_and_save_diagns(
-                histograms,
-                fit_results,
+            lambda: draw_and_save_lins(
+                sdds_calibration,
+                xfit_results,
+                xradsources,
                 path,
                 nthreads,
             )
@@ -520,6 +531,22 @@ def _write_xfit_report(fit_results, path):
             )
         ),
     )
+
+
+def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
+    return option(
+        display="Save S fit diagnostic plots.",
+        reply=":sparkles: Plots saved. :sparkles:",
+        promise=promise(
+            lambda: draw_and_save_diagns(
+                histograms,
+                fit_results,
+                path,
+                nthreads,
+            )
+        ),
+    )
+
 
 
 def _write_sfit_report(fit_results, path):
@@ -577,22 +604,6 @@ def _draw_and_save_channels_sspectra(
     )
 
 
-def _draw_and_save_lins(sdds_calibration, xfit_results, xradsources, path, nthreads):
-    return option(
-        display="Save X linearity plots.",
-        reply=":sparkles: Plots saved. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_lins(
-                sdds_calibration,
-                xfit_results,
-                xradsources,
-                path,
-                nthreads,
-            )
-        ),
-    )
-
-
 def _write_eventlist_to_fits(thunk, path):
     """
     designed to delay the evaluation of make_events_list. call it like :
@@ -613,6 +624,24 @@ def _write_eventlist_to_fits(thunk, path):
             )
         ),
     )
+
+
+def _draw_and_save_spectra(thunk, xradsources, sradsources, xpath, spath):
+    return option(
+        display="Save calibrated spectra.",
+        reply=":sparkles: Spectra plot saved :sparkle:",
+        promise=promise(
+            lambda: draw_and_save_spectrum(
+                thunk(),
+                xradsources,
+                sradsources,
+                xpath,
+                spath,
+            )
+        )
+    )
+
+
 
 
 def promise(f):
