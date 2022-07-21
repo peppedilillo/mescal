@@ -120,7 +120,6 @@ peak_hints_args.add_argument(
 )
 
 
-
 def run(args):
 
     console = interface.hello()
@@ -138,18 +137,24 @@ def run(args):
         data, channels = preprocess(data, couples, console)
         histograms = make_histograms(data, BINNING, console)
 
-    with console.status("Calibrating.."):
-        calibration = calibrate(*histograms, *radsources, channels, hint)
-        *results, flagged = inspect(*calibration, console)
+    with console.status("Working on it.."):
+        results = calibrate(*histograms, *radsources, channels, hint)
+        fits, calibrations, flagged = inspect(*results, console)
+        maybe_eventlist = promise(lambda: make_events_list(
+            data,
+            *calibrations,
+            couples,
+            systhreads,
+        ))
 
     with console.status("Writing and drawing.."):
         process_results(
             args.filepath,
-            couples,
-            data,
             histograms,
             radsources,
-            results,
+            fits,
+            calibrations,
+            maybe_eventlist,
             options,
             args.fmt,
             console,
@@ -296,23 +301,40 @@ def calibrate(xhistograms, shistograms, xradsources, sradsources, channels, hint
     )
 
 
+def get_eventlist(el):
+    """
+    this is for accessing the eventlist.
+
+    Args:
+        el: a list (a promise)
+
+    Returns: a dataframe
+
+    """
+    car, cdr = el
+    if car:
+        return cdr
+    else: # mutate
+        el[0] = 1
+        el[1] = cdr()
+        return el[1]
+
+
 def process_results(
     filepath,
-    detector_couples,
-    data,
     histograms,
     radsources,
-    results,
+    fits,
+    calibrations,
+    eventlist_promise,
     options,
     fmt,
     console,
 ):
     xhistograms, shistograms = histograms
     xradsources, sradsources = radsources
-    (xfit_results, sfit_results), (
-        sdds_calibration,
-        scintillators_lightout,
-    ) = results
+    xfit_results, sfit_results = fits
+    sdds_calibration, scintillators_lightout = calibrations
     write_report = get_writer(fmt)
 
     if True:
@@ -417,12 +439,7 @@ def process_results(
     if sdds_calibration and scintillators_lightout:
         options.append(
             _write_eventlist_to_fits(
-                lambda: make_events_list(
-                    data,
-                    sdds_calibration,
-                    scintillators_lightout,
-                    detector_couples,
-                ),
+                lambda: get_eventlist(eventlist_promise),
                 upaths.EVLFITS(filepath),
             )
         )
