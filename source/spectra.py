@@ -95,7 +95,6 @@ def _get_calibrated_events(data, calibrated_sdds, calibrated_scintillators, scin
 
 def _extract_gamma_events(quadrant_data, calibrated_scintillators, scintillator_couples):
     gamma_events = quadrant_data[quadrant_data['EVTYPE'] == 'S']
-
     channels = gamma_events['CHN']
     companion_to_chn = dict(scintillator_couples)
     same_value_if_coupled = gamma_events['CHN'].map(companion_to_chn).fillna(channels)
@@ -103,9 +102,9 @@ def _extract_gamma_events(quadrant_data, calibrated_scintillators, scintillator_
 
     simultaneous_scintillator_events = gamma_events.groupby(['TIME', 'CHN'])
     times, channels = np.array([*simultaneous_scintillator_events.groups.keys()]).T
-
     channel_to_companion = {v: k for k, v in dict(scintillator_couples).items()}
     companion_channels = pd.Series(channels).map(channel_to_companion).values
+
     xenergy_sum = simultaneous_scintillator_events.sum()['XENS'].values
     channels_lo = calibrated_scintillators['light_out'].loc[channels].values
     companions_lo = calibrated_scintillators['light_out'].loc[companion_channels].values

@@ -85,6 +85,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--cache",
+    default=False,
     action="store_true",
     help="enables loading and saving from cache.",
 )
