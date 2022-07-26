@@ -95,7 +95,6 @@ def _get_calibrated_events(data, calibrated_sdds, calibrated_scintillators, scin
 
 def _extract_gamma_events(quadrant_data, calibrated_scintillators, scintillator_couples):
     gamma_events = quadrant_data[quadrant_data['EVTYPE'] == 'S']
-
     channels = gamma_events['CHN']
     companion_to_chn = dict(scintillator_couples)
     same_value_if_coupled = gamma_events['CHN'].map(companion_to_chn).fillna(channels)
@@ -103,9 +102,9 @@ def _extract_gamma_events(quadrant_data, calibrated_scintillators, scintillator_
 
     simultaneous_scintillator_events = gamma_events.groupby(['TIME', 'CHN'])
     times, channels = np.array([*simultaneous_scintillator_events.groups.keys()]).T
-
     channel_to_companion = {v: k for k, v in dict(scintillator_couples).items()}
     companion_channels = pd.Series(channels).map(channel_to_companion).values
+
     xenergy_sum = simultaneous_scintillator_events.sum()['XENS'].values
     channels_lo = calibrated_scintillators['light_out'].loc[channels].values
     companions_lo = calibrated_scintillators['light_out'].loc[companion_channels].values
@@ -233,7 +232,7 @@ def _compute_louts(centers, center_errs, gain, gain_err, offset, offset_err, rad
     return light_outs, light_out_errs
 
 
-def xcalibrate(histograms, radsources, channels, default_calibration=None):
+def xcalibrate(histograms, radsources, channels, default_calib=None):
     results_xfit, results_cal, flagged = {}, {}, {}
     radsources_energies = [l.energy for l in radsources.values()]
 
@@ -242,8 +241,10 @@ def xcalibrate(histograms, radsources, channels, default_calibration=None):
             bins = histograms.bins
             counts = histograms.counts[quad][ch]
 
-            def packaged_calib(): return default_calibration[quad].loc[ch]
             try:
+                def packaged_calib():
+                    return default_calib[quad].loc[ch] if default_calib else None
+
                 limits = _find_peaks_limits(
                     bins,
                     counts,
@@ -293,10 +294,14 @@ def xcalibrate(histograms, radsources, channels, default_calibration=None):
 def _find_peaks_limits(bins, counts, radsources: list, unpack_calibration):
     try:
         channel_calib = unpack_calibration()
-    except TypeError:
-        return _lims_from_decays_ratio(bins, counts, radsources)
+    except KeyError:
+        logging.warning("no available default calibration.")
+        raise DetectPeakError()
     else:
-        return _lims_from_existing_calib(bins, counts, radsources, channel_calib)
+        if channel_calib is not None:
+            return _lims_from_existing_calib(bins, counts, radsources, channel_calib)
+        else:
+            return _lims_from_decays_ratio(bins, counts, radsources)
 
 
 def _lims_from_existing_calib(bins, counts, radsources: list, channel_calib):
@@ -429,13 +434,12 @@ def _peak_fitter(x, y, limits):
     x_stop = np.where(x < stop)[0][-1]
     x_fit = (x[x_start:x_stop + 1][1:] + x[x_start:x_stop + 1][:-1]) / 2
     y_fit = y[x_start:x_stop]
-    weights = np.sqrt(y_fit)
+    errors = np.clip(np.sqrt(y_fit), 1, None)
 
     mod = GaussianModel()
     pars = mod.guess(y_fit, x=x_fit)
-
     try:
-        result = mod.fit(y_fit, pars, x=x_fit, weights=weights)
+        result = mod.fit(y_fit, pars, x=x_fit, weights=1/errors)
     except TypeError:
         raise FailedFitError("peak fitter error.")
     x_fine = np.linspace(x[0], x[-1], len(x) * 100)

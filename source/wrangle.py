@@ -30,7 +30,7 @@ def filter_spurious(data):
 def filter_delay(data, hold_time):
     unique_times = data.TIME.unique()
     bad_events = unique_times[np.where(np.diff(unique_times) < hold_time)[0] + 1]
-    return data.drop(data.index[data['TIME'].isin(bad_events)]).reset_index()
+    return data.drop(data.index[data['TIME'].isin(bad_events)]).reset_index(drop=True)
 
 
 def infer_onchannels(data):

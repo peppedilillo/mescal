@@ -30,7 +30,9 @@ from source.plot import draw_and_save_qlooks
 from source.plot import draw_and_save_uncalibrated
 from source.plot import draw_and_save_slo
 from source.plot import draw_and_save_lins
+from source.plot import draw_and_save_spectrum
 from source.errors import ModelNotFoundError
+
 
 START, STOP, STEP = 15000, 28000, 10
 NBINS = int((STOP - START) / STEP)
@@ -85,6 +87,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--cache",
+    default=False,
     action="store_true",
     help="enables loading and saving from cache.",
 )
@@ -119,7 +122,6 @@ peak_hints_args.add_argument(
 )
 
 
-
 def run(args):
 
     console = interface.hello()
@@ -137,18 +139,24 @@ def run(args):
         data, channels = preprocess(data, couples, console)
         histograms = make_histograms(data, BINNING, console)
 
-    with console.status("Calibrating.."):
-        calibration = calibrate(*histograms, *radsources, channels, hint)
-        *results, flagged = inspect(*calibration, console)
+    with console.status("Working on it.."):
+        results = calibrate(*histograms, *radsources, channels, hint)
+        fits, calibrations, flagged = inspect(*results, console)
+        maybe_eventlist = promise(lambda: make_events_list(
+            data,
+            *calibrations,
+            couples,
+            systhreads,
+        ))
 
     with console.status("Writing and drawing.."):
         process_results(
             args.filepath,
-            couples,
-            data,
             histograms,
             radsources,
-            results,
+            fits,
+            calibrations,
+            maybe_eventlist,
             options,
             args.fmt,
             console,
@@ -295,23 +303,40 @@ def calibrate(xhistograms, shistograms, xradsources, sradsources, channels, hint
     )
 
 
+def get_eventlist(el):
+    """
+    this is for accessing the eventlist.
+
+    Args:
+        el: a list (a promise)
+
+    Returns: a dataframe
+
+    """
+    car, cdr = el
+    if car:
+        return cdr
+    else: # mutate
+        el[0] = 1
+        el[1] = cdr()
+        return el[1]
+
+
 def process_results(
     filepath,
-    detector_couples,
-    data,
     histograms,
     radsources,
-    results,
+    fits,
+    calibrations,
+    eventlist_promise,
     options,
     fmt,
     console,
 ):
     xhistograms, shistograms = histograms
     xradsources, sradsources = radsources
-    (xfit_results, sfit_results), (
-        sdds_calibration,
-        scintillators_lightout,
-    ) = results
+    xfit_results, sfit_results = fits
+    sdds_calibration, scintillators_lightout = calibrations
     write_report = get_writer(fmt)
 
     if True:
@@ -394,7 +419,6 @@ def process_results(
             path=upaths.SLOREPORT(filepath),
         )
         console.log(":blue_book: Wrote scintillators calibration results.")
-
         draw_and_save_slo(
             scintillators_lightout,
             path=upaths.SLOPLOT(filepath),
@@ -416,13 +440,17 @@ def process_results(
     if sdds_calibration and scintillators_lightout:
         options.append(
             _write_eventlist_to_fits(
-                lambda: make_events_list(
-                    data,
-                    sdds_calibration,
-                    scintillators_lightout,
-                    detector_couples,
-                ),
+                lambda: get_eventlist(eventlist_promise),
                 upaths.EVLFITS(filepath),
+            )
+        )
+        options.append(
+            _draw_and_save_spectra(
+                lambda: get_eventlist(eventlist_promise),
+                xradsources,
+                sradsources,
+                upaths.XSPPLOT(filepath),
+                upaths.SSPPLOT(filepath),
             )
         )
     return True
@@ -476,14 +504,15 @@ def _draw_and_save_xdiagns(histograms, fit_results, path, nthreads):
     )
 
 
-def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
+def _draw_and_save_lins(sdds_calibration, xfit_results, xradsources, path, nthreads):
     return option(
-        display="Save S fit diagnostic plots.",
+        display="Save X linearity plots.",
         reply=":sparkles: Plots saved. :sparkles:",
         promise=promise(
-            lambda: draw_and_save_diagns(
-                histograms,
-                fit_results,
+            lambda: draw_and_save_lins(
+                sdds_calibration,
+                xfit_results,
+                xradsources,
                 path,
                 nthreads,
             )
@@ -502,6 +531,22 @@ def _write_xfit_report(fit_results, path):
             )
         ),
     )
+
+
+def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
+    return option(
+        display="Save S fit diagnostic plots.",
+        reply=":sparkles: Plots saved. :sparkles:",
+        promise=promise(
+            lambda: draw_and_save_diagns(
+                histograms,
+                fit_results,
+                path,
+                nthreads,
+            )
+        ),
+    )
+
 
 
 def _write_sfit_report(fit_results, path):
@@ -559,22 +604,6 @@ def _draw_and_save_channels_sspectra(
     )
 
 
-def _draw_and_save_lins(sdds_calibration, xfit_results, xradsources, path, nthreads):
-    return option(
-        display="Save X linearity plots.",
-        reply=":sparkles: Plots saved. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_lins(
-                sdds_calibration,
-                xfit_results,
-                xradsources,
-                path,
-                nthreads,
-            )
-        ),
-    )
-
-
 def _write_eventlist_to_fits(thunk, path):
     """
     designed to delay the evaluation of make_events_list. call it like :
@@ -595,6 +624,24 @@ def _write_eventlist_to_fits(thunk, path):
             )
         ),
     )
+
+
+def _draw_and_save_spectra(thunk, xradsources, sradsources, xpath, spath):
+    return option(
+        display="Save calibrated spectra.",
+        reply=":sparkles: Spectra plot saved :sparkle:",
+        promise=promise(
+            lambda: draw_and_save_spectrum(
+                thunk(),
+                xradsources,
+                sradsources,
+                xpath,
+                spath,
+            )
+        )
+    )
+
+
 
 
 def promise(f):

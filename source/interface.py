@@ -59,7 +59,7 @@ def shutdown(console):
 def options_message(options):
     line_end = (lambda i: '\n')
     message = Text.assemble("\nAnything else?\n\n",
-                            *(Text.assemble(("\t{}. ".format(i),"bold magenta"),
+                            *(Text.assemble(("\t{:2d}. ".format(i),"bold magenta"),
                                             option.display + line_end(i)) for i, option in enumerate(options)))
     return message
 
