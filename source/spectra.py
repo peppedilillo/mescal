@@ -379,8 +379,8 @@ def _lims_from_decays_ratio(bins, counts, radsources: list):
 
 
 def _filter_peaks_lratio(radsources: list, peaks, peaks_infos):
-    normalize = (lambda x: [(x[i + 1] - x[i]) / (x[-1] - x[0]) for i in range(len(x) - 1)])
-    weight = (lambda x: [x[i + 1] * x[i] for i in range(len(x) - 1)])
+    def normalize(x): return [(x[i + 1] - x[i]) / (x[-1] - x[0]) for i in range(len(x) - 1)]
+    def weight(x): return [x[i + 1] * x[i] for i in range(len(x) - 1)]
 
     peaks_combinations = [*combinations(peaks, r=len(radsources))]
     proms_combinations = combinations(peaks_infos["prominences"], r=len(radsources))
