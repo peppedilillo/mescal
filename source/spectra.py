@@ -18,7 +18,7 @@ PHT_KEV = 3.65 / 1000
 histograms_collection = namedtuple('histogram', ['bins', 'counts'])
 
 
-def make_events_list(data, calibrated_sdds, calibrated_scintillators, scintillator_couples, nthreads=1,):
+def make_events_list(data, calibrated_sdds, calibrated_scintillators, scintillator_couples, nthreads=1, ):
     columns = ['TIME', 'ENERGY', 'EVTYPE', 'CHN', 'QUADID']
     types = ['float64', 'float32', 'U1', 'int8', 'U1']
     dtypes = {col: tp for col, tp in zip(columns, types)}
@@ -132,7 +132,7 @@ def _insert_xenergy_column(data, calibrated_sdds):
 
 def scalibrate(histograms, cal_df, radsources, lout_guess):
     results_fit, results_slo, flagged = {}, {}, {}
-    radsources_energies = [l.energy for l in radsources.values()]
+    radsources_energies = [s.energy for s in radsources.values()]
 
     bins = histograms.bins
     for quad in cal_df.keys():
@@ -234,7 +234,7 @@ def _compute_louts(centers, center_errs, gain, gain_err, offset, offset_err, rad
 
 def xcalibrate(histograms, radsources, channels, default_calib=None):
     results_xfit, results_cal, flagged = {}, {}, {}
-    radsources_energies = [l.energy for l in radsources.values()]
+    radsources_energies = [s.energy for s in radsources.values()]
 
     for quad in channels.keys():
         for ch in channels[quad]:
@@ -265,7 +265,7 @@ def xcalibrate(histograms, radsources, channels, default_calib=None):
                     radsources,
                 )
             except FailedFitError:
-                meassage = warn_failed_peak_fit(quad,ch)
+                meassage = warn_failed_peak_fit(quad, ch)
                 logging.warning(meassage)
                 flagged.setdefault(quad, []).append(ch)
                 continue
@@ -311,7 +311,7 @@ def _lims_from_existing_calib(bins, counts, radsources: list, channel_calib):
     distance = 5
     low_en_thr = 1.0  # keV
 
-    energies = (bins - channel_calib['offset'])/ channel_calib['gain']
+    energies = (bins - channel_calib['offset']) / channel_calib['gain']
     (inf_bin, *_), = np.where(energies > low_en_thr)
     smoothed_counts = move_mean(counts, window_len)
     unfiltered_peaks, unfiltered_peaks_info = find_peaks(
@@ -380,16 +380,15 @@ def _lims_from_decays_ratio(bins, counts, radsources: list):
 
 def _filter_peaks_lratio(radsources: list, peaks, peaks_infos):
     def normalize(x): return [(x[i + 1] - x[i]) / (x[-1] - x[0]) for i in range(len(x) - 1)]
-    def weight(x): return [x[i + 1] * x[i] for i in range(len(x) - 1)]
+    # def weight(x): return [x[i + 1] * x[i] for i in range(len(x) - 1)]
 
     peaks_combinations = [*combinations(peaks, r=len(radsources))]
-    proms_combinations = combinations(peaks_infos["prominences"], r=len(radsources))
     norm_ls = normalize(radsources)
     norm_ps = [*map(normalize, peaks_combinations)]
-    weights = [*map(weight, proms_combinations)]
-    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls))
-                  #/ np.square(weights)
-                  , axis=1)
+    # proms_combinations = combinations(peaks_infos["prominences"], r=len(radsources))
+    # weights = [*map(weight, proms_combinations)]
+    # loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls))/np.square(weights), axis=1)
+    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)), axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
     best_peaks_info = {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
     return best_peaks, best_peaks_info
@@ -397,9 +396,9 @@ def _filter_peaks_lratio(radsources: list, peaks, peaks_infos):
 
 def _fit_radsources_peaks(x, y, limits, radsources):
     centers, _, fwhms, _, *_ = _fit_peaks(x, y, limits)
-    sigmas = fwhms/2.35
+    sigmas = fwhms / 2.35
     lower, upper = zip(*[(rs.low_lim, rs.hi_lim) for rs in radsources.values()])
-    intervals = [*zip(centers + sigmas*lower, centers + sigmas*upper)]
+    intervals = [*zip(centers + sigmas * lower, centers + sigmas * upper)]
     fit_results = _fit_peaks(x, y, intervals)
     return intervals, fit_results
 
@@ -439,7 +438,7 @@ def _peak_fitter(x, y, limits):
     mod = GaussianModel()
     pars = mod.guess(y_fit, x=x_fit)
     try:
-        result = mod.fit(y_fit, pars, x=x_fit, weights=1/errors)
+        result = mod.fit(y_fit, pars, x=x_fit, weights=1 / errors)
     except TypeError:
         raise FailedFitError("peak fitter error.")
     x_fine = np.linspace(x[0], x[-1], len(x) * 100)
@@ -474,16 +473,15 @@ def compute_histogram(data, start, end, nbins, nthreads=1):
         quad_df = data[data['QUADID'] == quad]
         for ch in range(32):
             adcs = quad_df[(quad_df['CHN'] == ch)]['ADC']
-            counts, bins = np.histogram(adcs, range=(start, end), bins=nbins)
-            hist_quads[ch] = counts
-        return quad, hist_quads, bins
+            ys, _ = np.histogram(adcs, range=(start, end), bins=nbins)
+            hist_quads[ch] = ys
+        return quad, hist_quads
 
     bins = np.linspace(start, end, nbins + 1)
     results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in 'ABCD')
-    counts = {key: value for key, value, _ in results}
+    counts = {key: value for key, value in results}
     return histograms_collection(bins, counts)
 
 
 def move_mean(arr, n):
     return pd.Series(arr).rolling(n, center=True).mean().to_numpy()
-
