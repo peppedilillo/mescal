@@ -232,7 +232,7 @@ def _compute_louts(centers, center_errs, gain, gain_err, offset, offset_err, rad
     return light_outs, light_out_errs
 
 
-def xcalibrate(histograms, radsources, channels, default_calibration=None):
+def xcalibrate(histograms, radsources, channels, default_calib=None):
     results_xfit, results_cal, flagged = {}, {}, {}
     radsources_energies = [l.energy for l in radsources.values()]
 
@@ -241,8 +241,10 @@ def xcalibrate(histograms, radsources, channels, default_calibration=None):
             bins = histograms.bins
             counts = histograms.counts[quad][ch]
 
-            def packaged_calib(): return default_calibration[quad].loc[ch]
             try:
+                def packaged_calib():
+                    return default_calib[quad].loc[ch] if default_calib else None
+
                 limits = _find_peaks_limits(
                     bins,
                     counts,
@@ -292,10 +294,14 @@ def xcalibrate(histograms, radsources, channels, default_calibration=None):
 def _find_peaks_limits(bins, counts, radsources: list, unpack_calibration):
     try:
         channel_calib = unpack_calibration()
-    except TypeError:
-        return _lims_from_decays_ratio(bins, counts, radsources)
+    except KeyError:
+        logging.warning("no available default calibration.")
+        raise DetectPeakError()
     else:
-        return _lims_from_existing_calib(bins, counts, radsources, channel_calib)
+        if channel_calib is not None:
+            return _lims_from_existing_calib(bins, counts, radsources, channel_calib)
+        else:
+            return _lims_from_decays_ratio(bins, counts, radsources)
 
 
 def _lims_from_existing_calib(bins, counts, radsources: list, channel_calib):
@@ -428,13 +434,12 @@ def _peak_fitter(x, y, limits):
     x_stop = np.where(x < stop)[0][-1]
     x_fit = (x[x_start:x_stop + 1][1:] + x[x_start:x_stop + 1][:-1]) / 2
     y_fit = y[x_start:x_stop]
-    weights = np.sqrt(y_fit)
+    errors = 1/np.clip(np.sqrt(y_fit), 1, None)
 
     mod = GaussianModel()
     pars = mod.guess(y_fit, x=x_fit)
-
     try:
-        result = mod.fit(y_fit, pars, x=x_fit, weights=weights)
+        result = mod.fit(y_fit, pars, x=x_fit, weights=errors)
     except TypeError:
         raise FailedFitError("peak fitter error.")
     x_fine = np.linspace(x[0], x[-1], len(x) * 100)
