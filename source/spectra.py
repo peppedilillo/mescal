@@ -438,7 +438,7 @@ def _peak_fitter(x, y, limits):
     mod = GaussianModel()
     pars = mod.guess(y_fit, x=x_fit)
     try:
-        result = mod.fit(y_fit, pars, x=x_fit, weights=1 / errors)
+        result = mod.fit(y_fit, pars, x=x_fit, weights=1/errors)
     except TypeError:
         raise FailedFitError("peak fitter error.")
     x_fine = np.linspace(x[0], x[-1], len(x) * 100)

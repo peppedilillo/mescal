@@ -175,6 +175,7 @@ def run(args):
 def log_to(filepath):
     logging.basicConfig(
         filename=filepath,
+        filemode='w',
         level=logging.INFO,
         format = "[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
         "%(levelname)s: %(message)s"
@@ -640,8 +641,6 @@ def _draw_and_save_spectra(thunk, xradsources, sradsources, xpath, spath):
             )
         )
     )
-
-
 
 
 def promise(f):
