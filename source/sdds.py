@@ -16,7 +16,7 @@ CAL_PARAMS = [
 
 def as_dict_of_dataframes(f):
     def wrapper(*args):
-        nested_dict, radsources, *etc = f(*args)
+        nested_dict, radsources, flagged = f(*args)
         quadrants = nested_dict.keys()
 
         dict_of_dfs = {
@@ -26,7 +26,7 @@ def as_dict_of_dataframes(f):
             ).T.rename_axis("channel")
             for q in quadrants
         }
-        return dict_of_dfs, *etc
+        return dict_of_dfs, flagged
     return wrapper
 
 

@@ -10,18 +10,18 @@ def add_evtype_tag(data, couples):
     """
     inplace add event type (X or S) column
     """
-    data['CHN'] = data['CHN'] + 1
-    qm = data['QUADID'].map({key: 100 ** s2i(key) for key in 'ABCD'})
-    chm_dict = dict(np.concatenate([(couples[key] + 1) * 100 ** s2i(key) for key in couples.keys()]))
-    chm = data['CHN'] * qm
-    data.insert(loc=3, column='EVTYPE', value=(data
-                                               .assign(CHN=chm.map(chm_dict).fillna(chm))
-                                               .duplicated(['SID', 'CHN'], keep=False)
-                                               .map({False: 'X', True: 'S'})
-                                               .astype('string')))
-    data['CHN'] = data['CHN'] - 1
+    qm = data['QUADID'].map({key: 100 * s2i(key) for key in 'ABCD'})
+    chm_dict = dict(np.concatenate([couples[key] + 100 * s2i(key) for key in couples.keys()]))
+    chm = data['CHN'] + qm
+    data.insert(loc=3,
+                column='EVTYPE',
+                value=(data
+                       .assign(CHN=chm.map(chm_dict).fillna(chm))
+                       .duplicated(['SID', 'CHN'], keep=False)
+                       .map({False: 'X', True: 'S'})
+                       .astype('string'))
+                )
     return data
-
 
 def filter_spurious(data):
     return data[(data["NMULT"] < 2) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))]
