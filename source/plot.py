@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt; plt.style.use('seaborn')
 from joblib import Parallel
 from joblib import delayed
 
-from source.spectra import PHT_KEV
+from source.specutils import PHT_KEV
 
 
 def _compute_lims_for_x(radsources: dict):

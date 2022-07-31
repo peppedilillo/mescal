@@ -1,4 +1,5 @@
 timeit.py
+calibrate.py
 *.fits
 output/
 data/

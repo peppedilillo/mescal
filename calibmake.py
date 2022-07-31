@@ -9,28 +9,16 @@ import logging
 from source import upaths
 from source import interface
 from source.io import pandas_from
-from source.io import get_writer
-from source.io import write_eventlist_to_fits
-from source.io import write_report_to_excel
 from source.wrangle import get_couples
 from source.wrangle import add_evtype_tag
 from source.wrangle import infer_onchannels
 from source.wrangle import filter_delay
 from source.wrangle import filter_spurious
-from source.spectra import xcalibrate
-from source.spectra import scalibrate
-from source.spectra import compute_histogram
-from source.spectra import make_events_list
+from source.specutils import compute_histogram
+from source.xpeaks import fit_xradsources
+from source.sdds import calibrate_sdds
 from source.inventory import fetch_default_sdd_calibration
 from source.inventory import radsources_dicts
-from source.plot import draw_and_save_diagns
-from source.plot import draw_and_save_channels_xspectra
-from source.plot import draw_and_save_channels_sspectra
-from source.plot import draw_and_save_qlooks
-from source.plot import draw_and_save_uncalibrated
-from source.plot import draw_and_save_slo
-from source.plot import draw_and_save_lins
-from source.plot import draw_and_save_spectrum
 from source.errors import ModelNotFoundError
 
 
@@ -40,24 +28,6 @@ END = START + NBINS * STEP
 BINNING = (START, END, NBINS)
 RETRIGGER_TIME_IN_S = 20 * (10**-6)
 
-
-FIT_PARAMS = [
-    "center",
-    "center_err",
-    "fwhm",
-    "fwhm_err",
-    "amp",
-    "amp_err",
-    "lim_low",
-    "lim_high",
-]
-CAL_PARAMS = [
-    "gain",
-    "gain_err",
-    "offset",
-    "offset_err",
-    "chi2",
-]
 LO_PARAMS = [
     "light_out",
     "light_out_err",
@@ -78,8 +48,8 @@ parser = argparse.ArgumentParser(description=description)
 parser.add_argument(
     "radsources",
     help="radioactive sources used for calibration. "
-    "separated by comma, e.g.:  `-l=Fe,Cd,Cs`. "
-    "currently supported sources: Fe, Cd, Cs.",
+    "separated by comma, e.g. `Fe,Cd,Cs`."
+    "currently supported sources: Fe, Cd, Am, Cs.",
 )
 parser.add_argument(
     "filepath",
@@ -132,43 +102,30 @@ def run(args):
             hint = fetch_hint(args.model, args.temperature, console)
         except ModelNotFoundError:
             hint = None
-        radsources = radsources_dicts(radsources_list(args.radsources))
-        couples = get_couples()
+        radsources = radsources_dicts(to_list(args.radsources))
+        scintillator_couples = get_couples()
 
     with console.status("Preprocessing.."):
-        data, channels = preprocess(data, couples, console)
-        histograms = make_histograms(data, BINNING, console)
+        data, channels = preprocess(data, scintillator_couples, console)
+        xhistograms, shistograms = make_histograms(data, BINNING, console)
 
-    with console.status("Working on it.."):
-        results = calibrate(*histograms, *radsources, channels, hint)
-        fits, calibrations, flagged = inspect(*results, console)
-        maybe_eventlist = promise(lambda: make_events_list(
-            data,
-            *calibrations,
-            couples,
-            systhreads,
-        ))
+    with console.status("Calibrating.."):
+        xradsources, sradsources = radsources
+        if xradsources:
+            xfit_results, _ = fit_xradsources(
+                xhistograms,
+                xradsources,
+                channels,
+                hint,
+            )
 
-    with console.status("Writing and drawing.."):
-        process_results(
-            args.filepath,
-            histograms,
-            radsources,
-            fits,
-            calibrations,
-            maybe_eventlist,
-            options,
-            args.fmt,
-            console,
-        )
+            sdd_calibrations, _ = calibrate_sdds(
+                xradsources,
+                xfit_results,
+            )
 
-    if any(flagged):
-        warn_about_flagged(flagged, channels, console)
 
-    anything_else(options, console)
-
-    goodbye = interface.shutdown(console)
-
+            pass
     return True
 
 
@@ -192,16 +149,6 @@ def parse_args():
     return args
 
 
-def radsources_list(radsources_string):
-    return radsources_string.upper().split(",")
-
-
-def fetch_hint(model, temperature, console):
-    hint, key = fetch_default_sdd_calibration(model, temperature)
-    console.log(":open_book: Loaded detection hints for {}@{}°C.".format(*key))
-    return hint
-
-
 def get_from(fitspath: Path, console, use_cache=True):
     console.log(":question_mark: Looking for data..")
     cached = upaths.CACHEDIR().joinpath(fitspath.name).with_suffix(".pkl.gz")
@@ -217,6 +164,16 @@ def get_from(fitspath: Path, console, use_cache=True):
     else:
         raise FileNotFoundError("could not find input datafile.")
     return out
+
+
+def fetch_hint(model, temperature, console):
+    hint, key = fetch_default_sdd_calibration(model, temperature)
+    console.log(":open_book: Loaded detection hints for {}@{}°C.".format(*key))
+    return hint
+
+
+def to_list(radsources_string):
+    return radsources_string.upper().split(",")
 
 
 def filter_retrigger(df):
@@ -250,431 +207,8 @@ def make_histograms(data, binning, console):
     return xhistograms, shistograms
 
 
-def inspect(fits, calibrations, flagged, console):
-    sdds_calibration, scintillators_lightout = calibrations
-    flagged = merge_flagged_dicts(*flagged)
-
-    if not sdds_calibration and not scintillators_lightout:
-        console.log("[bold red] :cross_mark: Calibration failed.")
-    elif not scintillators_lightout or not scintillators_lightout:
-        console.log("[bold yellow]:yellow_circle: Calibration partially completed. ")
-    else:
-        console.log(":white_check_mark: Calibration complete.")
-    return fits, calibrations, flagged
-
-
 def _to_dfdict(x, idx):
-    return {q: pd.DataFrame(x[q], index=idx).T for q in x.keys()}
-
-
-def calibrate(xhistograms, shistograms, xradsources, sradsources, channels, hint):
-    if xradsources:
-        _xfitdict, _caldict, xflagged = xcalibrate(
-            xhistograms,
-            xradsources,
-            channels,
-            hint,
-        )
-        index = pd.MultiIndex.from_product((xradsources.keys(), FIT_PARAMS))
-        xfit_results = _to_dfdict(_xfitdict, index)
-        sdds_calibration = _to_dfdict(_caldict, CAL_PARAMS)
-
-        if sradsources:
-            _sfitdict, _slodict, sflagged = scalibrate(
-                shistograms,
-                sdds_calibration,
-                sradsources,
-                lout_guess=(10.0, 15.0),
-            )
-            index = pd.MultiIndex.from_product((sradsources.keys(), FIT_PARAMS))
-            sfit_results = _to_dfdict(_sfitdict, index)
-            scintillators_lightout = _to_dfdict(_slodict, LO_PARAMS)
-
-        else:
-            sfit_results, scintillators_lightout, sflagged = {}, {}, {}
-
-    else:
-        xfit_results, sdds_calibration, xflagged = {}, {}, {}
-        sfit_results, scintillators_lightout, sflagged = {}, {}, {}
-
-    return (
-        (xfit_results, sfit_results),
-        (sdds_calibration, scintillators_lightout),
-        (xflagged, sflagged),
-    )
-
-
-def get_eventlist(el):
-    """
-    this is for accessing the eventlist.
-
-    Args:
-        el: a list (a promise)
-
-    Returns: a dataframe
-
-    """
-    car, cdr = el
-    if car:
-        return cdr
-    else: # mutate
-        el[0] = 1
-        el[1] = cdr()
-        return el[1]
-
-
-def process_results(
-    filepath,
-    histograms,
-    radsources,
-    fits,
-    calibrations,
-    eventlist_promise,
-    options,
-    fmt,
-    console,
-):
-    xhistograms, shistograms = histograms
-    xradsources, sradsources = radsources
-    xfit_results, sfit_results = fits
-    sdds_calibration, scintillators_lightout = calibrations
-    write_report = get_writer(fmt)
-
-    if True:
-        options.append(
-            _draw_and_save_uncalibrated(
-                xhistograms,
-                shistograms,
-                upaths.UNCPLOT(filepath),
-                systhreads,
-            )
-        )
-    if xfit_results:
-        options.append(
-            _draw_and_save_xdiagns(
-                xhistograms,
-                xfit_results,
-                upaths.XDNPLOT(filepath),
-                systhreads,
-            )
-        )
-        options.append(
-            _write_xfit_report(
-                xfit_results,
-                upaths.XFTREPORT(filepath),
-            )
-        )
-
-    if sdds_calibration:
-        write_report(
-            sdds_calibration,
-            path=upaths.CALREPORT(filepath),
-        )
-        console.log(":blue_book: Wrote SDD calibration results.")
-
-        draw_and_save_qlooks(
-            sdds_calibration,
-            path=upaths.QLKPLOT(filepath),
-            nthreads=systhreads,
-        )
-        console.log(":chart_increasing: Saved X fit quicklook plots.")
-
-        options.append(
-            _draw_and_save_channels_xspectra(
-                xhistograms,
-                sdds_calibration,
-                xradsources,
-                upaths.XCSPLOT(filepath),
-                systhreads,
-            )
-        )
-        options.append(
-            _draw_and_save_lins(
-                sdds_calibration,
-                xfit_results,
-                xradsources,
-                upaths.LINPLOT(filepath),
-                systhreads,
-            )
-        )
-
-    if sfit_results:
-        options.append(
-            _draw_and_save_sdiagns(
-                shistograms,
-                sfit_results,
-                upaths.SDNPLOT(filepath),
-                systhreads,
-            )
-        )
-        options.append(
-            _write_sfit_report(
-                sfit_results,
-                upaths.SFTREPORT(filepath),
-            )
-        )
-
-    if scintillators_lightout:
-        write_report(
-            scintillators_lightout,
-            path=upaths.SLOREPORT(filepath),
-        )
-        console.log(":blue_book: Wrote scintillators calibration results.")
-        draw_and_save_slo(
-            scintillators_lightout,
-            path=upaths.SLOPLOT(filepath),
-            nthreads=systhreads,
-        )
-        console.log(":chart_increasing: Saved light-output plots.")
-
-        options.append(
-            _draw_and_save_channels_sspectra(
-                shistograms,
-                sdds_calibration,
-                scintillators_lightout,
-                sradsources,
-                upaths.SCSPLOT(filepath),
-                systhreads,
-            )
-        )
-
-    if sdds_calibration and scintillators_lightout:
-        options.append(
-            _write_eventlist_to_fits(
-                lambda: get_eventlist(eventlist_promise),
-                upaths.EVLFITS(filepath),
-            )
-        )
-        options.append(
-            _draw_and_save_spectra(
-                lambda: get_eventlist(eventlist_promise),
-                xradsources,
-                sradsources,
-                upaths.XSPPLOT(filepath),
-                upaths.SSPPLOT(filepath),
-            )
-        )
-    return True
-
-
-def merge_flagged_dicts(dx, ds):
-    fs = lambda x, l: (*x, "s") if x[0] in l else x
-    fx = lambda x, l: (*x, "x") if x[0] in l else x
-
-    out = {}
-    for key in "ABCD":
-        content = sorted(list(set(ds.setdefault(key, []) + dx.setdefault(key, []))))
-        if content:
-            out[key] = [fs(fx((x,), dx[key]), ds[key]) for x in content]
-    return out
-
-
-def warn_about_flagged(flagged, channels, console):
-    interface.print_rule(console, "[bold italic]Warning", style="red", align="center")
-    console.print(interface.flagged_message(flagged, channels))
-    return True
-
-
-def _draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads):
-    return option(
-        display="Save uncalibrated plots.",
-        reply=":sparkles: Saved uncalibrated plots. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_uncalibrated(
-                xhistograms,
-                shistograms,
-                path,
-                nthreads,
-            )
-        ),
-    )
-
-
-def _draw_and_save_xdiagns(histograms, fit_results, path, nthreads):
-    return option(
-        display="Save X fit diagnostic plots.",
-        reply=":sparkles: Plots saved. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_diagns(
-                histograms,
-                fit_results,
-                path,
-                nthreads,
-            )
-        ),
-    )
-
-
-def _draw_and_save_lins(sdds_calibration, xfit_results, xradsources, path, nthreads):
-    return option(
-        display="Save X linearity plots.",
-        reply=":sparkles: Plots saved. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_lins(
-                sdds_calibration,
-                xfit_results,
-                xradsources,
-                path,
-                nthreads,
-            )
-        ),
-    )
-
-
-def _write_xfit_report(fit_results, path):
-    return option(
-        display="Save X fit results.",
-        reply=":sparkles: Fit table saved. :sparkles:",
-        promise=promise(
-            lambda: write_report_to_excel(
-                fit_results,
-                path,
-            )
-        ),
-    )
-
-
-def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
-    return option(
-        display="Save S fit diagnostic plots.",
-        reply=":sparkles: Plots saved. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_diagns(
-                histograms,
-                fit_results,
-                path,
-                nthreads,
-            )
-        ),
-    )
-
-
-
-def _write_sfit_report(fit_results, path):
-    return option(
-        display="Save S fit results.",
-        reply=":sparkles: Fit table saved. :sparkles:",
-        promise=promise(
-            lambda: write_report_to_excel(
-                fit_results,
-                path,
-            )
-        ),
-    )
-
-
-def _draw_and_save_channels_xspectra(
-    xhistograms, sdds_calibration, xradsources, path, nthreads
-):
-    return option(
-        display="Save X channel spectra plots.",
-        reply=":sparkles: Plots saved. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_channels_xspectra(
-                xhistograms,
-                sdds_calibration,
-                xradsources,
-                path,
-                nthreads,
-            )
-        ),
-    )
-
-
-def _draw_and_save_channels_sspectra(
-    shistograms,
-    sdds_calibration,
-    scintillators_lightout,
-    sradsources,
-    path,
-    nthreads,
-):
-    return option(
-        display="Save S channel spectra plots.",
-        reply=":sparkles: Plots saved. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_channels_sspectra(
-                shistograms,
-                sdds_calibration,
-                scintillators_lightout,
-                sradsources,
-                path,
-                nthreads,
-            )
-        ),
-    )
-
-
-def _write_eventlist_to_fits(thunk, path):
-    """
-    designed to delay the evaluation of make_events_list. call it like :
-    _write_eventlist_to_fits(
-            (lambda: make_events_list(data,
-                                      sdds_calibration,
-                                      scintillators_lightout,
-                                      detector_couples)),
-            upaths.EVLFITS(filepath))
-    """
-    return option(
-        display="Write calibrated events to fits.",
-        reply=":sparkles: Event list saved. :sparkles:",
-        promise=promise(
-            lambda: write_eventlist_to_fits(
-                thunk(),
-                path,
-            )
-        ),
-    )
-
-
-def _draw_and_save_spectra(thunk, xradsources, sradsources, xpath, spath):
-    return option(
-        display="Save calibrated spectra.",
-        reply=":sparkles: Spectra plot saved :sparkle:",
-        promise=promise(
-            lambda: draw_and_save_spectrum(
-                thunk(),
-                xradsources,
-                sradsources,
-                xpath,
-                spath,
-            )
-        )
-    )
-
-
-def promise(f):
-    return [0, f]
-
-
-def fulfill(opt):
-    car, cdr = opt
-    if car:
-        pass
-    else:
-        opt[0] = 1
-        return cdr()
-
-
-def anything_else(options, console):
-    interface.print_rule(console, "[italic]Optional Outputs", align="center")
-    console.print(interface.options_message(options))
-
-    while True:
-        answer = interface.prompt_user_about(options)
-        if answer is terminate_mescal:
-            console.print(terminate_mescal.reply)
-            break
-        else:
-            with console.status("Working.."):
-                if fulfill(answer.promise):
-                    console.print(answer.reply)
-                else:
-                    console.print("[red]We already did that..")
-
-    interface.print_rule(console)
-    return True
-
+    return {q: pd.DataFrame(x[q], index=idx).T.rename_axis("channel") for q in x.keys()}
 
 
 if __name__ == "__main__":

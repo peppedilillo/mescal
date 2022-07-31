@@ -13,8 +13,8 @@ from source.wrangle import add_evtype_tag
 from source.wrangle import infer_onchannels
 from source.wrangle import filter_delay
 from source.wrangle import filter_spurious
-from source.spectra import compute_histogram
-from source.spectra import make_events_list
+from source.specutils import compute_histogram
+from source.specutils import make_events_list
 from source.inventory import fetch_default_sdd_calibration
 from source.inventory import fetch_default_slo_calibration
 from source.plot import draw_and_save_channels_xspectra
