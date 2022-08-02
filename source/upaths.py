@@ -6,7 +6,6 @@ paths here defined will work across different os.
 
 from pathlib import Path
 
-
 prjpath = Path(__file__).parent.parent
 
 

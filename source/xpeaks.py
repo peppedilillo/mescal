@@ -96,7 +96,11 @@ def fit_xradsources(histograms, radsources, channels, default_calib):
     return results, radsources, flagged
 
 
-def _find_peaks_limits(bins, counts, radsources: list, unpack_calibration):
+def _find_peaks_limits(
+        bins,
+        counts,
+        radsources: list,
+        unpack_calibration=lambda: None):
     try:
         channel_calib = unpack_calibration()
     except KeyError:
