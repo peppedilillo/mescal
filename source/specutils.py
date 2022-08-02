@@ -11,6 +11,15 @@ PHT_KEV = 3.65 / 1000
 histograms_collection = namedtuple('histogram', ['bins', 'counts'])
 
 
+def fit_radsources_peaks(x, y, limits, radsources):
+    centers, _, fwhms, _, *_ = _fit_peaks(x, y, limits)
+    sigmas = fwhms/2.35
+    lower, upper = zip(*[(rs.low_lim, rs.hi_lim) for rs in radsources.values()])
+    intervals = [*zip(centers + sigmas*lower, centers + sigmas*upper)]
+    fit_results = _fit_peaks(x, y, intervals)
+    return intervals, fit_results
+
+
 def _fit_peaks(x, y, limits):
     n_peaks = len(limits)
     centers = np.zeros(n_peaks)
@@ -58,12 +67,12 @@ def _peak_fitter(x, y, limits):
     return result, start, stop, x_fine, fitting_curve
 
 
-def compute_histogram(data, start, end, nbins, nthreads=1):
+def compute_histogram(value, data, start, end, nbins, nthreads=1):
     def helper(quad):
         hist_quads = {}
         quad_df = data[data['QUADID'] == quad]
         for ch in range(32):
-            adcs = quad_df[(quad_df['CHN'] == ch)]['ADC']
+            adcs = quad_df[(quad_df['CHN'] == ch)][value]
             ys, _ = np.histogram(adcs, range=(start, end), bins=nbins)
             hist_quads[ch] = ys
         return quad, hist_quads

@@ -14,12 +14,19 @@ from source.wrangle import add_evtype_tag
 from source.wrangle import infer_onchannels
 from source.wrangle import filter_delay
 from source.wrangle import filter_spurious
+from source.wrangle import electrons_to_energy
+from source.wrangle import make_electron_list
 from source.specutils import compute_histogram
 from source.xpeaks import fit_xradsources
+from source.speaks import fit_sradsources
+from source.speaks import fit_sumhistograms
+from source.scintillators import calibrate_scintillators
+from source.scintillators import compute_los
 from source.sdds import calibrate_sdds
 from source.inventory import fetch_default_sdd_calibration
 from source.inventory import radsources_dicts
-from source.errors import ModelNotFoundError
+from source.plot import draw_and_save_spectrum
+from source.errors import DetectorModelNotFound
 
 
 START, STOP, STEP = 15000, 28000, 10
@@ -100,14 +107,20 @@ def run(args):
         data = get_from(args.filepath, console, use_cache=args.cache)
         try:
             hint = fetch_hint(args.model, args.temperature, console)
-        except ModelNotFoundError:
+        except DetectorModelNotFound:
             hint = None
         radsources = radsources_dicts(to_list(args.radsources))
         scintillator_couples = get_couples()
 
     with console.status("Preprocessing.."):
         data, channels = preprocess(data, scintillator_couples, console)
-        xhistograms, shistograms = make_histograms(data, BINNING, console)
+        xhistograms = compute_histogram(
+            'ADC', data[data["EVTYPE"] == "X"], *BINNING, nthreads=systhreads
+        )
+        shistograms = compute_histogram(
+            'ADC', data[data["EVTYPE"] == "S"], *BINNING, nthreads=systhreads
+        )
+        console.log(":white_check_mark: Binned data.")
 
     with console.status("Calibrating.."):
         xradsources, sradsources = radsources
@@ -123,9 +136,50 @@ def run(args):
                 xradsources,
                 xfit_results,
             )
+            console.log(":white_check_mark: Calibrated SDDs.")
 
+            if sradsources:
+                sfit_results, _ = fit_sradsources(
+                    shistograms,
+                    sdd_calibrations,
+                    sradsources,
+                )
 
-            pass
+                evlist_electrons = make_electron_list(
+                    data,
+                    sdd_calibrations,
+                    sfit_results,
+                    scintillator_couples,
+                    systhreads
+                )
+                console.log(":white_check_mark: Made electron list")
+
+                sum_histograms = compute_histogram(
+                    'ELECTRONS',
+                    evlist_electrons[evlist_electrons["EVTYPE"] == "S"],
+                    *(1000, 25000, int((25000 - 1000) / 50)),
+                    nthreads=systhreads,
+                )
+
+                sumfit_results, _ = fit_sumhistograms(
+                    sum_histograms,
+                    sradsources,
+                )
+
+                scint_calibrations = calibrate_scintillators(
+                    sumfit_results,
+                    sradsources,
+                )
+
+                slo_results = compute_los(
+                    sfit_results,
+                    scint_calibrations,
+                    scintillator_couples,
+                )
+
+                eventlist = electrons_to_energy(evlist_electrons, scint_calibrations, scintillator_couples)
+                draw_and_save_spectrum(eventlist, *radsources, 'plotx.png', 'plots.png')
+
     return True
 
 
@@ -194,17 +248,6 @@ def preprocess(data, detector_couples, console):
         )
     )
     return data, channels
-
-
-def make_histograms(data, binning, console):
-    xhistograms = compute_histogram(
-        data[data["EVTYPE"] == "X"], *binning, nthreads=systhreads
-    )
-    shistograms = compute_histogram(
-        data[data["EVTYPE"] == "S"], *binning, nthreads=systhreads
-    )
-    console.log(":white_check_mark: Binned data.")
-    return xhistograms, shistograms
 
 
 def _to_dfdict(x, idx):

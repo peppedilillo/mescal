@@ -2,7 +2,7 @@ from itertools import combinations
 import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
-from source.specutils import _fit_peaks
+from source.specutils import fit_radsources_peaks
 from source.specutils import move_mean
 from source.errors import DetectPeakError
 from source.errors import FailedFitError
@@ -78,7 +78,7 @@ def fit_xradsources(histograms, radsources, channels, default_calib):
                 continue
 
             try:
-                intervals, fit_results = _fit_radsources_peaks(
+                intervals, fit_results = fit_radsources_peaks(
                     bins,
                     counts,
                     limits,
@@ -210,12 +210,3 @@ def _filter_peaks_lratio(radsources: list, peaks, peaks_infos):
     best_peaks_info = {key: val[np.isin(peaks, best_peaks)]
                        for key, val in peaks_infos.items()}
     return best_peaks, best_peaks_info
-
-
-def _fit_radsources_peaks(x, y, limits, radsources):
-    centers, _, fwhms, _, *_ = _fit_peaks(x, y, limits)
-    sigmas = fwhms / 2.35
-    lower, upper = zip(*[(rs.low_lim, rs.hi_lim) for rs in radsources.values()])
-    intervals = [*zip(centers + sigmas * lower, centers + sigmas * upper)]
-    fit_results = _fit_peaks(x, y, intervals)
-    return intervals, fit_results

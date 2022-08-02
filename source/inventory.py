@@ -13,7 +13,7 @@ from source.upaths import FM1Tp00CAL
 from source.upaths import FM1Tp00SLO
 from source.upaths import FM1Tp20CAL
 from source.upaths import FM1Tp20SLO
-from source.errors import ModelNotFoundError
+from source.errors import DetectorModelNotFound
 from source.errors import SourceNotFoundError
 from source.io import read_report_from_excel
 
@@ -72,7 +72,7 @@ def fetch_default_sdd_calibration(model, temp):
         return calibration_df, (model, ROOM_TEMP)
 
     else:
-        raise ModelNotFoundError("model not available.")
+        raise DetectorModelNotFound("model not available.")
 
 
 def fetch_default_slo_calibration(model, temp):
@@ -89,7 +89,7 @@ def fetch_default_slo_calibration(model, temp):
         return calibration_df, (model, ROOM_TEMP)
 
     else:
-        raise ModelNotFoundError("model not available.")
+        raise DetectorModelNotFound("model not available.")
 
 
 def get_quadrant_map(quad: str, arr_borders: bool = True):

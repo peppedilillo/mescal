@@ -1,4 +1,4 @@
-class ModelNotFoundError(Exception):
+class DetectorModelNotFound(Exception):
     """An error when querying an unsupported detector."""
 
 
