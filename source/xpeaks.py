@@ -1,26 +1,10 @@
 from itertools import combinations
 import numpy as np
-import pandas as pd
 from scipy.signal import find_peaks
-from source.specutils import fit_radsources_peaks
 from source.specutils import move_mean
 from source.errors import DetectPeakError
-from source.errors import FailedFitError
-from source.errors import warn_failed_peak_detection
-from source.errors import warn_failed_peak_fit
 import logging
 
-
-FIT_PARAMS = [
-    "center",
-    "center_err",
-    "fwhm",
-    "fwhm_err",
-    "amp",
-    "amp_err",
-    "lim_low",
-    "lim_high",
-]
 
 SMOOTHING = 5
 
@@ -31,83 +15,18 @@ PEAKS_DETECTION_PARAMETERS = {
 }
 
 
-def as_dict_of_dataframes(f):
-    def wrapper(*args):
-        nested_dict, radsources, flagged = f(*args)
-        quadrants = nested_dict.keys()
-        index = pd.MultiIndex.from_product(
-            (radsources.keys(), FIT_PARAMS),
-            names=['source', 'parameter']
-        )
-
-        dict_of_dfs = {
-            q: pd.DataFrame(
-                nested_dict[q],
-                index=index
-            ).T.rename_axis("channel")
-            for q in quadrants
-        }
-        return dict_of_dfs, flagged
-    return wrapper
-
-
-@as_dict_of_dataframes
-def fit_xradsources(histograms, radsources, channels, default_calib):
-    results, flagged = {}, {}
-    energies = [s.energy for s in radsources.values()]
-
-    for quad in channels.keys():
-        for ch in channels[quad]:
-            bins = histograms.bins
-            counts = histograms.counts[quad][ch]
-
-            try:
-                def packaged_calib():
-                    return default_calib[quad].loc[ch] if default_calib else None
-
-                limits = _find_peaks_limits(
-                    bins,
-                    counts,
-                    energies,
-                    packaged_calib,
-                )
-            except DetectPeakError:
-                message = warn_failed_peak_detection(quad, ch)
-                logging.warning(message)
-                flagged.setdefault(quad, []).append(ch)
-                continue
-
-            try:
-                intervals, fit_results = fit_radsources_peaks(
-                    bins,
-                    counts,
-                    limits,
-                    radsources,
-                )
-            except FailedFitError:
-                meassage = warn_failed_peak_fit(quad, ch)
-                logging.warning(meassage)
-                flagged.setdefault(quad, []).append(ch)
-                continue
-
-            int_inf, int_sup = zip(*intervals)
-            results.setdefault(quad, {})[ch] = np.column_stack(
-                (*fit_results, int_inf, int_sup)).flatten()
-    return results, radsources, flagged
-
-
 def _find_peaks_limits(
         bins,
         counts,
         radsources: list,
-        unpack_calibration=lambda: None):
+        unpack_calibration=lambda: False):
     try:
         channel_calib = unpack_calibration()
     except KeyError:
         logging.warning("no available default calibration.")
         raise DetectPeakError()
     else:
-        if channel_calib is not None:
+        if channel_calib:
             return _lims_from_existing_calib(bins, counts, radsources, channel_calib)
         else:
             return _lims_from_decays_ratio(bins, counts, radsources)
@@ -202,13 +121,9 @@ def normalize(x):
 
 
 def _filter_peaks_lratio(radsources: list, peaks, peaks_infos):
-    # def weight(x): return [x[i + 1] * x[i] for i in range(len(x) - 1)]
     peaks_combinations = [*combinations(peaks, r=len(radsources))]
     norm_ls = normalize(radsources)
     norm_ps = [*map(normalize, peaks_combinations)]
-    # proms_combinations = combinations(peaks_infos["prominences"], r=len(radsources))
-    # weights = [*map(weight, proms_combinations)]
-    # loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls))/np.square(weights), axis=1)
     loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)), axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
     best_peaks_info = {key: val[np.isin(peaks, best_peaks)]

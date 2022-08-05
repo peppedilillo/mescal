@@ -1,3 +1,4 @@
+from os import cpu_count
 from collections import namedtuple
 import numpy as np
 import pandas as pd
@@ -6,9 +7,28 @@ from lmfit.models import GaussianModel
 from source.errors import FailedFitError
 
 
-PHT_KEV = 3.65 / 1000
+histogram = namedtuple('histogram', ['bins', 'counts'])
 
-histograms_collection = namedtuple('histogram', ['bins', 'counts'])
+
+def compute_histogram(value, data, bins, nthreads=1):
+    def helper(quad):
+        hist_quads = {}
+        quad_df = data[data['QUADID'] == quad]
+        for ch in range(32):
+            adcs = quad_df[(quad_df['CHN'] == ch)][value]
+            ys, _ = np.histogram(adcs, bins=bins)
+            hist_quads[ch] = ys
+        return quad, hist_quads
+
+    nthreads = min(4, cpu_count())
+    results = Parallel(n_jobs=nthreads)(delayed(helper)(quad)
+                                        for quad in 'ABCD')
+    counts = {key: value for key, value in results}
+    return histogram(bins, counts)
+
+
+def move_mean(arr, n):
+    return pd.Series(arr).rolling(n, center=True).mean().to_numpy()
 
 
 def fit_radsources_peaks(x, y, limits, radsources):
@@ -65,23 +85,3 @@ def _peak_fitter(x, y, limits):
                              sigma=result.best_values['sigma'])
 
     return result, start, stop, x_fine, fitting_curve
-
-
-def compute_histogram(value, data, start, end, nbins, nthreads=1):
-    def helper(quad):
-        hist_quads = {}
-        quad_df = data[data['QUADID'] == quad]
-        for ch in range(32):
-            adcs = quad_df[(quad_df['CHN'] == ch)][value]
-            ys, _ = np.histogram(adcs, range=(start, end), bins=nbins)
-            hist_quads[ch] = ys
-        return quad, hist_quads
-
-    bins = np.linspace(start, end, nbins + 1)
-    results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in 'ABCD')
-    counts = {key: value for key, value in results}
-    return histograms_collection(bins, counts)
-
-
-def move_mean(arr, n):
-    return pd.Series(arr).rolling(n, center=True).mean().to_numpy()

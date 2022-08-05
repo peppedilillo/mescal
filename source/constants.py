@@ -1,0 +1,1 @@
+PHOTOEL_PER_KEV = 3.65 / 1000.

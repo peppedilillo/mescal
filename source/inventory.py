@@ -1,3 +1,5 @@
+import numpy as np
+
 from assets import detectors
 from assets.radsources_db import Fe
 from assets.radsources_db import Fe_kbeta
@@ -117,3 +119,12 @@ def radsources_dicts(sources: list):
     xdecays = {k: v for k, v in sorted(xdecays.items(), key=lambda item: item[1])}
     sdecays = {k: v for k, v in sorted(sdecays.items(), key=lambda item: item[1])}
     return xdecays, sdecays
+
+
+def get_quad_couples(quad):
+    qmaparr = np.array(get_quadrant_map(quad))
+    return np.lexsort((qmaparr[:, 0], qmaparr[:, 1])).reshape(16, 2)[1:]
+
+
+def get_couples():
+    return {q: get_quad_couples(q) for q in "ABCD"}

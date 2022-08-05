@@ -1,13 +1,11 @@
 from math import sqrt
 from math import pi
-
 import numpy as np
 import matplotlib; matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt; plt.style.use('seaborn')
 from joblib import Parallel
 from joblib import delayed
-
-from source.specutils import PHT_KEV
+from source.constants import PHOTOEL_PER_KEV
 
 
 def _compute_lims_for_x(radsources: dict):
@@ -80,7 +78,7 @@ def draw_and_save_channels_sspectra(histograms, res_cal, res_slo, radsources: di
     def helper(quad):
         for ch in res_slo[quad].index:
             xenbins = (histograms.bins - res_cal[quad].loc[ch]['offset']) / res_cal[quad].loc[ch]['gain']
-            enbins = xenbins/res_slo[quad]['light_out'].loc[ch]/PHT_KEV
+            enbins = xenbins / res_slo[quad]['light_out'].loc[ch] / PHOTOEL_PER_KEV
 
             fig, ax = _spectrum(enbins,
                                 histograms.counts[quad][ch],

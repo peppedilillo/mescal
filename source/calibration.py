@@ -5,12 +5,15 @@ import pandas as pd
 from lmfit.models import LinearModel
 
 import source.errors as err
+from source.constants import PHOTOEL_PER_KEV
 from source.inventory import fetch_default_sdd_calibration
 from source.speaks import _estimate_peaks_from_guess
 from source.specutils import _fit_peaks
-from source.utils import compute_histogram
-from source.wrangle import make_electron_list, electrons_to_energy
+from source.specutils import compute_histogram
+from source.eventlist import make_electron_list
+from source.eventlist import electrons_to_energy
 from source.xpeaks import _find_peaks_limits
+
 
 FIT_PARAMS = [
     "center",
@@ -43,13 +46,13 @@ def as_fit_dataframe(f):
         quadrants = nested_dict.keys()
         index = pd.MultiIndex.from_product(
             (radsources.keys(), FIT_PARAMS),
-            names=['source', 'parameter']
+            names=['source', 'parameter'],
         )
 
         dict_of_dfs = {
             q: pd.DataFrame(
                 nested_dict[q],
-                index=index
+                index=index,
             ).T.rename_axis("channel")
             for q in quadrants
         }
@@ -66,7 +69,7 @@ def as_cal_dataframe(f):
         dict_of_dfs = {
             q: pd.DataFrame(
                 nested_dict[q],
-                index=CAL_PARAMS
+                index=CAL_PARAMS,
             ).T.rename_axis("channel")
             for q in quadrants
         }
@@ -83,7 +86,7 @@ def as_slo_dataframe(f):
         dict_of_dfs = {
             q: pd.DataFrame(
                 nested_dict[q],
-                index=LO_PARAMS
+                index=LO_PARAMS,
             ).T.rename_axis("channel")
             for q in quadrants
         }
@@ -92,16 +95,7 @@ def as_slo_dataframe(f):
     return wrapper
 
 
-def adc_bins():
-    start, stop, step = 15000, 28000, 10
-    nbins = int((stop - start) / step)
-    end = start + nbins * step
-    bins = np.linspace(start, end, nbins + 1)
-    return bins
-
-
-def electron_bins():
-    start, stop, step = 1000, 25000, 50
+def linrange(start, stop, step):
     nbins = int((stop - start) / step)
     end = start + nbins * step
     bins = np.linspace(start, end, nbins + 1)
@@ -109,9 +103,8 @@ def electron_bins():
 
 
 class Calibration:
-    adc_bins = adc_bins()
-    electron_bins = electron_bins()
-    photoel_per_keV = 3.65 / 1000.
+    adc_bins = linrange(15000, 28000, 10)
+    electron_bins = linrange(1000, 25000, 50)
     light_out_guess = (20., 30.)
 
     def __init__(
@@ -122,8 +115,8 @@ class Calibration:
             detector_model=None,
             temperature=None,
             console=None,
+            nthreads = 1,
     ):
-        self.console = console
         self.radsources = radsources
         self.channels = channels
         self.couples = couples
@@ -139,6 +132,8 @@ class Calibration:
         self.scal = {}
         self.ecal = {}
         self.flagged = {}
+        self.console = console
+        self.nthreads = nthreads
 
     def __call__(self, data):
         self.xhistograms = self.make_xistograms(data)
@@ -200,7 +195,7 @@ class Calibration:
         try:
             hint, key = fetch_default_sdd_calibration(
                 self.detector_model,
-                self.temperature
+                self.temperature,
             )
         except err.DetectorModelNotFound:
             hint = None
@@ -218,7 +213,8 @@ class Calibration:
         histograms = compute_histogram(
             value,
             data,
-            bins
+            bins,
+            nthreads=self.nthreads,
         )
         return histograms
 
@@ -229,7 +225,7 @@ class Calibration:
         histograms = compute_histogram(
             value,
             data,
-            bins
+            bins,
         )
         return histograms
 
@@ -240,7 +236,7 @@ class Calibration:
         histograms = compute_histogram(
             value,
             data,
-            bins
+            bins,
         )
         return histograms
 
@@ -259,7 +255,7 @@ class Calibration:
 
                 try:
                     def packaged_hint():
-                        return hint[quad].loc[ch] if hint else None
+                        return hint[quad].loc[ch] if hint else False
 
                     limits = _find_peaks_limits(
                         bins,
@@ -292,62 +288,6 @@ class Calibration:
                     (*fit_results, int_inf, int_sup)).flatten()
         return results, radiation_sources
 
-    @as_cal_dataframe
-    def calibrate_sdds(self):
-        fits = self.xfit
-        energies = [s.energy for s in self.get_x_radsources().values()]
-
-        results = {}
-        for quad in fits.keys():
-            for ch in fits[quad].index:
-                centers = fits[quad].loc[ch][:, 'center'].values
-                center_errs = fits[quad].loc[ch][:, 'center_err'].values
-
-                try:
-                    cal_results = self._calibrate_chn(
-                        centers,
-                        energies,
-                        center_errs,
-                    )
-                except err.FailedFitError:
-                    message = err.warn_failed_linearity_fit(quad, ch)
-                    logging.warning(message)
-                    self.flag_channel(quad, ch, 'xcal')
-                    continue
-
-                results.setdefault(quad, {})[ch] = np.array(cal_results)
-        return results
-
-    @staticmethod
-    def _calibrate_chn(centers, radsources: list, weights=None):
-        lmod = LinearModel()
-        pars = lmod.guess(centers, x=radsources)
-        try:
-            resultlin = lmod.fit(
-                centers,
-                pars,
-                x=radsources,
-                weights=weights,
-            )
-        except ValueError:
-            raise err.FailedFitError("linear fitter error")
-
-        chi2 = resultlin.redchi
-        gain = resultlin.params['slope'].value
-        offset = resultlin.params['intercept'].value
-        gain_err = resultlin.params['slope'].stderr
-        offset_err = resultlin.params['intercept'].stderr
-        return gain, gain_err, offset, offset_err, chi2
-
-    @staticmethod
-    def fit_radsources_peaks(x, y, limits, constrains):
-        centers, _, fwhms, _, *_ = _fit_peaks(x, y, limits)
-        sigmas = fwhms / 2.35
-        lower, upper = zip(*constrains)
-        intervals = [*zip(centers + sigmas * lower, centers + sigmas * upper)]
-        fit_results = _fit_peaks(x, y, intervals)
-        return intervals, fit_results
-
     @as_fit_dataframe
     def fit_sradsources(self):
         bins = self.shistograms.bins
@@ -363,7 +303,7 @@ class Calibration:
                 gain = cal_df[quad].loc[ch]['gain']
                 offset = cal_df[quad].loc[ch]['offset']
 
-                guesses = [[0.5 * lout_lim * self.photoel_per_keV * lv * gain
+                guesses = [[(0.5 * lout_lim) * PHOTOEL_PER_KEV * lv * gain
                             + offset
                             for lout_lim in self.light_out_guess]
                            for lv in energies]
@@ -441,6 +381,62 @@ class Calibration:
                 results.setdefault(quad, {})[ch] = np.column_stack(
                     (*fit_results, int_inf, int_sup)).flatten()
         return results, radiation_sources
+
+    @staticmethod
+    def fit_radsources_peaks(x, y, limits, constrains):
+        centers, _, fwhms, _, *_ = _fit_peaks(x, y, limits)
+        sigmas = fwhms / 2.35
+        lower, upper = zip(*constrains)
+        intervals = [*zip(centers + sigmas * lower, centers + sigmas * upper)]
+        fit_results = _fit_peaks(x, y, intervals)
+        return intervals, fit_results
+
+    @as_cal_dataframe
+    def calibrate_sdds(self):
+        fits = self.xfit
+        energies = [s.energy for s in self.get_x_radsources().values()]
+
+        results = {}
+        for quad in fits.keys():
+            for ch in fits[quad].index:
+                centers = fits[quad].loc[ch][:, 'center'].values
+                center_errs = fits[quad].loc[ch][:, 'center_err'].values
+
+                try:
+                    cal_results = self._calibrate_chn(
+                        centers,
+                        energies,
+                        center_errs,
+                    )
+                except err.FailedFitError:
+                    message = err.warn_failed_linearity_fit(quad, ch)
+                    logging.warning(message)
+                    self.flag_channel(quad, ch, 'xcal')
+                    continue
+
+                results.setdefault(quad, {})[ch] = np.array(cal_results)
+        return results
+
+    @staticmethod
+    def _calibrate_chn(centers, radsources: list, weights=None):
+        lmod = LinearModel()
+        pars = lmod.guess(centers, x=radsources)
+        try:
+            resultlin = lmod.fit(
+                centers,
+                pars,
+                x=radsources,
+                weights=weights,
+            )
+        except ValueError:
+            raise err.FailedFitError("linear fitter error")
+
+        chi2 = resultlin.redchi
+        gain = resultlin.params['slope'].value
+        offset = resultlin.params['intercept'].value
+        gain_err = resultlin.params['slope'].stderr
+        offset_err = resultlin.params['intercept'].stderr
+        return gain, gain_err, offset, offset_err, chi2
 
     @as_slo_dataframe
     def calibrate_scintillators(self):

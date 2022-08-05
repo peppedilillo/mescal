@@ -35,10 +35,10 @@ def df_to_table(df, title):
     return table
 
 
-def flagged_message(flagged, onchannels):
+def flagged_message(num_flagged: int, num_ch: int):
     message = Text("\nWhile processing data I've found {} channels out of {} "
                    "for which calibration could not be completed."
-                   .format(sum(len(v) for v in flagged.values()), sum(len(v) for v in onchannels.values())))
+                   .format(num_flagged, num_ch))
     return message
 
 

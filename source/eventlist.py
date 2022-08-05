@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 from joblib import Parallel, delayed
-from source.inventory import get_quadrant_map
-from source.specutils import PHT_KEV
+from source.constants import PHOTOEL_PER_KEV
+
 
 s2i = (lambda quad: "ABCD".find(str.upper(quad)))
 i2s = (lambda n: chr(65 + n))
@@ -17,7 +17,7 @@ def _as_ucid_dataframe(dict_of_df):
 
 def _convert_x_events(data):
     out = data[:]
-    energies = out['ELECTRONS']*PHT_KEV
+    energies = out['ELECTRONS']*PHOTOEL_PER_KEV
     out.insert(0, 'ENERGY', energies)
     out.drop(columns = ['ELECTRONS'])
     return out
@@ -41,7 +41,6 @@ def electrons_to_energy(data, scint_calibrations, couples):
     gamma_events = _convert_gamma_events(data, scint_calibrations, couples)
     out = pd.concat((x_events,gamma_events)).sort_values('TIME').reset_index(drop=True)
     return out
-
 
 
 def make_electron_list(data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=1,):
@@ -143,7 +142,7 @@ def _insert_electron_column(data, calibrated_sdds):
     offsets = calibrated_sdds.loc[chns]['offset'].values
     gains = calibrated_sdds.loc[chns]['gain'].values
 
-    electrons = (adcs - offsets) / gains / PHT_KEV
+    electrons = (adcs - offsets) / gains / PHOTOEL_PER_KEV
     data.insert(0, 'ELECTRONS', electrons)
     return data
 
@@ -183,12 +182,3 @@ def infer_onchannels(data):
         if onchs.any():
             out[quad] = onchs
     return out
-
-
-def get_quad_couples(quad):
-    qmaparr = np.array(get_quadrant_map(quad))
-    return np.lexsort((qmaparr[:, 0], qmaparr[:, 1])).reshape(16, 2)[1:]
-
-
-def get_couples():
-    return {q: get_quad_couples(q) for q in "ABCD"}
