@@ -128,9 +128,9 @@ class Calibration:
         self.xfit = {}
         self.sfit = {}
         self.efit = {}
-        self.xcal = {}
-        self.scal = {}
-        self.ecal = {}
+        self.sdd_cal = {}
+        self.scint_cal = {}
+        self.optical_coupling = {}
         self.flagged = {}
         self.console = console
         self.nthreads = nthreads
@@ -144,15 +144,15 @@ class Calibration:
 
         if self.get_x_radsources():
             self.xfit = self.fit_xradsources()
-            self.xcal = self.calibrate_sdds()
+            self.sdd_cal = self.calibrate_sdds()
             self.print(
-                ":white_check_mark: Calibrated SDDs."
+                ":white_check_mark: Analyzed X events."
             )
             if self.get_gamma_radsources():
                 self.sfit = self.fit_sradsources()
                 electron_evlist = make_electron_list(
                     data,
-                    self.xcal,
+                    self.sdd_cal,
                     self.sfit,
                     self.couples,
                 )
@@ -161,14 +161,14 @@ class Calibration:
                 )
                 self.ehistograms = self.make_ehistograms(electron_evlist)
                 self.efit = self.fit_gamma_electrons()
-                self.scal = self.calibrate_scintillators()
-                self.ecal = self.compute_effective_light_outputs()
+                self.scint_cal = self.calibrate_scintillators()
+                self.optical_coupling = self.compute_effective_light_outputs()
                 self.print(
-                    ":white_check_mark: Calibrated scintillators."
+                    ":white_check_mark: Analyzed gamma events."
                 )
                 eventlist = electrons_to_energy(
                     electron_evlist,
-                    self.scal,
+                    self.scint_cal,
                     self.couples
                 )
 
@@ -291,7 +291,7 @@ class Calibration:
     @as_fit_dataframe
     def fit_sradsources(self):
         bins = self.shistograms.bins
-        cal_df = self.xcal
+        cal_df = self.sdd_cal
         radiation_sources = self.get_gamma_radsources()
         energies = [s.energy for s in radiation_sources.values()]
         constrains = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
@@ -457,7 +457,7 @@ class Calibration:
     @as_slo_dataframe
     def compute_effective_light_outputs(self):
         sfit_results = self.sfit
-        scint_calibs = self.scal
+        scint_calibs = self.scint_cal
         couples = self.couples
 
         results = {}

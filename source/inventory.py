@@ -48,6 +48,7 @@ SLO_CALIBS = {
 
 ROOM_TEMP = +20
 
+
 def available_temps(model, calibs):
     out = [temp
            for available_model, temp in calibs.keys()

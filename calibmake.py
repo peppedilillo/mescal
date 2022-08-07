@@ -115,7 +115,7 @@ def run(args):
         )
         eventlist = calibration(data)
 
-    with console.status("Writing and drawing.."):
+    with console.status("Processing results.."):
         process_results(calibration, eventlist, args.filepath, args.fmt, console)
 
     if any(calibration.flagged):
@@ -140,7 +140,7 @@ def start_log(filepath):
 
 
 @atexit.register
-def stop_log():
+def end_log():
     logging.shutdown()
 
 
@@ -201,9 +201,22 @@ def process_results(calibration, eventlist, filepath, output_format, console):
     sradsources = calibration.get_gamma_radsources()
     xfit_results = calibration.xfit
     sfit_results = calibration.sfit
-    sdd_calibration = calibration.xcal
-    sdd_lightout = calibration.ecal
+    sdd_calibration = calibration.sdd_cal
+    effective_louts = calibration.optical_coupling
     write_report = get_writer(output_format)
+
+    if not sdd_calibration and not effective_louts:
+        console.log(
+            "[bold red]:red_circle: Calibration failed."
+        )
+    elif not sdd_calibration or not effective_louts:
+        console.log(
+            "[bold yellow]:yellow_circle: Calibration partially completed. "
+        )
+    else:
+        console.log(
+            ":green_circle: Calibration complete."
+        )
 
     if True:
         options.append(
@@ -214,6 +227,7 @@ def process_results(calibration, eventlist, filepath, output_format, console):
                 systhreads,
             )
         )
+
     if xfit_results:
         options.append(
             _draw_and_save_xdiagns(
@@ -279,14 +293,14 @@ def process_results(calibration, eventlist, filepath, output_format, console):
             )
         )
 
-    if sdd_lightout:
+    if effective_louts:
         write_report(
-            sdd_lightout,
+            effective_louts,
             path=upaths.SLOREPORT(filepath),
         )
         console.log(":blue_book: Wrote scintillators calibration results.")
         draw_and_save_slo(
-            sdd_lightout,
+            effective_louts,
             path=upaths.SLOPLOT(filepath),
             nthreads=systhreads,
         )
@@ -296,14 +310,14 @@ def process_results(calibration, eventlist, filepath, output_format, console):
             _draw_and_save_channels_sspectra(
                 shistograms,
                 sdd_calibration,
-                sdd_lightout,
+                effective_louts,
                 sradsources,
                 upaths.SCSPLOT(filepath),
                 systhreads,
             )
         )
 
-    if sdd_calibration and sdd_lightout:
+    if sdd_calibration and effective_louts:
         options.append(
             _write_eventlist_to_fits(
                 eventlist,
@@ -518,4 +532,3 @@ if __name__ == "__main__":
     systhreads = min(4, cpu_count())
     start_log(upaths.LOGFILE(args.filepath))
     run(args)
-    logging.shutdown()

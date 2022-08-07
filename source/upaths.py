@@ -1,3 +1,4 @@
+# fmt: off
 '''
 this module defines all the paths used across the project.
 (so you don't have to go mad in case you need to rethink you output locations)

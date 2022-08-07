@@ -50,8 +50,8 @@ def _fit_peaks(x, y, limits):
     amp_errs = np.zeros(n_peaks)
 
     for i in range(n_peaks):
-        low_lim, hi_lim = limits[i]
-        result, start, stop, x_fine, fitting_curve = _peak_fitter(x, y, (low_lim, hi_lim))
+        lowlim, hilim = limits[i]
+        result, start, stop, x_fine, fitting_curve = _peak_fitter(x, y, (lowlim, hilim))
         centers[i] = result.params['center'].value
         center_errs[i] = result.params['center'].stderr
         fwhms[i] = result.params['fwhm'].value
@@ -59,7 +59,7 @@ def _fit_peaks(x, y, limits):
         amps[i] = result.params['amplitude'].value
         amp_errs[i] = result.params['amplitude'].stderr
 
-        if not (low_lim < centers[i] < hi_lim):
+        if not (lowlim < centers[i] < hilim):
             raise FailedFitError("peaks limits do not contain fit center")
     return centers, center_errs, fwhms, fwhm_errs, amps, amp_errs
 
