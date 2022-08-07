@@ -8,11 +8,17 @@ s2i = lambda quad: "ABCD".find(str.upper(quad))
 i2s = lambda n: chr(65 + n)
 
 
-def _as_ucid_dataframe(dict_of_df, chm_dict):
-    out = pd.concat([pd.DataFrame(df.values,
-                                  index=df.index.map(lambda x: x + 100*s2i(key)),
-                                  columns=df.columns)
-                     for key, df in dict_of_df.items()])
+def _as_ucid_dataframe(dict_of_df):
+    out = pd.concat(
+        [
+            pd.DataFrame(
+                df.values,
+                index=df.index.map(lambda x: x + 100 * s2i(key)),
+                columns=df.columns,
+            )
+            for key, df in dict_of_df.items()
+        ]
+    )
     return out
 
 
@@ -27,17 +33,18 @@ def _convert_x_events(data):
 def _convert_gamma_events(data, scint_calibrations, couples):
     out = data[:]
     qm = out["QUADID"].map({key: 100 * s2i(key) for key in "ABCD"})
-    chm_dict = dict(
+    inverted_couples = {key: {v: k for k, v in d.items()} for key, d in couples.items()}
+    companion_to_channel = dict(
         np.concatenate(
             [
-                np.array([*couples[key].items()]) + 100 * s2i(key)
+                np.array([*inverted_couples[key].items()]) + 100 * s2i(key)
                 for key in couples.keys()
             ]
         )
     )
-    chm = out["CHN"] + qm
-    scint_ids = chm.map(chm_dict).fillna(chm)
-    ucid_calibs = _as_ucid_dataframe(scint_calibrations, chm_dict)
+    channel = out["CHN"] + qm
+    scint_ids = channel.map(companion_to_channel).fillna(channel)
+    ucid_calibs = _as_ucid_dataframe(scint_calibrations)
     energies = out["ELECTRONS"] / ucid_calibs.loc[scint_ids]["light_out"].values
     out.insert(0, "ENERGY", energies)
     out.drop(columns=["ELECTRONS"])
@@ -140,7 +147,7 @@ def _get_coupled_channels(channels, couples):
 def _extract_gamma_events(quadrant_data, scintillator_couples):
     gamma_events = quadrant_data[quadrant_data["EVTYPE"] == "S"]
     channels = gamma_events["CHN"]
-    companion_to_chn = scintillator_couples
+    companion_to_chn = {k: v for v, k in scintillator_couples.items()}
     same_value_if_coupled = gamma_events["CHN"].map(companion_to_chn).fillna(channels)
     gamma_events = gamma_events.assign(CHN=same_value_if_coupled)
 

@@ -2,10 +2,10 @@ import logging
 from itertools import combinations
 
 import numpy as np
+import pandas as pd
 from scipy.signal import find_peaks
 
 from source.errors import DetectPeakError
-from source.specutils import move_mean
 
 SMOOTHING = 5
 
@@ -14,6 +14,10 @@ PEAKS_DETECTION_PARAMETERS = {
     "width": 5,
     "distance": 5,
 }
+
+
+def move_mean(arr, n):
+    return pd.Series(arr).rolling(n, center=True).mean().to_numpy()
 
 
 def _find_peaks_limits(

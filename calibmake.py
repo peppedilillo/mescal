@@ -13,14 +13,14 @@ from source.eventlist import (
     add_evtype_tag,
     filter_delay,
     filter_spurious,
-    infer_onchannels,
+    infer_onchannels
 )
 from source.inventory import get_couples, radsources_dicts
 from source.io import (
     get_writer,
     pandas_from,
     write_eventlist_to_fits,
-    write_report_to_excel,
+    write_report_to_excel
 )
 from source.plot import (
     draw_and_save_channels_sspectra,
@@ -30,7 +30,7 @@ from source.plot import (
     draw_and_save_qlooks,
     draw_and_save_slo,
     draw_and_save_spectrum,
-    draw_and_save_uncalibrated,
+    draw_and_save_uncalibrated
 )
 
 RETRIGGER_TIME_IN_S = 20 * (10**-6)

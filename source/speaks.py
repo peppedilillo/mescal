@@ -1,9 +1,9 @@
 import numpy as np
+import pandas as pd
 from scipy.signal import find_peaks
 
 from source.constants import PHOTOEL_PER_KEV
 from source.errors import DetectPeakError
-from source.specutils import move_mean
 
 SMOOTHING = 20
 
@@ -11,6 +11,10 @@ PEAKS_DETECTION_PARAMETERS = {
     "prominence": 5,
     "width": 20,
 }
+
+
+def move_mean(arr, n):
+    return pd.Series(arr).rolling(n, center=True).mean().to_numpy()
 
 
 def _dist_from_intv(x, lo, hi):
@@ -59,6 +63,3 @@ def _compute_louts(
         / radsources
     )
     return light_outs, light_out_errs
-
-
-

@@ -1,15 +1,18 @@
 import logging
+from collections import namedtuple
+from os import cpu_count
 
 import numpy as np
 import pandas as pd
-from lmfit.models import LinearModel
+from joblib import Parallel, delayed
+from lmfit.models import GaussianModel, LinearModel
 
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
+from source.errors import FailedFitError
 from source.eventlist import electrons_to_energy, make_electron_list
 from source.inventory import fetch_default_sdd_calibration
 from source.speaks import _estimate_peaks_from_guess
-from source.specutils import _fit_peaks, compute_histogram
 from source.xpeaks import _find_peaks_limits
 
 FIT_PARAMS = [
@@ -35,6 +38,8 @@ LO_PARAMS = [
     "light_out",
     "light_out_err",
 ]
+
+histogram = namedtuple("histogram", ["bins", "counts"])
 
 
 def as_fit_dataframe(f):
@@ -341,8 +346,8 @@ class Calibration:
 
         results = {}
         for quad in self.couples.keys():
-            for ch in self.couples[quad].values():
-                counts = self.ehistograms.counts[quad][ch]
+            for scint in self.couples[quad].keys():
+                counts = self.ehistograms.counts[quad][scint]
                 try:
                     limits = _estimate_peaks_from_guess(
                         bins,
@@ -350,9 +355,9 @@ class Calibration:
                         guess=guesses,
                     )
                 except err.DetectPeakError:
-                    message = err.warn_failed_peak_detection(quad, ch)
+                    message = err.warn_failed_peak_detection(quad, scint)
                     logging.warning(message)
-                    self.flag_channel(quad, ch, "epeak")
+                    self.flag_channel(quad, scint, "epeak")
                     continue
 
                 try:
@@ -363,13 +368,13 @@ class Calibration:
                         constrains,
                     )
                 except err.FailedFitError:
-                    message = err.warn_failed_peak_fit(quad, ch)
+                    message = err.warn_failed_peak_fit(quad, scint)
                     logging.warning(message)
-                    self.flag_channel(quad, ch, "efit")
+                    self.flag_channel(quad, scint, "efit")
                     continue
 
                 int_inf, int_sup = zip(*intervals)
-                results.setdefault(quad, {})[ch] = np.column_stack(
+                results.setdefault(quad, {})[scint] = np.column_stack(
                     (*fit_results, int_inf, int_sup)
                 ).flatten()
         return results, radiation_sources
@@ -438,13 +443,51 @@ class Calibration:
         results = {}
         for quad in self.efit.keys():
             df = self.efit[quad]
-            for ch in df.index:
-                los = df.loc[ch][:, "center"].values / energies
-                lo_errs = df.loc[ch][:, "center_err"].values / energies
+            for scint in df.index:
+                los = df.loc[scint][:, "center"].values / energies
+                # lo_errs = df.loc[scint][:, "center_err"].values / energies
+                lo_errs = self.scintillator_lout_error(quad, scint, energies)
 
                 lo, lo_err = self.deal_with_multiple_gamma_decays(los, lo_errs)
-                results.setdefault(quad, {})[ch] = np.array((lo, lo_err))
+                results.setdefault(quad, {})[scint] = np.array((lo, lo_err))
         return results
+
+    def scintillator_lout_error(self, quad, scint, energies):
+        cell = scint
+        cell_cal = (
+            self.sdd_cal[quad]
+            .loc[scint][
+                [
+                    "gain",
+                    "gain_err",
+                    "offset",
+                    "offset_err",
+                ]
+            ]
+            .to_list()
+        )
+        companion = self.couples[quad][cell]
+        comp_cal = (
+            self.sdd_cal[quad]
+            .loc[companion][
+                [
+                    "gain",
+                    "gain_err",
+                    "offset",
+                    "offset_err",
+                ]
+            ]
+            .to_list()
+        )
+
+        centers_cell = self.sfit[quad].loc[cell][:, "center"].values
+        centers_comp = self.sfit[quad].loc[companion][:, "center"].values
+        electron_err_cell = electron_error(centers_cell, *cell_cal)
+        electron_err_companion = electron_error(centers_comp, *comp_cal)
+        electron_err_sum = np.sqrt(electron_err_cell**2 + electron_err_companion**2)
+        fit_error = self.efit[quad].loc[cell][:, "center_err"].values
+        error = (electron_err_sum + fit_error) / energies
+        return error
 
     @as_slo_dataframe
     def compute_effective_light_outputs(self):
@@ -482,5 +525,86 @@ class Calibration:
     @staticmethod
     def deal_with_multiple_gamma_decays(light_outs, light_outs_errs):
         mean_lout = light_outs.mean()
-        mean_lout_err = np.sqrt(np.sum(light_outs_errs**2))/len(light_outs_errs)
+        mean_lout_err = np.sqrt(np.sum(light_outs_errs**2)) / len(light_outs_errs)
         return mean_lout, mean_lout_err
+
+
+def compute_histogram(value, data, bins, nthreads=1):
+    def helper(quad):
+        hist_quads = {}
+        quad_df = data[data["QUADID"] == quad]
+        for ch in range(32):
+            adcs = quad_df[(quad_df["CHN"] == ch)][value]
+            ys, _ = np.histogram(adcs, bins=bins)
+            hist_quads[ch] = ys
+        return quad, hist_quads
+
+    nthreads = min(4, cpu_count())
+    results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in "ABCD")
+    counts = {key: value for key, value in results}
+    return histogram(bins, counts)
+
+
+def _fit_peaks(x, y, limits):
+    n_peaks = len(limits)
+    centers = np.zeros(n_peaks)
+    center_errs = np.zeros(n_peaks)
+    fwhms = np.zeros(n_peaks)
+    fwhm_errs = np.zeros(n_peaks)
+    amps = np.zeros(n_peaks)
+    amp_errs = np.zeros(n_peaks)
+
+    for i in range(n_peaks):
+        lowlim, hilim = limits[i]
+        result, start, stop, x_fine, fitting_curve = _peak_fitter(x, y, (lowlim, hilim))
+        centers[i] = result.params["center"].value
+        center_errs[i] = result.params["center"].stderr
+        fwhms[i] = result.params["fwhm"].value
+        fwhm_errs[i] = result.params["fwhm"].stderr
+        amps[i] = result.params["amplitude"].value
+        amp_errs[i] = result.params["amplitude"].stderr
+
+        if not (lowlim < centers[i] < hilim):
+            raise FailedFitError("peaks limits do not contain fit center")
+    return centers, center_errs, fwhms, fwhm_errs, amps, amp_errs
+
+
+def _peak_fitter(x, y, limits):
+    start, stop = limits
+    x_start = np.where(x >= start)[0][0]
+    x_stop = np.where(x < stop)[0][-1]
+    x_fit = (x[x_start : x_stop + 1][1:] + x[x_start : x_stop + 1][:-1]) / 2
+    y_fit = y[x_start:x_stop]
+    errors = np.clip(np.sqrt(y_fit), 1, None)
+
+    mod = GaussianModel()
+    pars = mod.guess(y_fit, x=x_fit)
+    try:
+        result = mod.fit(y_fit, pars, x=x_fit, weights=1 / errors)
+    except TypeError:
+        raise FailedFitError("peak fitter error.")
+    x_fine = np.linspace(x[0], x[-1], len(x) * 100)
+    fitting_curve = mod.eval(
+        x=x_fine,
+        amplitude=result.best_values["amplitude"],
+        center=result.best_values["center"],
+        sigma=result.best_values["sigma"],
+    )
+
+    return result, start, stop, x_fine, fitting_curve
+
+
+def electron_error(
+    adc,
+    gain,
+    gain_err,
+    offset,
+    offset_err,
+):
+    error = (
+        np.sqrt(
+            +((offset_err / gain) ** 2) + ((adc - offset) / gain**2) * (gain_err**2)
+        )
+        / PHOTOEL_PER_KEV
+    )
+    return error

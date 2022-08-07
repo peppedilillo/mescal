@@ -4,8 +4,16 @@ from assets import detectors
 from assets.radsources_db import Am, Am_x60, Cd, Cs, Fe, Fe_kbeta
 from source.errors import DetectorModelNotFound, SourceNotFoundError
 from source.io import read_report_from_excel
-from source.upaths import (FM1Tm10CAL, FM1Tm10SLO, FM1Tm20CAL, FM1Tm20SLO,
-                           FM1Tp00CAL, FM1Tp00SLO, FM1Tp20CAL, FM1Tp20SLO)
+from source.upaths import (
+    FM1Tm10CAL,
+    FM1Tm10SLO,
+    FM1Tm20CAL,
+    FM1Tm20SLO,
+    FM1Tp00CAL,
+    FM1Tp00SLO,
+    FM1Tp20CAL,
+    FM1Tp20SLO
+)
 
 X_SOURCES = {
     "FE": Fe,
