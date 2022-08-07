@@ -26,13 +26,14 @@ def _convert_x_events(data):
 def _convert_gamma_events(data, scint_calibrations, couples):
     out = data[:]
     qm = out['QUADID'].map({key: 100 * s2i(key) for key in 'ABCD'})
-    chm_dict = dict(np.concatenate([couples[key] + 100 * s2i(key) for key in couples.keys()]))
+    chm_dict = dict(np.concatenate([ np.array([*couples[key].items()]) + 100 * s2i(key)
+                                    for key in couples.keys()]))
     chm = out['CHN'] + qm
     scint_ids = chm.map(chm_dict).fillna(chm)
     ucid_calibs = _as_ucid_dataframe(scint_calibrations)
     energies = out['ELECTRONS']/ucid_calibs.loc[scint_ids]['light_out'].values
     out.insert(0, 'ENERGY', energies)
-    out.drop(columns = ['ELECTRONS'])
+    out.drop(columns=['ELECTRONS'])
     return out
 
 
@@ -111,7 +112,7 @@ def _get_coupled_channels(channels, couples):
         a list  of channels.
     """
     coupled_channels = []
-    for couple in couples:
+    for couple in couples.items():
         if all([channel in channels for channel in couple]):
             coupled_channels += [ch for ch in couple]
     return coupled_channels
@@ -120,7 +121,7 @@ def _get_coupled_channels(channels, couples):
 def _extract_gamma_events(quadrant_data, scintillator_couples):
     gamma_events = quadrant_data[quadrant_data['EVTYPE'] == 'S']
     channels = gamma_events['CHN']
-    companion_to_chn = dict(scintillator_couples)
+    companion_to_chn = scintillator_couples
     same_value_if_coupled = gamma_events['CHN'].map(companion_to_chn).fillna(channels)
     gamma_events = gamma_events.assign(CHN=same_value_if_coupled)
 
@@ -152,7 +153,8 @@ def add_evtype_tag(data, couples):
     inplace add event type (X or S) column
     """
     qm = data['QUADID'].map({key: 100 * s2i(key) for key in 'ABCD'})
-    chm_dict = dict(np.concatenate([couples[key] + 100 * s2i(key) for key in couples.keys()]))
+    chm_dict = dict(np.concatenate([ np.array([*couples[key].items()]) + 100 * s2i(key)
+                                    for key in couples.keys()]))
     chm = data['CHN'] + qm
     data.insert(loc=len(data.columns),
                 column='EVTYPE',

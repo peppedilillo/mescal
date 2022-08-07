@@ -1,4 +1,5 @@
 import argparse
+import atexit
 from os import cpu_count
 from collections import namedtuple
 
@@ -122,12 +123,12 @@ def run(args):
 
     anything_else(options, console)
 
-    goodbye =interface.shutdown(console)
+    goodbye = interface.shutdown(console)
 
     return True
 
 
-def log_to(filepath):
+def start_log(filepath):
     logging.basicConfig(
         filename=filepath,
         filemode='w',
@@ -136,6 +137,11 @@ def log_to(filepath):
         "%(levelname)s: %(message)s"
     )
     return True
+
+
+@atexit.register
+def stop_log():
+    logging.shutdown()
 
 
 def parse_args():
@@ -181,7 +187,7 @@ def preprocess(data, detector_couples, console):
 
 def warn_about_flagged(flagged, channels, console):
     flagged_count = len(set([item for sublist in flagged.values() for item in sublist]))
-    channel_count = len(channels)
+    channel_count = len([item for sublist in channels.values() for item in sublist])
     interface.print_rule(console, "[bold italic]Warning", style="red", align="center")
     console.print(interface.flagged_message(flagged_count, channel_count))
     return True
@@ -196,7 +202,7 @@ def process_results(calibration, eventlist, filepath, output_format, console):
     xfit_results = calibration.xfit
     sfit_results = calibration.sfit
     sdd_calibration = calibration.xcal
-    sdd_lightout = calibration.scal
+    sdd_lightout = calibration.ecal
     write_report = get_writer(output_format)
 
     if True:
@@ -510,5 +516,6 @@ def anything_else(options, console):
 if __name__ == "__main__":
     args = parse_args()
     systhreads = min(4, cpu_count())
-    log_to(upaths.LOGFILE(args.filepath))
+    start_log(upaths.LOGFILE(args.filepath))
     run(args)
+    logging.shutdown()

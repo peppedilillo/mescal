@@ -168,7 +168,7 @@ class Calibration:
                 )
                 eventlist = electrons_to_energy(
                     electron_evlist,
-                    self.ecal,
+                    self.scal,
                     self.couples
                 )
 
@@ -349,8 +349,8 @@ class Calibration:
                    for lv in energies]
 
         results = {}
-        for quad in self.ehistograms.counts.keys():
-            for ch in self.ehistograms.counts[quad].keys():
+        for quad in self.couples.keys():
+            for ch in self.couples[quad].values():
                 counts = self.ehistograms.counts[quad][ch]
                 try:
                     limits = _estimate_peaks_from_guess(
@@ -464,7 +464,7 @@ class Calibration:
         for quad in sfit_results.keys():
             sfit = sfit_results[quad]
             scint = scint_calibs[quad]
-            quad_couples = dict(couples[quad])
+            quad_couples = couples[quad]
             inverted_quad_couples = {v: k for k, v in quad_couples.items()}
             for ch in sfit.index:
                 try:

@@ -123,7 +123,9 @@ def radsources_dicts(sources: list):
 
 def get_quad_couples(quad):
     qmaparr = np.array(get_quadrant_map(quad))
-    return np.lexsort((qmaparr[:, 0], qmaparr[:, 1])).reshape(16, 2)[1:]
+    arr = np.lexsort((qmaparr[:, 0], qmaparr[:, 1])).reshape(16, 2)[1:]
+    dic = dict(arr)
+    return dic
 
 
 def get_couples():

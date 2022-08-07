@@ -54,8 +54,7 @@ def draw_and_save_diagns(histograms, res_fit, path, nthreads=1):
             ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch))
             plt.close(fig)
-
-    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_fit.keys())
+    return Parallel(n_jobs=nthreads, max_nbytes=None)(delayed(helper)(quad) for quad in res_fit.keys())
 
 
 def draw_and_save_channels_xspectra(histograms, res_cal, radsources: dict, path, nthreads=1):
