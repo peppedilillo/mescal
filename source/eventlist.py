@@ -8,10 +8,11 @@ s2i = lambda quad: "ABCD".find(str.upper(quad))
 i2s = lambda n: chr(65 + n)
 
 
-def _as_ucid_dataframe(dict_of_df):
-    for quad, df in dict_of_df.items():
-        df.index = df.index + 100 * s2i(quad)
-    out = pd.concat([df for df in dict_of_df.values()])
+def _as_ucid_dataframe(dict_of_df, chm_dict):
+    out = pd.concat([pd.DataFrame(df.values,
+                                  index=df.index.map(lambda x: x + 100*s2i(key)),
+                                  columns=df.columns)
+                     for key, df in dict_of_df.items()])
     return out
 
 
@@ -36,7 +37,7 @@ def _convert_gamma_events(data, scint_calibrations, couples):
     )
     chm = out["CHN"] + qm
     scint_ids = chm.map(chm_dict).fillna(chm)
-    ucid_calibs = _as_ucid_dataframe(scint_calibrations)
+    ucid_calibs = _as_ucid_dataframe(scint_calibrations, chm_dict)
     energies = out["ELECTRONS"] / ucid_calibs.loc[scint_ids]["light_out"].values
     out.insert(0, "ENERGY", energies)
     out.drop(columns=["ELECTRONS"])
