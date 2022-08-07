@@ -14,10 +14,6 @@ class DetectPeakError(Exception):
     """An error while finding peaks."""
 
 
-class PoorFitError(Exception):
-    """An when trying to fit a bad peak."""
-
-
 class FailedFitError(Exception):
     """An error when fitting fails."""
 

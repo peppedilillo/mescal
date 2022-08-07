@@ -1,58 +1,44 @@
 import numpy as np
 
 from assets import detectors
-from assets.radsources_db import Fe
-from assets.radsources_db import Fe_kbeta
-from assets.radsources_db import Cd
-from assets.radsources_db import Am
-from assets.radsources_db import Am_x60
-from assets.radsources_db import Cs
-from source.upaths import FM1Tm20CAL
-from source.upaths import FM1Tm20SLO
-from source.upaths import FM1Tm10CAL
-from source.upaths import FM1Tm10SLO
-from source.upaths import FM1Tp00CAL
-from source.upaths import FM1Tp00SLO
-from source.upaths import FM1Tp20CAL
-from source.upaths import FM1Tp20SLO
-from source.errors import DetectorModelNotFound
-from source.errors import SourceNotFoundError
+from assets.radsources_db import Am, Am_x60, Cd, Cs, Fe, Fe_kbeta
+from source.errors import DetectorModelNotFound, SourceNotFoundError
 from source.io import read_report_from_excel
+from source.upaths import (FM1Tm10CAL, FM1Tm10SLO, FM1Tm20CAL, FM1Tm20SLO,
+                           FM1Tp00CAL, FM1Tp00SLO, FM1Tp20CAL, FM1Tp20SLO)
 
 X_SOURCES = {
-    'FE': Fe,
-    'FE_KBETA': Fe_kbeta,
-    'CD': Cd,
-    'AM': Am,
-    'AM_X60': Am_x60,
+    "FE": Fe,
+    "FE_KBETA": Fe_kbeta,
+    "CD": Cd,
+    "AM": Am,
+    "AM_X60": Am_x60,
 }
 
 GAMMA_SOURCES = {
-    'CS': Cs,
+    "CS": Cs,
 }
 
 SDD_CALIBS = {
-    ('fm1', -20): FM1Tm20CAL,
-    ('fm1', -10): FM1Tm10CAL,
-    ('fm1', 0):   FM1Tp00CAL,
-    ('fm1', +20): FM1Tp20CAL,
+    ("fm1", -20): FM1Tm20CAL,
+    ("fm1", -10): FM1Tm10CAL,
+    ("fm1", 0): FM1Tp00CAL,
+    ("fm1", +20): FM1Tp20CAL,
 }
 
 
 SLO_CALIBS = {
-    ('fm1', -20): FM1Tm20SLO,
-    ('fm1', -10): FM1Tm10SLO,
-    ('fm1', 0):   FM1Tp00SLO,
-    ('fm1', +20): FM1Tp20SLO,
+    ("fm1", -20): FM1Tm20SLO,
+    ("fm1", -10): FM1Tm10SLO,
+    ("fm1", 0): FM1Tp00SLO,
+    ("fm1", +20): FM1Tp20SLO,
 }
 
 ROOM_TEMP = +20
 
 
 def available_temps(model, calibs):
-    out = [temp
-           for available_model, temp in calibs.keys()
-           if model == available_model]
+    out = [temp for available_model, temp in calibs.keys() if model == available_model]
     return out
 
 
@@ -63,8 +49,9 @@ def available_models(calibs):
 
 def fetch_default_sdd_calibration(model, temp):
     if model in available_models(SDD_CALIBS) and (temp is not None):
-        nearest_available_temperature = min(available_temps(model, SDD_CALIBS)[::-1],
-                                            key=lambda x: abs(x - temp))
+        nearest_available_temperature = min(
+            available_temps(model, SDD_CALIBS)[::-1], key=lambda x: abs(x - temp)
+        )
         calibration_path = SDD_CALIBS[(model, nearest_available_temperature)]
         calibration_df = read_report_from_excel(calibration_path)
         return calibration_df, (model, nearest_available_temperature)
@@ -79,9 +66,12 @@ def fetch_default_sdd_calibration(model, temp):
 
 
 def fetch_default_slo_calibration(model, temp):
-    if model in available_models(SLO_CALIBS) and temp in available_temps(model, SLO_CALIBS):
-        nearest_available_temperature = min(available_temps(model, SLO_CALIBS)[::-1],
-                                            key=lambda x: abs(x - temp))
+    if model in available_models(SLO_CALIBS) and temp in available_temps(
+        model, SLO_CALIBS
+    ):
+        nearest_available_temperature = min(
+            available_temps(model, SLO_CALIBS)[::-1], key=lambda x: abs(x - temp)
+        )
         calibration_path = SLO_CALIBS[(model, nearest_available_temperature)]
         calibration_df = read_report_from_excel(calibration_path)
         return calibration_df, (model, nearest_available_temperature)
@@ -96,7 +86,7 @@ def fetch_default_slo_calibration(model, temp):
 
 
 def get_quadrant_map(quad: str, arr_borders: bool = True):
-    if quad in ['A', 'B', 'C', 'D']:
+    if quad in ["A", "B", "C", "D"]:
         arr = detectors.map[quad]
     else:
         raise ValueError("Unknown quadrant key. Allowed keys are A,B,C,D")

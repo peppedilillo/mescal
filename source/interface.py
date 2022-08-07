@@ -1,26 +1,30 @@
 from time import sleep
 
 from rich.console import Console
-from rich.table import Table
-from rich.text import Text
-from rich.prompt import Confirm
 from rich.pretty import pprint
 from rich.prompt import IntPrompt
+from rich.table import Table
+from rich.text import Text
 
 from source.upaths import LOGOPATH
 
-
-hdr_text = Text()\
-    .append("Welcome to ", style='italic')\
-    .append("mescal", style='purple bold')\
-    .append(", a software to analyze HERMES-TP/SP data.\n", style='italic')
+hdr_text = (
+    Text()
+    .append("Welcome to ", style="italic")
+    .append("mescal", style="purple bold")
+    .append(", a software to analyze HERMES-TP/SP data.\n", style="italic")
+)
 
 
 def hello():
     console = Console()
-    with open(LOGOPATH, 'r') as logo:
+    with open(LOGOPATH, "r") as logo:
         for i, line in enumerate(logo.readlines()):
-            console.print(line.strip("\n"), style="bold color({})".format(int(i + 160)), justify='center');
+            console.print(
+                line.strip("\n"),
+                style="bold color({})".format(int(i + 160)),
+                justify="center",
+            )
             sleep(0.1)
     print_rule(console, hdr_text)
     return console
@@ -35,32 +39,22 @@ def df_to_table(df, title):
     return table
 
 
-def flagged_message(num_flagged: int, num_ch: int):
-    message = Text("\nWhile processing data I've found {} channels out of {} "
-                   "for which calibration could not be completed."
-                   .format(num_flagged, num_ch))
-    return message
-
-
-def prompt_user_flagged():
-    message = Text("Display flagged channels? ", style='italic')
-    return Confirm.ask(message)
-
-
-def prettyprint(x, **kwargs):
-    return pprint(x, **kwargs)
-
-
 def shutdown(console):
-    console.print("\nShutting down, goodbye! :waving_hand:\n")
+    console.print("Shutting down, goodbye! :waving_hand:\n")
     return
 
 
 def options_message(options):
-    line_end = (lambda i: '\n')
-    message = Text.assemble("\nAnything else?\n\n",
-                            *(Text.assemble(("\t{:2d}. ".format(i),"bold magenta"),
-                                            option.display + line_end(i)) for i, option in enumerate(options)))
+    line_end = lambda i: "\n"
+    message = Text.assemble(
+        "Anything else?\n\n",
+        *(
+            Text.assemble(
+                ("\t{:2d}. ".format(i), "bold magenta"), option.display + line_end(i)
+            )
+            for i, option in enumerate(options)
+        )
+    )
     return message
 
 
@@ -74,3 +68,4 @@ def print_rule(console, *args, **kwargs):
     sleep(0.2)
     console.print()
     console.rule(*args, **kwargs)
+    console.print()

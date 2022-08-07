@@ -1,33 +1,37 @@
 import argparse
 import atexit
-from os import cpu_count
+import logging
 from collections import namedtuple
+from os import cpu_count
+from pathlib import Path
 
 import pandas as pd
-from pathlib import Path
-import logging
 
-from source import upaths
-from source import interface
-from source.io import pandas_from
-from source.io import get_writer
-from source.io import write_eventlist_to_fits
-from source.io import write_report_to_excel
-from source.eventlist import add_evtype_tag
-from source.eventlist import infer_onchannels
-from source.eventlist import filter_delay
-from source.eventlist import filter_spurious
-from source.inventory import get_couples
+from source import interface, upaths
 from source.calibration import Calibration
-from source.inventory import radsources_dicts
-from source.plot import draw_and_save_diagns
-from source.plot import draw_and_save_channels_xspectra
-from source.plot import draw_and_save_channels_sspectra
-from source.plot import draw_and_save_qlooks
-from source.plot import draw_and_save_uncalibrated
-from source.plot import draw_and_save_slo
-from source.plot import draw_and_save_lins
-from source.plot import draw_and_save_spectrum
+from source.eventlist import (
+    add_evtype_tag,
+    filter_delay,
+    filter_spurious,
+    infer_onchannels,
+)
+from source.inventory import get_couples, radsources_dicts
+from source.io import (
+    get_writer,
+    pandas_from,
+    write_eventlist_to_fits,
+    write_report_to_excel,
+)
+from source.plot import (
+    draw_and_save_channels_sspectra,
+    draw_and_save_channels_xspectra,
+    draw_and_save_diagns,
+    draw_and_save_lins,
+    draw_and_save_qlooks,
+    draw_and_save_slo,
+    draw_and_save_spectrum,
+    draw_and_save_uncalibrated,
+)
 
 RETRIGGER_TIME_IN_S = 20 * (10**-6)
 
@@ -77,8 +81,7 @@ peak_hints_args = parser.add_argument_group(
 peak_hints_args.add_argument(
     "--model",
     "--m",
-    help="hermes flight model to calibrate. "
-    "supported models: fm1. "
+    help="hermes flight model to calibrate. " "supported models: fm1. ",
 )
 peak_hints_args.add_argument(
     "--temperature",
@@ -131,10 +134,10 @@ def run(args):
 def start_log(filepath):
     logging.basicConfig(
         filename=filepath,
-        filemode='w',
+        filemode="w",
         level=logging.INFO,
         format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
-        "%(levelname)s: %(message)s"
+        "%(levelname)s: %(message)s",
     )
     return True
 
@@ -149,8 +152,10 @@ def parse_args():
     args.filepath = Path(args.filepath)
     args.radsources = args.radsources.upper().split(",")
     if (args.model is None) and args.temperature:
-        parser.error("if a temperature arguments is specified "
-                     "a model argument must be specified too ")
+        parser.error(
+            "if a temperature arguments is specified "
+            "a model argument must be specified too "
+        )
     return args
 
 
@@ -186,10 +191,21 @@ def preprocess(data, detector_couples, console):
 
 
 def warn_about_flagged(flagged, channels, console):
-    flagged_count = len(set([item for sublist in flagged.values() for item in sublist]))
-    channel_count = len([item for sublist in channels.values() for item in sublist])
     interface.print_rule(console, "[bold italic]Warning", style="red", align="center")
-    console.print(interface.flagged_message(flagged_count, channel_count))
+
+    for flag in flagged.keys():
+        num_flagged = len(flagged[flag])
+        message = "{} channels were flagged with '{}'.".format(num_flagged, flag)
+        console.print(message)
+
+    num_flagged = len(set([item for sublist in flagged.values() for item in sublist]))
+    num_channels = len([item for sublist in channels.values() for item in sublist])
+    message = (
+        "In total, {} channels out of {} were flagged.\n"
+        "For more details, see the log file.".format(num_flagged, num_channels)
+    )
+
+    console.print(message)
     return True
 
 
@@ -206,17 +222,11 @@ def process_results(calibration, eventlist, filepath, output_format, console):
     write_report = get_writer(output_format)
 
     if not sdd_calibration and not effective_louts:
-        console.log(
-            "[bold red]:red_circle: Calibration failed."
-        )
+        console.log("[bold red]:red_circle: Calibration failed.")
     elif not sdd_calibration or not effective_louts:
-        console.log(
-            "[bold yellow]:yellow_circle: Calibration partially completed. "
-        )
+        console.log("[bold yellow]:yellow_circle: Calibration partially completed. ")
     else:
-        console.log(
-            ":green_circle: Calibration complete."
-        )
+        console.log(":green_circle: Calibration complete.")
 
     if True:
         options.append(
@@ -490,7 +500,7 @@ def _draw_and_save_spectra(eventlist, xradsources, sradsources, xpath, spath):
                 xpath,
                 spath,
             )
-        )
+        ),
     )
 
 
