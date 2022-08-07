@@ -148,6 +148,7 @@ class Calibration:
                     self.sdd_cal,
                     self.sfit,
                     self.couples,
+                    self.nthreads,
                 )
                 self.print(":white_check_mark: Made electron list")
                 self.ehistograms = self.make_ehistograms(electron_evlist)
@@ -480,4 +481,6 @@ class Calibration:
 
     @staticmethod
     def deal_with_multiple_gamma_decays(light_outs, light_outs_errs):
-        return light_outs.mean(), np.sqrt(np.sum(light_outs_errs**2))
+        mean_lout = light_outs.mean()
+        mean_lout_err = np.sqrt(np.sum(light_outs_errs**2))/len(light_outs_errs)
+        return mean_lout, mean_lout_err

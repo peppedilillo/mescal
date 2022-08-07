@@ -1,7 +1,6 @@
 from time import sleep
 
 from rich.console import Console
-from rich.pretty import pprint
 from rich.prompt import IntPrompt
 from rich.table import Table
 from rich.text import Text
