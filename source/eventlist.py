@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 
+import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
 
 s2i = lambda quad: "ABCD".find(str.upper(quad))
@@ -43,9 +44,12 @@ def _convert_gamma_events(data, scint_calibrations, couples):
         )
     )
     channel = out["CHN"] + qm
-    scint_ids = channel.map(companion_to_channel).fillna(channel)
+    scint_ucid = channel.map(companion_to_channel).fillna(channel)
     ucid_calibs = _as_ucid_dataframe(scint_calibrations)
-    energies = out["ELECTRONS"] / ucid_calibs.loc[scint_ids]["light_out"].values
+    if scint_ucid.isin(ucid_calibs.index).all():
+        energies = out["ELECTRONS"] / ucid_calibs.loc[scint_ucid]["light_out"].values
+    else:
+        raise err.CalibratedEventlistError("failed event calibration.")
     out.insert(0, "ENERGY", energies)
     out.drop(columns=["ELECTRONS"])
     return out

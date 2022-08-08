@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
 
-from source.errors import DetectPeakError
+import source.errors as err
 
 SMOOTHING = 5
 
@@ -21,18 +21,17 @@ def move_mean(arr, n):
 
 
 def _find_peaks_limits(
-    bins, counts, radsources: list, unpack_calibration=lambda: False
+    bins, counts, radsources: list, unpack_calibration=lambda: None
 ):
     try:
         channel_calib = unpack_calibration()
     except KeyError:
-        logging.warning("no available default calibration.")
-        raise DetectPeakError()
+        raise err.DefaultCalibNotFoundError()
     else:
-        if channel_calib:
-            return _lims_from_existing_calib(bins, counts, radsources, channel_calib)
-        else:
+        if channel_calib is None:
             return _lims_from_decays_ratio(bins, counts, radsources)
+        else:
+            return _lims_from_existing_calib(bins, counts, radsources, channel_calib)
 
 
 def _lims_from_existing_calib(
@@ -60,7 +59,7 @@ def _lims_from_existing_calib(
         unfiltered_peaks_info,
     )
     if len(enfiltered_peaks) < len(radsources):
-        raise DetectPeakError("candidate peaks are less than radsources to fit.")
+        raise err.DetectPeakError("candidate peaks are less than radsources to fit.")
     peaks, peaks_info = _filter_peaks_proximity(
         radsources,
         energies,
@@ -103,7 +102,7 @@ def _lims_from_decays_ratio(
         find_peaks_params = PEAKS_DETECTION_PARAMETERS
 
     if len(radsources) < 3:
-        raise DetectPeakError("not enough radsources to calibrate.")
+        raise err.DetectPeakError("not enough radsources to calibrate.")
 
     mm = move_mean(counts, SMOOTHING)
     unfiltered_peaks, unfiltered_peaks_info = find_peaks(
@@ -111,7 +110,7 @@ def _lims_from_decays_ratio(
         **find_peaks_params,
     )
     if len(unfiltered_peaks) < len(radsources):
-        raise DetectPeakError("candidate peaks are less than radsources to fit.")
+        raise err.DetectPeakError("candidate peaks are less than radsources to fit.")
 
     peaks, peaks_info = _filter_peaks_lratio(
         radsources,

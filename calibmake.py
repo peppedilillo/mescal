@@ -327,7 +327,7 @@ def process_results(calibration, eventlist, filepath, output_format, console):
             )
         )
 
-    if sdd_calibration and effective_louts:
+    if not eventlist is None:
         options.append(
             _write_eventlist_to_fits(
                 eventlist,

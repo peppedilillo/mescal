@@ -1,6 +1,5 @@
 import logging
 from collections import namedtuple
-from os import cpu_count
 
 import numpy as np
 import pandas as pd
@@ -9,7 +8,6 @@ from lmfit.models import GaussianModel, LinearModel
 
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
-from source.errors import FailedFitError
 from source.eventlist import electrons_to_energy, make_electron_list
 from source.inventory import fetch_default_sdd_calibration
 from source.speaks import _estimate_peaks_from_guess
@@ -142,30 +140,35 @@ class Calibration:
         self.shistograms = self.make_shistograms(data)
         self.print(":white_check_mark: Binned data.")
 
-        if self.get_x_radsources():
-            self.xfit = self.fit_xradsources()
-            self.sdd_cal = self.calibrate_sdds()
-            self.print(":white_check_mark: Analyzed X events.")
-            if self.get_gamma_radsources():
-                self.sfit = self.fit_sradsources()
-                electron_evlist = make_electron_list(
-                    data,
-                    self.sdd_cal,
-                    self.sfit,
-                    self.couples,
-                    self.nthreads,
-                )
-                self.print(":white_check_mark: Made electron list")
-                self.ehistograms = self.make_ehistograms(electron_evlist)
-                self.efit = self.fit_gamma_electrons()
-                self.scint_cal = self.calibrate_scintillators()
-                self.optical_coupling = self.compute_effective_light_outputs()
-                self.print(":white_check_mark: Analyzed gamma events.")
-                eventlist = electrons_to_energy(
-                    electron_evlist, self.scint_cal, self.couples
-                )
+        if not self.get_x_radsources():
+            return
+        self.xfit = self.fit_xradsources()
+        self.sdd_cal = self.calibrate_sdds()
+        self.print(":white_check_mark: Analyzed X events.")
 
-                return eventlist
+        if not self.get_gamma_radsources():
+            return
+        self.sfit = self.fit_sradsources()
+        electron_evlist = make_electron_list(
+            data,
+            self.sdd_cal,
+            self.sfit,
+            self.couples,
+            self.nthreads,
+        )
+        self.ehistograms = self.make_ehistograms(electron_evlist)
+        self.efit = self.fit_gamma_electrons()
+        self.scint_cal = self.calibrate_scintillators()
+        self.optical_coupling = self.compute_effective_light_outputs()
+        self.print(":white_check_mark: Analyzed gamma events.")
+
+        if not self.scint_cal:
+            return
+        eventlist = electrons_to_energy(
+            electron_evlist, self.scint_cal, self.couples
+        )
+
+        return eventlist
 
     def print(self, message):
         if self.console:
@@ -216,6 +219,7 @@ class Calibration:
             value,
             data,
             bins,
+            nthreads=self.nthreads,
         )
         return histograms
 
@@ -227,6 +231,7 @@ class Calibration:
             value,
             data,
             bins,
+            nthreads=self.nthreads,
         )
         return histograms
 
@@ -244,9 +249,9 @@ class Calibration:
                 counts = self.xhistograms.counts[quad][ch]
 
                 try:
-
+                    # TODO: find a better solution
                     def packaged_hint():
-                        return hint[quad].loc[ch] if hint else False
+                        return hint[quad].loc[ch] if hint else None
 
                     limits = _find_peaks_limits(
                         bins,
@@ -254,9 +259,13 @@ class Calibration:
                         energies,
                         packaged_hint,
                     )
-
                 except err.DetectPeakError:
                     message = err.warn_failed_peak_detection(quad, ch)
+                    logging.warning(message)
+                    self.flag_channel(quad, ch, "xpeak")
+                    continue
+                except err.DefaultCalibNotFoundError as e:
+                    message = err.warn_missing_defcal(quad, ch)
                     logging.warning(message)
                     self.flag_channel(quad, ch, "xpeak")
                     continue
@@ -345,8 +354,12 @@ class Calibration:
         ]
 
         results = {}
-        for quad in self.couples.keys():
-            for scint in self.couples[quad].keys():
+        for quad in self.channels.keys():
+            for ch in self.channels[quad]:
+                if ch not in self.couples[quad].keys():
+                    continue
+                scint = ch
+
                 counts = self.ehistograms.counts[quad][scint]
                 try:
                     limits = _estimate_peaks_from_guess(
@@ -445,7 +458,6 @@ class Calibration:
             df = self.efit[quad]
             for scint in df.index:
                 los = df.loc[scint][:, "center"].values / energies
-                # lo_errs = df.loc[scint][:, "center_err"].values / energies
                 lo_errs = self.scintillator_lout_error(quad, scint, energies)
 
                 lo, lo_err = self.deal_with_multiple_gamma_decays(los, lo_errs)
@@ -497,29 +509,39 @@ class Calibration:
 
         results = {}
         for quad in sfit_results.keys():
-            sfit = sfit_results[quad]
-            scint = scint_calibs[quad]
+            sfit_quad = sfit_results[quad]
+            scal_quad = scint_calibs[quad]
             quad_couples = couples[quad]
             inverted_quad_couples = {v: k for k, v in quad_couples.items()}
-            for ch in sfit.index:
-                try:
+            for ch in sfit_quad.index:
+                if ch in quad_couples.keys():
                     companion = quad_couples[ch]
-                except KeyError:
-                    companion = inverted_quad_couples[ch]
-
-                if ch in scint.index:
-                    lo = scint.loc[ch]["light_out"]
-                    lo_err = scint.loc[ch]["light_out_err"]
+                    scint = ch
                 else:
-                    lo = scint.loc[companion]["light_out"]
-                    lo_err = scint.loc[companion]["light_out_err"]
+                    companion = inverted_quad_couples[ch]
+                    scint = companion
 
-                centers = sfit.loc[ch][:, "center"].values
-                centers_companion = sfit.loc[companion][:, "center"].values
-                effs = lo * centers / (centers + centers_companion)
-                eff_errs = lo_err * centers / (centers + centers_companion)
-                eff, eff_err = self.deal_with_multiple_gamma_decays(effs, eff_errs)
-                results.setdefault(quad, {})[ch] = np.array((eff, eff_err))
+                try:
+                    lo, lo_err = scal_quad.loc[scint][
+                        [
+                            "light_out",
+                            "light_out_err",
+                        ]
+                    ].to_list()
+
+                except KeyError:
+                    message = err.warn_missing_lout(quad, ch)
+                    logging.warning(message)
+                    self.flag_channel(quad, ch, "lout")
+                    continue
+
+                else:
+                    centers = sfit_quad.loc[ch][:, "center"].values
+                    centers_companion = sfit_quad.loc[companion][:, "center"].values
+                    effs = lo * centers / (centers + centers_companion)
+                    eff_errs = lo_err * centers / (centers + centers_companion)
+                    eff, eff_err = self.deal_with_multiple_gamma_decays(effs, eff_errs)
+                    results.setdefault(quad, {})[ch] = np.array((eff, eff_err))
         return results
 
     @staticmethod
@@ -539,7 +561,6 @@ def compute_histogram(value, data, bins, nthreads=1):
             hist_quads[ch] = ys
         return quad, hist_quads
 
-    nthreads = min(4, cpu_count())
     results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in "ABCD")
     counts = {key: value for key, value in results}
     return histogram(bins, counts)
@@ -565,7 +586,7 @@ def _fit_peaks(x, y, limits):
         amp_errs[i] = result.params["amplitude"].stderr
 
         if not (lowlim < centers[i] < hilim):
-            raise FailedFitError("peaks limits do not contain fit center")
+            raise err.FailedFitError("peaks limits do not contain fit center")
     return centers, center_errs, fwhms, fwhm_errs, amps, amp_errs
 
 
@@ -582,7 +603,7 @@ def _peak_fitter(x, y, limits):
     try:
         result = mod.fit(y_fit, pars, x=x_fit, weights=1 / errors)
     except TypeError:
-        raise FailedFitError("peak fitter error.")
+        raise err.FailedFitError("peak fitter error.")
     x_fine = np.linspace(x[0], x[-1], len(x) * 100)
     fitting_curve = mod.eval(
         x=x_fine,
