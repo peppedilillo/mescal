@@ -20,25 +20,23 @@ def move_mean(arr, n):
     return pd.Series(arr).rolling(n, center=True).mean().to_numpy()
 
 
-def _find_peaks_limits(
-    bins, counts, radsources: list, unpack_calibration=lambda: None
+def find_xlimits(
+        bins, counts, radsources: list, gain_guess=None, offset_guess=None,
 ):
-    try:
-        channel_calib = unpack_calibration()
-    except KeyError:
-        raise err.DefaultCalibNotFoundError()
+    if (gain_guess is not None) and (offset_guess is not None):
+        return _lims_from_guess(bins, counts, radsources, gain_guess, offset_guess)
+    elif (gain_guess is not None) or (offset_guess is not None):
+        raise ValueError("not yet implemented!")
     else:
-        if channel_calib is None:
-            return _lims_from_decays_ratio(bins, counts, radsources)
-        else:
-            return _lims_from_existing_calib(bins, counts, radsources, channel_calib)
+        return _lims_from_decays_ratio(bins, counts, radsources)
 
 
-def _lims_from_existing_calib(
+def _lims_from_guess(
     bins,
     counts,
     radsources: list,
-    channel_calib,
+    gain_guess,
+    offset_guess,
     find_peaks_params=None,
 ):
     if find_peaks_params is None:
@@ -46,7 +44,7 @@ def _lims_from_existing_calib(
 
     low_en_threshold = 1.0  # keV
 
-    energies = (bins - channel_calib["offset"]) / channel_calib["gain"]
+    energies = (bins - offset_guess) / gain_guess
     ((inf_bin, *_),) = np.where(energies > low_en_threshold)
     smoothed_counts = move_mean(counts, SMOOTHING)
     unfiltered_peaks, unfiltered_peaks_info = find_peaks(

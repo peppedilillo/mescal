@@ -11,7 +11,7 @@ from source.constants import PHOTOEL_PER_KEV
 from source.eventlist import electrons_to_energy, make_electron_list
 from source.inventory import fetch_default_sdd_calibration
 from source.speaks import _estimate_peaks_from_guess
-from source.xpeaks import _find_peaks_limits
+from source.xpeaks import find_xlimits
 
 FIT_PARAMS = [
     "center",
@@ -108,14 +108,14 @@ class Calibration:
     light_out_guess = (20.0, 30.0)
 
     def __init__(
-        self,
-        channels,
-        couples,
-        radsources,
-        detector_model=None,
-        temperature=None,
-        console=None,
-        nthreads=1,
+            self,
+            channels,
+            couples,
+            radsources,
+            detector_model=None,
+            temperature=None,
+            console=None,
+            nthreads=1,
     ):
         self.radsources = radsources
         self.channels = channels
@@ -188,15 +188,11 @@ class Calibration:
         self.flagged.setdefault(flag, []).append((quad, chn))
 
     def fetch_hint(self):
-        try:
-            hint, key = fetch_default_sdd_calibration(
-                self.detector_model,
-                self.temperature,
-            )
-        except err.DetectorModelNotFound:
-            hint = None
-        else:
-            self.print(":open_book: Loaded detection hints for {}@{}°C.".format(*key))
+        hint, key = fetch_default_sdd_calibration(
+            self.detector_model,
+            self.temperature,
+        )
+        self.print(":open_book: Loaded detection hints for {}@{}°C.".format(*key))
         return hint
 
     def make_xistograms(self, data):
@@ -238,26 +234,40 @@ class Calibration:
     @as_fit_dataframe
     def fit_xradsources(self):
         bins = self.xhistograms.bins
-        hint = self.fetch_hint()
         radiation_sources = self.get_x_radsources()
         energies = [s.energy for s in radiation_sources.values()]
         constrains = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
+        if self.detector_model:
+            hint = self.fetch_hint()
+        else:
+            hint = None
 
         results = {}
         for quad in self.channels.keys():
             for ch in self.channels[quad]:
                 counts = self.xhistograms.counts[quad][ch]
 
-                try:
-                    # TODO: find a better solution
-                    def packaged_hint():
-                        return hint[quad].loc[ch] if hint else None
+                if hint:
+                    try:
+                        gain_guess, offset_guess = hint[quad].loc[ch][[
+                            'gain',
+                            'offset'
+                        ]]
+                    except KeyError:
+                        message = err.warn_missing_defcal(quad, ch)
+                        logging.warning(message)
+                        self.flag_channel(quad, ch, "defcal")
+                        continue
+                else:
+                    gain_guess, offset_guess = None, None
 
-                    limits = _find_peaks_limits(
+                try:
+                    limits = find_xlimits(
                         bins,
                         counts,
                         energies,
-                        packaged_hint,
+                        gain_guess,
+                        offset_guess,
                     )
                 except err.DetectPeakError:
                     message = err.warn_failed_peak_detection(quad, ch)
@@ -496,7 +506,7 @@ class Calibration:
         centers_comp = self.sfit[quad].loc[companion][:, "center"].values
         electron_err_cell = electron_error(centers_cell, *cell_cal)
         electron_err_companion = electron_error(centers_comp, *comp_cal)
-        electron_err_sum = np.sqrt(electron_err_cell**2 + electron_err_companion**2)
+        electron_err_sum = np.sqrt(electron_err_cell ** 2 + electron_err_companion ** 2)
         fit_error = self.efit[quad].loc[cell][:, "center_err"].values
         error = (electron_err_sum + fit_error) / energies
         return error
@@ -547,7 +557,7 @@ class Calibration:
     @staticmethod
     def deal_with_multiple_gamma_decays(light_outs, light_outs_errs):
         mean_lout = light_outs.mean()
-        mean_lout_err = np.sqrt(np.sum(light_outs_errs**2)) / len(light_outs_errs)
+        mean_lout_err = np.sqrt(np.sum(light_outs_errs ** 2)) / len(light_outs_errs)
         return mean_lout, mean_lout_err
 
 
@@ -594,7 +604,7 @@ def _peak_fitter(x, y, limits):
     start, stop = limits
     x_start = np.where(x >= start)[0][0]
     x_stop = np.where(x < stop)[0][-1]
-    x_fit = (x[x_start : x_stop + 1][1:] + x[x_start : x_stop + 1][:-1]) / 2
+    x_fit = (x[x_start: x_stop + 1][1:] + x[x_start: x_stop + 1][:-1]) / 2
     y_fit = y[x_start:x_stop]
     errors = np.clip(np.sqrt(y_fit), 1, None)
 
@@ -616,16 +626,16 @@ def _peak_fitter(x, y, limits):
 
 
 def electron_error(
-    adc,
-    gain,
-    gain_err,
-    offset,
-    offset_err,
+        adc,
+        gain,
+        gain_err,
+        offset,
+        offset_err,
 ):
     error = (
-        np.sqrt(
-            +((offset_err / gain) ** 2) + ((adc - offset) / gain**2) * (gain_err**2)
-        )
-        / PHOTOEL_PER_KEV
+            np.sqrt(
+                +((offset_err / gain) ** 2) + ((adc - offset) / gain ** 2) * (gain_err ** 2)
+            )
+            / PHOTOEL_PER_KEV
     )
     return error
