@@ -1,3 +1,4 @@
+# fmt: off
 '''
 this module defines all the paths used across the project.
 (so you don't have to go mad in case you need to rethink you output locations)
@@ -5,7 +6,6 @@ paths here defined will work across different os.
 '''
 
 from pathlib import Path
-
 
 prjpath = Path(__file__).parent.parent
 

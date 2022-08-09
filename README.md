@@ -19,17 +19,3 @@ To launch `calibmake.py` over a calibration acquisition (FM1, radioactive source
 2. Launch `python calibmake.py --model=fm1 --temperature=-20 Fe,Cd,Cs "C:\somepath\sources_m20deg_85_LV0d5.fits""`
 
 For more informations and options regarding `calibmake.py`, try the helper via `python calibmake.py --help`.
-
-## calibrate.py
-
-This script allows the calibration in energy of an acquisition of a HERMES detector, based on previous results.
-It supposes your acquisition to be in the standard HERMES 0.5 fits format.
-
-_Example:_
-
-To launch `calibrate.py` over an acquisition (FM1, radioactive sources 55Fe, 109Cd and 137Cs, temperature 20°C) located at path  "C:\somepath\sources_m20deg_85_LV0d5.fits":
-
-1. Move to the mescal directory.
-2. Launch `python calibrate.py --model=fm1 --temperature=-20 "C:\somepath\sources_m20deg_85_LV0d5.fits"`
-
-For more informations and options regarding `calibrate.py`, try the helper via `python calibrate.py --help`.

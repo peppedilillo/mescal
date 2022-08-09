@@ -1,67 +1,39 @@
 import argparse
-from os import cpu_count
+import atexit
+import logging
 from collections import namedtuple
+from os import cpu_count
+from pathlib import Path
 
 import pandas as pd
-from pathlib import Path
-import logging
 
-from source import upaths
-from source import interface
-from source.io import pandas_from
-from source.io import get_writer
-from source.io import write_eventlist_to_fits
-from source.io import write_report_to_excel
-from source.wrangle import get_couples
-from source.wrangle import add_evtype_tag
-from source.wrangle import infer_onchannels
-from source.wrangle import filter_delay
-from source.wrangle import filter_spurious
-from source.spectra import xcalibrate
-from source.spectra import scalibrate
-from source.spectra import compute_histogram
-from source.spectra import make_events_list
-from source.inventory import fetch_default_sdd_calibration
-from source.inventory import radsources_dicts
-from source.plot import draw_and_save_diagns
-from source.plot import draw_and_save_channels_xspectra
-from source.plot import draw_and_save_channels_sspectra
-from source.plot import draw_and_save_qlooks
-from source.plot import draw_and_save_uncalibrated
-from source.plot import draw_and_save_slo
-from source.plot import draw_and_save_lins
-from source.plot import draw_and_save_spectrum
-from source.errors import ModelNotFoundError
+from source import interface, upaths
+from source.calibration import Calibration
+from source.eventlist import (
+    add_evtype_tag,
+    filter_delay,
+    filter_spurious,
+    infer_onchannels
+)
+from source.inventory import get_couples, radsources_dicts
+from source.io import (
+    get_writer,
+    pandas_from,
+    write_eventlist_to_fits,
+    write_report_to_excel
+)
+from source.plot import (
+    draw_and_save_channels_sspectra,
+    draw_and_save_channels_xspectra,
+    draw_and_save_diagns,
+    draw_and_save_lins,
+    draw_and_save_qlooks,
+    draw_and_save_slo,
+    draw_and_save_spectrum,
+    draw_and_save_uncalibrated
+)
 
-
-START, STOP, STEP = 15000, 28000, 10
-NBINS = int((STOP - START) / STEP)
-END = START + NBINS * STEP
-BINNING = (START, END, NBINS)
 RETRIGGER_TIME_IN_S = 20 * (10**-6)
-
-
-FIT_PARAMS = [
-    "center",
-    "center_err",
-    "fwhm",
-    "fwhm_err",
-    "amp",
-    "amp_err",
-    "lim_low",
-    "lim_high",
-]
-CAL_PARAMS = [
-    "gain",
-    "gain_err",
-    "offset",
-    "offset_err",
-    "chi2",
-]
-LO_PARAMS = [
-    "light_out",
-    "light_out_err",
-]
 
 
 option = namedtuple("option", ["display", "reply", "promise"])
@@ -78,8 +50,8 @@ parser = argparse.ArgumentParser(description=description)
 parser.add_argument(
     "radsources",
     help="radioactive sources used for calibration. "
-    "separated by comma, e.g.:  `-l=Fe,Cd,Cs`. "
-    "currently supported sources: Fe, Cd, Cs.",
+    "separated by comma, e.g. `Fe,Cd,Cs`."
+    "currently supported sources: Fe, Cd, Am, Cs.",
 )
 parser.add_argument(
     "filepath",
@@ -109,8 +81,7 @@ peak_hints_args = parser.add_argument_group(
 peak_hints_args.add_argument(
     "--model",
     "--m",
-    help="hermes flight model to calibrate. "
-    "supported models: fm1. "
+    help="hermes flight model to calibrate. " "supported models: fm1. ",
 )
 peak_hints_args.add_argument(
     "--temperature",
@@ -128,42 +99,30 @@ def run(args):
 
     with console.status("Initializing.."):
         data = get_from(args.filepath, console, use_cache=args.cache)
-        try:
-            hint = fetch_hint(args.model, args.temperature, console)
-        except ModelNotFoundError:
-            hint = None
-        radsources = radsources_dicts(radsources_list(args.radsources))
-        couples = get_couples()
+        radsources = radsources_dicts(args.radsources)
 
     with console.status("Preprocessing.."):
-        data, channels = preprocess(data, couples, console)
-        histograms = make_histograms(data, BINNING, console)
+        scintillator_couples = get_couples()
+        channels = infer_onchannels(data)
+        data = preprocess(data, scintillator_couples, console)
 
-    with console.status("Working on it.."):
-        results = calibrate(*histograms, *radsources, channels, hint)
-        fits, calibrations, flagged = inspect(*results, console)
-        maybe_eventlist = promise(lambda: make_events_list(
-            data,
-            *calibrations,
-            couples,
-            systhreads,
-        ))
-
-    with console.status("Writing and drawing.."):
-        process_results(
-            args.filepath,
-            histograms,
+    with console.status("Calibrating.."):
+        calibration = Calibration(
+            channels,
+            scintillator_couples,
             radsources,
-            fits,
-            calibrations,
-            maybe_eventlist,
-            options,
-            args.fmt,
+            args.model,
+            args.temperature,
             console,
+            systhreads,
         )
+        eventlist = calibration(data)
 
-    if any(flagged):
-        warn_about_flagged(flagged, channels, console)
+    with console.status("Processing results.."):
+        process_results(calibration, eventlist, args.filepath, args.fmt, console)
+
+    if any(calibration.flagged):
+        warn_about_flagged(calibration.flagged, channels, console)
 
     anything_else(options, console)
 
@@ -172,33 +131,32 @@ def run(args):
     return True
 
 
-def log_to(filepath):
+def start_log(filepath):
     logging.basicConfig(
         filename=filepath,
+        filemode="w",
         level=logging.INFO,
-        format = "[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
-        "%(levelname)s: %(message)s"
+        format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
+        "%(levelname)s: %(message)s",
     )
     return True
+
+
+@atexit.register
+def end_log():
+    logging.shutdown()
 
 
 def parse_args():
     args = parser.parse_args()
     args.filepath = Path(args.filepath)
+    args.radsources = args.radsources.upper().split(",")
     if (args.model is None) and args.temperature:
-        parser.error("if a temperature arguments is specified "
-                     "a model argument must be specified too ")
+        parser.error(
+            "if a temperature arguments is specified "
+            "a model argument must be specified too "
+        )
     return args
-
-
-def radsources_list(radsources_string):
-    return radsources_string.upper().split(",")
-
-
-def fetch_hint(model, temperature, console):
-    hint, key = fetch_default_sdd_calibration(model, temperature)
-    console.log(":open_book: Loaded detection hints for {}@{}°C.".format(*key))
-    return hint
 
 
 def get_from(fitspath: Path, console, use_cache=True):
@@ -218,126 +176,57 @@ def get_from(fitspath: Path, console, use_cache=True):
     return out
 
 
-def filter_retrigger(df):
-    return filter_delay(df, hold_time=RETRIGGER_TIME_IN_S)
-
-
 def preprocess(data, detector_couples, console):
-    channels = infer_onchannels(data)
-    console.log(":white_check_mark: Found active channels.")
     data = add_evtype_tag(data, detector_couples)
     console.log(":white_check_mark: Tagged X and S events.")
     events_pre_filter = len(data)
-    data = filter_retrigger(filter_spurious(data))
+    data = filter_delay(filter_spurious(data), RETRIGGER_TIME_IN_S)
     filtered_percentual = 100 * (events_pre_filter - len(data)) / events_pre_filter
     console.log(
         ":white_check_mark: Filtered out {:.1f}% of the events.".format(
             filtered_percentual
         )
     )
-    return data, channels
+    return data
 
 
-def make_histograms(data, binning, console):
-    xhistograms = compute_histogram(
-        data[data["EVTYPE"] == "X"], *binning, nthreads=systhreads
+def warn_about_flagged(flagged, channels, console):
+    interface.print_rule(console, "[bold italic]Warning", style="red", align="center")
+
+    for flag in flagged.keys():
+        num_flagged = len(flagged[flag])
+        message = "{} channels were flagged with '{}'.".format(num_flagged, flag)
+        console.print(message)
+
+    num_flagged = len(set([item for sublist in flagged.values() for item in sublist]))
+    num_channels = len([item for sublist in channels.values() for item in sublist])
+    message = (
+        "In total, {} channels out of {} were flagged.\n"
+        "For more details, see the log file.".format(num_flagged, num_channels)
     )
-    shistograms = compute_histogram(
-        data[data["EVTYPE"] == "S"], *binning, nthreads=systhreads
-    )
-    console.log(":white_check_mark: Binned data.")
-    return xhistograms, shistograms
+
+    console.print(message)
+    return True
 
 
-def inspect(fits, calibrations, flagged, console):
-    sdds_calibration, scintillators_lightout = calibrations
-    flagged = merge_flagged_dicts(*flagged)
+# noinspection PyTypeChecker
+def process_results(calibration, eventlist, filepath, output_format, console):
+    xhistograms = calibration.xhistograms
+    shistograms = calibration.shistograms
+    xradsources = calibration.get_x_radsources()
+    sradsources = calibration.get_gamma_radsources()
+    xfit_results = calibration.xfit
+    sfit_results = calibration.sfit
+    sdd_calibration = calibration.sdd_cal
+    effective_louts = calibration.optical_coupling
+    write_report = get_writer(output_format)
 
-    if not sdds_calibration and not scintillators_lightout:
-        console.log("[bold red] :cross_mark: Calibration failed.")
-    elif not scintillators_lightout or not scintillators_lightout:
+    if not sdd_calibration and not effective_louts:
+        console.log("[bold red]:red_circle: Calibration failed.")
+    elif not sdd_calibration or not effective_louts:
         console.log("[bold yellow]:yellow_circle: Calibration partially completed. ")
     else:
-        console.log(":white_check_mark: Calibration complete.")
-    return fits, calibrations, flagged
-
-
-def _to_dfdict(x, idx):
-    return {q: pd.DataFrame(x[q], index=idx).T for q in x.keys()}
-
-
-def calibrate(xhistograms, shistograms, xradsources, sradsources, channels, hint):
-    if xradsources:
-        _xfitdict, _caldict, xflagged = xcalibrate(
-            xhistograms,
-            xradsources,
-            channels,
-            hint,
-        )
-        index = pd.MultiIndex.from_product((xradsources.keys(), FIT_PARAMS))
-        xfit_results = _to_dfdict(_xfitdict, index)
-        sdds_calibration = _to_dfdict(_caldict, CAL_PARAMS)
-
-        if sradsources:
-            _sfitdict, _slodict, sflagged = scalibrate(
-                shistograms,
-                sdds_calibration,
-                sradsources,
-                lout_guess=(10.0, 15.0),
-            )
-            index = pd.MultiIndex.from_product((sradsources.keys(), FIT_PARAMS))
-            sfit_results = _to_dfdict(_sfitdict, index)
-            scintillators_lightout = _to_dfdict(_slodict, LO_PARAMS)
-
-        else:
-            sfit_results, scintillators_lightout, sflagged = {}, {}, {}
-
-    else:
-        xfit_results, sdds_calibration, xflagged = {}, {}, {}
-        sfit_results, scintillators_lightout, sflagged = {}, {}, {}
-
-    return (
-        (xfit_results, sfit_results),
-        (sdds_calibration, scintillators_lightout),
-        (xflagged, sflagged),
-    )
-
-
-def get_eventlist(el):
-    """
-    this is for accessing the eventlist.
-
-    Args:
-        el: a list (a promise)
-
-    Returns: a dataframe
-
-    """
-    car, cdr = el
-    if car:
-        return cdr
-    else: # mutate
-        el[0] = 1
-        el[1] = cdr()
-        return el[1]
-
-
-def process_results(
-    filepath,
-    histograms,
-    radsources,
-    fits,
-    calibrations,
-    eventlist_promise,
-    options,
-    fmt,
-    console,
-):
-    xhistograms, shistograms = histograms
-    xradsources, sradsources = radsources
-    xfit_results, sfit_results = fits
-    sdds_calibration, scintillators_lightout = calibrations
-    write_report = get_writer(fmt)
+        console.log(":green_circle: Calibration complete.")
 
     if True:
         options.append(
@@ -348,6 +237,7 @@ def process_results(
                 systhreads,
             )
         )
+
     if xfit_results:
         options.append(
             _draw_and_save_xdiagns(
@@ -364,15 +254,15 @@ def process_results(
             )
         )
 
-    if sdds_calibration:
+    if sdd_calibration:
         write_report(
-            sdds_calibration,
+            sdd_calibration,
             path=upaths.CALREPORT(filepath),
         )
         console.log(":blue_book: Wrote SDD calibration results.")
 
         draw_and_save_qlooks(
-            sdds_calibration,
+            sdd_calibration,
             path=upaths.QLKPLOT(filepath),
             nthreads=systhreads,
         )
@@ -381,7 +271,7 @@ def process_results(
         options.append(
             _draw_and_save_channels_xspectra(
                 xhistograms,
-                sdds_calibration,
+                sdd_calibration,
                 xradsources,
                 upaths.XCSPLOT(filepath),
                 systhreads,
@@ -389,7 +279,7 @@ def process_results(
         )
         options.append(
             _draw_and_save_lins(
-                sdds_calibration,
+                sdd_calibration,
                 xfit_results,
                 xradsources,
                 upaths.LINPLOT(filepath),
@@ -413,14 +303,14 @@ def process_results(
             )
         )
 
-    if scintillators_lightout:
+    if effective_louts:
         write_report(
-            scintillators_lightout,
+            effective_louts,
             path=upaths.SLOREPORT(filepath),
         )
         console.log(":blue_book: Wrote scintillators calibration results.")
         draw_and_save_slo(
-            scintillators_lightout,
+            effective_louts,
             path=upaths.SLOPLOT(filepath),
             nthreads=systhreads,
         )
@@ -429,48 +319,30 @@ def process_results(
         options.append(
             _draw_and_save_channels_sspectra(
                 shistograms,
-                sdds_calibration,
-                scintillators_lightout,
+                sdd_calibration,
+                effective_louts,
                 sradsources,
                 upaths.SCSPLOT(filepath),
                 systhreads,
             )
         )
 
-    if sdds_calibration and scintillators_lightout:
+    if not eventlist is None:
         options.append(
             _write_eventlist_to_fits(
-                lambda: get_eventlist(eventlist_promise),
+                eventlist,
                 upaths.EVLFITS(filepath),
             )
         )
         options.append(
             _draw_and_save_spectra(
-                lambda: get_eventlist(eventlist_promise),
+                eventlist,
                 xradsources,
                 sradsources,
                 upaths.XSPPLOT(filepath),
                 upaths.SSPPLOT(filepath),
             )
         )
-    return True
-
-
-def merge_flagged_dicts(dx, ds):
-    fs = lambda x, l: (*x, "s") if x[0] in l else x
-    fx = lambda x, l: (*x, "x") if x[0] in l else x
-
-    out = {}
-    for key in "ABCD":
-        content = sorted(list(set(ds.setdefault(key, []) + dx.setdefault(key, []))))
-        if content:
-            out[key] = [fs(fx((x,), dx[key]), ds[key]) for x in content]
-    return out
-
-
-def warn_about_flagged(flagged, channels, console):
-    interface.print_rule(console, "[bold italic]Warning", style="red", align="center")
-    console.print(interface.flagged_message(flagged, channels))
     return True
 
 
@@ -548,7 +420,6 @@ def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
     )
 
 
-
 def _write_sfit_report(fit_results, path):
     return option(
         display="Save S fit results.",
@@ -604,44 +475,33 @@ def _draw_and_save_channels_sspectra(
     )
 
 
-def _write_eventlist_to_fits(thunk, path):
-    """
-    designed to delay the evaluation of make_events_list. call it like :
-    _write_eventlist_to_fits(
-            (lambda: make_events_list(data,
-                                      sdds_calibration,
-                                      scintillators_lightout,
-                                      detector_couples)),
-            upaths.EVLFITS(filepath))
-    """
+def _write_eventlist_to_fits(eventlist, path):
     return option(
         display="Write calibrated events to fits.",
         reply=":sparkles: Event list saved. :sparkles:",
         promise=promise(
             lambda: write_eventlist_to_fits(
-                thunk(),
+                eventlist,
                 path,
             )
         ),
     )
 
 
-def _draw_and_save_spectra(thunk, xradsources, sradsources, xpath, spath):
+def _draw_and_save_spectra(eventlist, xradsources, sradsources, xpath, spath):
     return option(
         display="Save calibrated spectra.",
         reply=":sparkles: Spectra plot saved :sparkle:",
         promise=promise(
             lambda: draw_and_save_spectrum(
-                thunk(),
+                eventlist,
                 xradsources,
                 sradsources,
                 xpath,
                 spath,
             )
-        )
+        ),
     )
-
-
 
 
 def promise(f):
@@ -677,10 +537,8 @@ def anything_else(options, console):
     return True
 
 
-
 if __name__ == "__main__":
-    systhreads = min(4, cpu_count())
     args = parse_args()
-    log_to(upaths.LOGFILE(args.filepath))
-
+    systhreads = min(4, cpu_count())
+    start_log(upaths.LOGFILE(args.filepath))
     run(args)
