@@ -237,6 +237,7 @@ class Calibration:
         radiation_sources = self.get_x_radsources()
         energies = [s.energy for s in radiation_sources.values()]
         constrains = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
+        # TODO still don't like how we deal with hints
         if self.detector_model:
             hint = self.fetch_hint()
         else:
@@ -594,9 +595,6 @@ def _fit_peaks(x, y, limits):
         fwhm_errs[i] = result.params["fwhm"].stderr
         amps[i] = result.params["amplitude"].value
         amp_errs[i] = result.params["amplitude"].stderr
-
-        if not (lowlim < centers[i] < hilim):
-            raise err.FailedFitError("peaks limits do not contain fit center")
     return centers, center_errs, fwhms, fwhm_errs, amps, amp_errs
 
 
