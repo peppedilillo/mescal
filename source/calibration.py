@@ -108,14 +108,14 @@ class Calibration:
     light_out_guess = (20.0, 30.0)
 
     def __init__(
-            self,
-            channels,
-            couples,
-            radsources,
-            detector_model=None,
-            temperature=None,
-            console=None,
-            nthreads=1,
+        self,
+        channels,
+        couples,
+        radsources,
+        detector_model=None,
+        temperature=None,
+        console=None,
+        nthreads=1,
     ):
         self.radsources = radsources
         self.channels = channels
@@ -164,9 +164,7 @@ class Calibration:
 
         if not self.scint_cal:
             return
-        eventlist = electrons_to_energy(
-            electron_evlist, self.scint_cal, self.couples
-        )
+        eventlist = electrons_to_energy(electron_evlist, self.scint_cal, self.couples)
 
         return eventlist
 
@@ -250,10 +248,9 @@ class Calibration:
 
                 if hint:
                     try:
-                        gain_guess, offset_guess = hint[quad].loc[ch][[
-                            'gain',
-                            'offset'
-                        ]]
+                        gain_guess, offset_guess = hint[quad].loc[ch][
+                            ["gain", "offset"]
+                        ]
                     except KeyError:
                         message = err.warn_missing_defcal(quad, ch)
                         logging.warning(message)
@@ -506,7 +503,7 @@ class Calibration:
         centers_comp = self.sfit[quad].loc[companion][:, "center"].values
         electron_err_cell = electron_error(centers_cell, *cell_cal)
         electron_err_companion = electron_error(centers_comp, *comp_cal)
-        electron_err_sum = np.sqrt(electron_err_cell ** 2 + electron_err_companion ** 2)
+        electron_err_sum = np.sqrt(electron_err_cell**2 + electron_err_companion**2)
         fit_error = self.efit[quad].loc[cell][:, "center_err"].values
         error = (electron_err_sum + fit_error) / energies
         return error
@@ -526,12 +523,16 @@ class Calibration:
                     scint = companion
 
                 try:
-                    lo, lo_err = self.scint_cal[quad].loc[scint][
-                        [
-                            "light_out",
-                            "light_out_err",
+                    lo, lo_err = (
+                        self.scint_cal[quad]
+                        .loc[scint][
+                            [
+                                "light_out",
+                                "light_out_err",
+                            ]
                         ]
-                    ].to_list()
+                        .to_list()
+                    )
 
                 except KeyError:
                     message = err.warn_missing_lout(quad, ch)
@@ -541,21 +542,29 @@ class Calibration:
 
                 else:
                     centers = self.sfit[quad].loc[ch][:, "center"].values
-                    gain, offset = self.sdd_cal[quad].loc[ch][[
-                        "gain",
-                        "offset"
-                    ]].values
-                    centers_electrons = (centers - offset)/gain/PHOTOEL_PER_KEV
+                    gain, offset = self.sdd_cal[quad].loc[ch][["gain", "offset"]].values
+                    centers_electrons = (centers - offset) / gain / PHOTOEL_PER_KEV
 
-                    centers_companion = self.sfit[quad].loc[companion][:, "center"].values
-                    gain_comp, offset_comp = self.sdd_cal[quad].loc[companion][[
-                        "gain",
-                        "offset"
-                    ]].values
-                    centers_electrons_comp = (centers_companion - offset_comp)/gain_comp/PHOTOEL_PER_KEV
+                    centers_companion = (
+                        self.sfit[quad].loc[companion][:, "center"].values
+                    )
+                    gain_comp, offset_comp = (
+                        self.sdd_cal[quad].loc[companion][["gain", "offset"]].values
+                    )
+                    centers_electrons_comp = (
+                        (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
+                    )
 
-                    effs = lo * centers_electrons / (centers_electrons + centers_electrons_comp)
-                    eff_errs = lo_err * centers_electrons / (centers_electrons + centers_electrons_comp)
+                    effs = (
+                        lo
+                        * centers_electrons
+                        / (centers_electrons + centers_electrons_comp)
+                    )
+                    eff_errs = (
+                        lo_err
+                        * centers_electrons
+                        / (centers_electrons + centers_electrons_comp)
+                    )
                     eff, eff_err = self._deal_with_multiple_gamma_decays(effs, eff_errs)
                     results.setdefault(quad, {})[ch] = np.array((eff, eff_err))
         return results
@@ -563,26 +572,28 @@ class Calibration:
     def _effective_lout_error(self, quad, scint, ch, companion):
         # TODO: unused atm. requires further verificantions. as it is, very little
         #       differences from much simpler calculations.
-        lo = self.scint_cal[quad].loc[scint]['light_out']
-        lo_err = self.scint_cal[quad].loc[scint]['light_out_err']
+        lo = self.scint_cal[quad].loc[scint]["light_out"]
+        lo_err = self.scint_cal[quad].loc[scint]["light_out_err"]
         centers = self.sfit[quad].loc[ch][:, "center"].to_numpy()
         centers_err = self.sfit[quad].loc[ch][:, "center_err"].to_numpy()
         centers_companion = self.sfit[quad].loc[companion][:, "center"].to_numpy()
-        centers_companion_err = self.sfit[quad].loc[companion][:, "center_err"].to_numpy()
+        centers_companion_err = (
+            self.sfit[quad].loc[companion][:, "center_err"].to_numpy()
+        )
 
         errors = np.sqrt(
-            lo_err**2 * (centers/(centers + centers_companion))**2 +
-            centers_err**2 *
-                (lo * centers_companion / ( centers + centers_companion )**2)**2 +
-            centers_companion_err**2 *
-                (lo * centers / ( centers + centers_companion )**2 )**2
+            lo_err**2 * (centers / (centers + centers_companion)) ** 2
+            + centers_err**2
+            * (lo * centers_companion / (centers + centers_companion) ** 2) ** 2
+            + centers_companion_err**2
+            * (lo * centers / (centers + centers_companion) ** 2) ** 2
         )
         return errors
 
     @staticmethod
     def _deal_with_multiple_gamma_decays(light_outs, light_outs_errs):
         mean_lout = light_outs.mean()
-        mean_lout_err = np.sqrt(np.sum(light_outs_errs ** 2)) / len(light_outs_errs)
+        mean_lout_err = np.sqrt(np.sum(light_outs_errs**2)) / len(light_outs_errs)
         return mean_lout, mean_lout_err
 
 
@@ -626,7 +637,7 @@ def _peak_fitter(x, y, limits):
     start, stop = limits
     x_start = np.where(x >= start)[0][0]
     x_stop = np.where(x < stop)[0][-1]
-    x_fit = (x[x_start: x_stop + 1][1:] + x[x_start: x_stop + 1][:-1]) / 2
+    x_fit = (x[x_start : x_stop + 1][1:] + x[x_start : x_stop + 1][:-1]) / 2
     y_fit = y[x_start:x_stop]
     errors = np.clip(np.sqrt(y_fit), 1, None)
 
@@ -648,16 +659,16 @@ def _peak_fitter(x, y, limits):
 
 
 def electron_error(
-        adc,
-        gain,
-        gain_err,
-        offset,
-        offset_err,
+    adc,
+    gain,
+    gain_err,
+    offset,
+    offset_err,
 ):
     error = (
-            np.sqrt(
-                +((offset_err / gain) ** 2) + ((adc - offset) / gain ** 2) * (gain_err ** 2)
-            )
-            / PHOTOEL_PER_KEV
+        np.sqrt(
+            +((offset_err / gain) ** 2) + ((adc - offset) / gain**2) * (gain_err**2)
+        )
+        / PHOTOEL_PER_KEV
     )
     return error

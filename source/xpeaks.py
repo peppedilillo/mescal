@@ -23,7 +23,11 @@ def move_mean(arr, n):
 
 
 def find_xlimits(
-        bins, counts, radsources: list, gain_guess=None, offset_guess=None,
+    bins,
+    counts,
+    radsources: list,
+    gain_guess=None,
+    offset_guess=None,
 ):
     if (gain_guess is not None) and (offset_guess is not None):
         return _lims_from_guess(bins, counts, radsources, gain_guess, offset_guess)
@@ -139,11 +143,14 @@ def _filter_peaks_lratio(radsources: list, peaks, peaks_infos):
     norm_ps = [*map(_normalize, peaks_combinations)]
     if PROMINENCE_WEIGHTING:
         weights = [*map(_weight, proms_combinations)]
-        loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls))
-                      / np.square(weights)
-                      , axis=1)
+        loss = np.sum(
+            np.square(np.array(norm_ps) - np.array(norm_ls)) / np.square(weights),
+            axis=1,
+        )
     else:
         loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)), axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
-    best_peaks_info = {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
+    best_peaks_info = {
+        key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()
+    }
     return best_peaks, best_peaks_info
