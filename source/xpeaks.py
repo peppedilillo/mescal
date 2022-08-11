@@ -7,10 +7,12 @@ from scipy.signal import find_peaks
 
 import source.errors as err
 
+PROMINENCE_WEIGHTING = False
+
 SMOOTHING = 5
 
 PEAKS_DETECTION_PARAMETERS = {
-    "prominence": 10,
+    "prominence": 100,
     "width": 5,
     "distance": 10,
 }
@@ -122,34 +124,26 @@ def _lims_from_decays_ratio(
     return limits
 
 
-def normalize(x):
+def _normalize(x):
     return [(x[i + 1] - x[i]) / (x[-1] - x[0]) for i in range(len(x) - 1)]
 
 
-def weight(x):
+def _weight(x):
     return [x[i + 1] * x[i] for i in range(len(x) - 1)]
 
-
-#def _filter_peaks_lratio(radsources: list, peaks, peaks_infos):
-#    peaks_combinations = [*combinations(peaks, r=len(radsources))]
-#    norm_ls = normalize(radsources)
-#    norm_ps = [*map(normalize, peaks_combinations)]
-#    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)), axis=1)
-#    best_peaks = peaks_combinations[np.argmin(loss)]
-#    best_peaks_info = {
-#        key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()
-#    }
-#    return best_peaks, best_peaks_info
 
 def _filter_peaks_lratio(radsources: list, peaks, peaks_infos):
     peaks_combinations = [*combinations(peaks, r=len(radsources))]
     proms_combinations = combinations(peaks_infos["prominences"], r=len(radsources))
-    norm_ls = normalize(radsources)
-    norm_ps = [*map(normalize, peaks_combinations)]
-    weights = [*map(weight, proms_combinations)]
-    loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls))
-                  #/ np.square(weights)
-                  , axis=1)
+    norm_ls = _normalize(radsources)
+    norm_ps = [*map(_normalize, peaks_combinations)]
+    if PROMINENCE_WEIGHTING:
+        weights = [*map(_weight, proms_combinations)]
+        loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls))
+                      / np.square(weights)
+                      , axis=1)
+    else:
+        loss = np.sum(np.square(np.array(norm_ps) - np.array(norm_ls)), axis=1)
     best_peaks = peaks_combinations[np.argmin(loss)]
     best_peaks_info = {key: val[np.isin(peaks, best_peaks)] for key, val in peaks_infos.items()}
     return best_peaks, best_peaks_info

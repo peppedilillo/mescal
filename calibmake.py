@@ -193,11 +193,6 @@ def preprocess(data, detector_couples, console):
 def warn_about_flagged(flagged, channels, console):
     interface.print_rule(console, "[bold italic]Warning", style="red", align="center")
 
-    for flag in flagged.keys():
-        num_flagged = len(flagged[flag])
-        message = "{} channels were flagged with '{}'.".format(num_flagged, flag)
-        console.print(message)
-
     num_flagged = len(set([item for sublist in flagged.values() for item in sublist]))
     num_channels = len([item for sublist in channels.values() for item in sublist])
     message = (
@@ -213,8 +208,8 @@ def warn_about_flagged(flagged, channels, console):
 def process_results(calibration, eventlist, filepath, output_format, console):
     xhistograms = calibration.xhistograms
     shistograms = calibration.shistograms
-    xradsources = calibration.get_x_radsources()
-    sradsources = calibration.get_gamma_radsources()
+    xradsources = calibration._xradsources()
+    sradsources = calibration._sradsources()
     xfit_results = calibration.xfit
     sfit_results = calibration.sfit
     sdd_calibration = calibration.sdd_cal

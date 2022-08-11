@@ -8,8 +8,8 @@ from source.errors import DetectPeakError
 SMOOTHING = 20
 
 PEAKS_DETECTION_PARAMETERS = {
-    "prominence": 5,
-    "width": 20,
+    "prominence": 10,
+    "width": 10,
 }
 
 
@@ -21,9 +21,9 @@ def _dist_from_intv(x, lo, hi):
     return abs((x - lo) + (x - hi))
 
 
-def _closest_peaks(guess, peaks, peaks_infos):
+def _closest_peaks(guess, bins, peaks, peaks_infos):
     peaks_dist_from_guess = [
-        [_dist_from_intv(peak, guess_lo, guess_hi) for peak in peaks]
+        [_dist_from_intv(bins[peak], guess_lo, guess_hi) for peak in peaks]
         for guess_lo, guess_hi in guess
     ]
     argmin = np.argmin(peaks_dist_from_guess, axis=1)
@@ -39,7 +39,7 @@ def _estimate_peaks_from_guess(bins, counts, guess, find_peaks_params=None):
     mm = move_mean(counts, SMOOTHING)
     many_peaks, many_peaks_info = find_peaks(mm, **find_peaks_params)
     if len(many_peaks) >= len(guess):
-        peaks, peaks_info = _closest_peaks(guess, many_peaks, many_peaks_info)
+        peaks, peaks_info = _closest_peaks(guess, bins, many_peaks, many_peaks_info)
     else:
         raise DetectPeakError("candidate peaks are less than sources to fit.")
     limits = [
