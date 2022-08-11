@@ -34,19 +34,6 @@ SDD_CALIBS = {
 }
 
 
-SLO_CALIBS = {
-    ("fm1", -20): paths.FM1Tm20SLO,
-    ("fm1", -10): paths.FM1Tm10SLO,
-    ("fm1", 0):   paths.FM1Tp00SLO,
-    ("fm1", +20): paths.FM1Tp20SLO,
-    ("pfm", +20): paths.PFMTp20SLO,
-    ("pfm", +10): paths.PFMTp10SLO,
-    ("pfm", 0):   paths.PFMTp00SLO,
-    ("pfm", -10): paths.PFMTm10SLO,
-    ("pfm", -20): paths.PFMTm20SLO,
-}
-
-
 ROOM_TEMP = +20
 
 
@@ -71,26 +58,6 @@ def fetch_default_sdd_calibration(model, temp):
 
     if model in available_models(SDD_CALIBS) and (temp is None):
         calibration_path = SDD_CALIBS[(model, ROOM_TEMP)]
-        calibration_df = read_report_from_excel(calibration_path)
-        return calibration_df, (model, ROOM_TEMP)
-
-    else:
-        raise DetectorModelNotFound("model not available.")
-
-
-def fetch_default_slo_calibration(model, temp):
-    if model in available_models(SLO_CALIBS) and temp in available_temps(
-        model, SLO_CALIBS
-    ):
-        nearest_available_temperature = min(
-            available_temps(model, SLO_CALIBS)[::-1], key=lambda x: abs(x - temp)
-        )
-        calibration_path = SLO_CALIBS[(model, nearest_available_temperature)]
-        calibration_df = read_report_from_excel(calibration_path)
-        return calibration_df, (model, nearest_available_temperature)
-
-    if model in available_models(SLO_CALIBS) and (temp is None):
-        calibration_path = SLO_CALIBS[(model, ROOM_TEMP)]
         calibration_df = read_report_from_excel(calibration_path)
         return calibration_df, (model, ROOM_TEMP)
 
