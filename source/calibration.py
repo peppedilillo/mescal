@@ -541,15 +541,27 @@ class Calibration:
 
                 else:
                     centers = self.sfit[quad].loc[ch][:, "center"].values
+                    gain, offset = self.sdd_cal[quad].loc[ch][[
+                        "gain",
+                        "offset"
+                    ]].values
+                    centers_electrons = (centers - offset)/gain/PHOTOEL_PER_KEV
+
                     centers_companion = self.sfit[quad].loc[companion][:, "center"].values
-                    effs = lo * centers / (centers + centers_companion)
-                    eff_errs = lo_err * centers / (centers + centers_companion)
+                    gain_comp, offset_comp = self.sdd_cal[quad].loc[companion][[
+                        "gain",
+                        "offset"
+                    ]].values
+                    centers_electrons_comp = (centers_companion - offset_comp)/gain_comp/PHOTOEL_PER_KEV
+
+                    effs = lo * centers_electrons / (centers_electrons + centers_electrons_comp)
+                    eff_errs = lo_err * centers_electrons / (centers_electrons + centers_electrons_comp)
                     eff, eff_err = self._deal_with_multiple_gamma_decays(effs, eff_errs)
                     results.setdefault(quad, {})[ch] = np.array((eff, eff_err))
         return results
 
     def _effective_lout_error(self, quad, scint, ch, companion):
-        # TODO: unused atm. deserves further checking. as it is, very little
+        # TODO: unused atm. requires further verificantions. as it is, very little
         #       differences from much simpler calculations.
         lo = self.scint_cal[quad].loc[scint]['light_out']
         lo_err = self.scint_cal[quad].loc[scint]['light_out_err']
