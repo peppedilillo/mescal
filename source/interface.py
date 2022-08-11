@@ -1,4 +1,5 @@
 from time import sleep
+from datetime import datetime
 
 from rich.console import Console
 from rich.prompt import IntPrompt
@@ -15,16 +16,21 @@ hdr_text = (
 )
 
 
+def logo():
+    with open(LOGOPATH, "r") as logofile:
+        as_string = logofile.read()
+    return as_string
+
+
 def hello():
     console = Console()
-    with open(LOGOPATH, "r") as logo:
-        for i, line in enumerate(logo.readlines()):
-            console.print(
-                line.strip("\n"),
-                style="bold color({})".format(int(i + 160)),
-                justify="center",
-            )
-            sleep(0.1)
+    for i, line in enumerate(logo().split("\n")):
+        console.print(
+            line,
+            style="bold color({})".format(int(i + 160)),
+            justify="center",
+        )
+        sleep(0.1)
     print_rule(console, hdr_text)
     return console
 

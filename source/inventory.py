@@ -4,16 +4,8 @@ from assets import detectors
 from assets.radsources_db import Am, Am_x60, Cd, Cs, Fe, Fe_kbeta
 from source.errors import DetectorModelNotFound, SourceNotFoundError
 from source.io import read_report_from_excel
-from source.upaths import (
-    FM1Tm10CAL,
-    FM1Tm10SLO,
-    FM1Tm20CAL,
-    FM1Tm20SLO,
-    FM1Tp00CAL,
-    FM1Tp00SLO,
-    FM1Tp20CAL,
-    FM1Tp20SLO
-)
+import source.upaths as paths
+
 
 X_SOURCES = {
     "FE": Fe,
@@ -23,24 +15,37 @@ X_SOURCES = {
     "AM_X60": Am_x60,
 }
 
+
 GAMMA_SOURCES = {
     "CS": Cs,
 }
 
+
 SDD_CALIBS = {
-    ("fm1", -20): FM1Tm20CAL,
-    ("fm1", -10): FM1Tm10CAL,
-    ("fm1", 0): FM1Tp00CAL,
-    ("fm1", +20): FM1Tp20CAL,
+    ("fm1", -20): paths.FM1Tm20CAL,
+    ("fm1", -10): paths.FM1Tm10CAL,
+    ("fm1", 0):   paths.FM1Tp00CAL,
+    ("fm1", +20): paths.FM1Tp20CAL,
+    ("pfm", +20): paths.PFMTp20CAL,
+    ("pfm", +10): paths.PFMTp10CAL,
+    ("pfm", 0):   paths.PFMTp00CAL,
+    ("pfm", -10): paths.PFMTm10CAL,
+    ("pfm", -20): paths.PFMTm20CAL,
 }
 
 
 SLO_CALIBS = {
-    ("fm1", -20): FM1Tm20SLO,
-    ("fm1", -10): FM1Tm10SLO,
-    ("fm1", 0): FM1Tp00SLO,
-    ("fm1", +20): FM1Tp20SLO,
+    ("fm1", -20): paths.FM1Tm20SLO,
+    ("fm1", -10): paths.FM1Tm10SLO,
+    ("fm1", 0):   paths.FM1Tp00SLO,
+    ("fm1", +20): paths.FM1Tp20SLO,
+    ("pfm", +20): paths.PFMTp20SLO,
+    ("pfm", +10): paths.PFMTp10SLO,
+    ("pfm", 0):   paths.PFMTp00SLO,
+    ("pfm", -10): paths.PFMTm10SLO,
+    ("pfm", -20): paths.PFMTm20SLO,
 }
+
 
 ROOM_TEMP = +20
 
