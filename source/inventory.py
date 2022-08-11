@@ -1,11 +1,10 @@
 import numpy as np
 
+import source.upaths as paths
 from assets import detectors
 from assets.radsources_db import Am, Am_x60, Cd, Cs, Fe, Fe_kbeta
 from source.errors import DetectorModelNotFound, SourceNotFoundError
 from source.io import read_report_from_excel
-import source.upaths as paths
-
 
 X_SOURCES = {
     "FE": Fe,
@@ -24,11 +23,11 @@ GAMMA_SOURCES = {
 SDD_CALIBS = {
     ("fm1", -20): paths.FM1Tm20CAL,
     ("fm1", -10): paths.FM1Tm10CAL,
-    ("fm1", 0):   paths.FM1Tp00CAL,
+    ("fm1", 0): paths.FM1Tp00CAL,
     ("fm1", +20): paths.FM1Tp20CAL,
     ("pfm", +20): paths.PFMTp20CAL,
     ("pfm", +10): paths.PFMTp10CAL,
-    ("pfm", 0):   paths.PFMTp00CAL,
+    ("pfm", 0): paths.PFMTp00CAL,
     ("pfm", -10): paths.PFMTm10CAL,
     ("pfm", -20): paths.PFMTm20CAL,
 }
