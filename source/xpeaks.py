@@ -7,12 +7,12 @@ from scipy.signal import find_peaks
 
 import source.errors as err
 
-PROMINENCE_WEIGHTING = False
+PROMINENCE_WEIGHTING = True
 
 SMOOTHING = 5
 
 PEAKS_DETECTION_PARAMETERS = {
-    "prominence": 100,
+    "prominence": 70,
     "width": 5,
     "distance": 10,
 }
