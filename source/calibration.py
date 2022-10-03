@@ -10,7 +10,7 @@ import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
 from source.eventlist import electrons_to_energy, make_electron_list
 from source.inventory import fetch_default_sdd_calibration
-from source.speaks import _estimate_peaks_from_guess
+from source.speaks import _estimate_peaks_from_guess, SPEAKS_DETECTION_PARAMETERS, EPEAKS_DETECTION_PARAMETERS
 from source.xpeaks import find_xlimits
 
 FIT_PARAMS = [
@@ -104,6 +104,7 @@ def linrange(start, stop, step):
 
 class Calibration:
     adc_bins = linrange(15000, 28000, 10)
+    scint_bins = linrange(15000, 28000, 10)
     electron_bins = linrange(1000, 25000, 50)
     light_out_guess = (20.0, 30.0)
 
@@ -207,7 +208,7 @@ class Calibration:
 
     def _make_shistograms(self, data):
         value = "ADC"
-        bins = self.adc_bins
+        bins = self.scint_bins
         data = data[data["EVTYPE"] == "S"]
         histograms = compute_histogram(
             value,
@@ -324,6 +325,7 @@ class Calibration:
                         bins,
                         counts,
                         guess=guesses,
+                        find_peaks_params=SPEAKS_DETECTION_PARAMETERS
                     )
                 except err.DetectPeakError:
                     message = err.warn_failed_peak_detection(quad, ch)
@@ -373,6 +375,7 @@ class Calibration:
                         bins,
                         counts,
                         guess=guesses,
+                        find_peaks_params=EPEAKS_DETECTION_PARAMETERS
                     )
                 except err.DetectPeakError:
                     message = err.warn_failed_peak_detection(quad, scint)

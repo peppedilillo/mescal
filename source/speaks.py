@@ -7,10 +7,18 @@ from source.errors import DetectPeakError
 
 SMOOTHING = 20
 
-PEAKS_DETECTION_PARAMETERS = {
-    "prominence": 10,
+SPEAKS_DETECTION_PARAMETERS = {
+    "prominence": 6,
     "width": 10,
 }
+
+
+EPEAKS_DETECTION_PARAMETERS = {
+    "prominence": 30,
+    "width": 10,
+}
+
+PROMINENCE_WEIGHTING = False
 
 
 def move_mean(arr, n):
@@ -22,11 +30,16 @@ def _dist_from_intv(x, lo, hi):
 
 
 def _closest_peaks(guess, bins, peaks, peaks_infos):
-    peaks_dist_from_guess = [
+    peaks_dist_from_guess = np.array([
         [_dist_from_intv(bins[peak], guess_lo, guess_hi) for peak in peaks]
         for guess_lo, guess_hi in guess
-    ]
-    argmin = np.argmin(peaks_dist_from_guess, axis=1)
+    ])
+    if PROMINENCE_WEIGHTING:
+        assert "prominences" in peaks_infos.keys()
+        weights = peaks_infos["prominences"]
+        argmin = np.argmin(peaks_dist_from_guess**2/weights, axis=1)
+    else:
+        argmin = np.argmin(peaks_dist_from_guess, axis=1)
     best_peaks = peaks[argmin]
     best_peaks_infos = {key: val[argmin] for key, val in peaks_infos.items()}
     return best_peaks, best_peaks_infos

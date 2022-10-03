@@ -7,7 +7,7 @@ from scipy.signal import find_peaks
 
 import source.errors as err
 
-PROMINENCE_WEIGHTING = True
+PROMINENCE_WEIGHTING = False
 
 SMOOTHING = 5
 
@@ -138,10 +138,11 @@ def _weight(x):
 
 def _filter_peaks_lratio(radsources: list, peaks, peaks_infos):
     peaks_combinations = [*combinations(peaks, r=len(radsources))]
-    proms_combinations = combinations(peaks_infos["prominences"], r=len(radsources))
     norm_ls = _normalize(radsources)
     norm_ps = [*map(_normalize, peaks_combinations)]
     if PROMINENCE_WEIGHTING:
+        assert "prominences" in peaks_infos.keys()
+        proms_combinations = combinations(peaks_infos["prominences"], r=len(radsources))
         weights = [*map(_weight, proms_combinations)]
         loss = np.sum(
             np.square(np.array(norm_ps) - np.array(norm_ls)) / np.square(weights),
