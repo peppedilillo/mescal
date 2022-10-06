@@ -36,26 +36,30 @@ SDD_CALIBS = {
 ROOM_TEMP = +20
 
 
-def available_temps(model, calibs):
+def available_temps_hints(model, calibs):
     out = [temp for available_model, temp in calibs.keys() if model == available_model]
     return out
 
 
-def available_models(calibs):
+def available_models_hints(calibs):
     models, _ = zip(*calibs.keys())
     return [*set(models)]
 
 
 def fetch_default_sdd_calibration(model, temp):
-    if model in available_models(SDD_CALIBS) and (temp is not None):
+    # if a default calibs for the selected detector models exists
+    # and a temperature was specified, search for the calibrations at
+    # closest temperature
+    if model in available_models_hints(SDD_CALIBS) and (temp is not None):
         nearest_available_temperature = min(
-            available_temps(model, SDD_CALIBS)[::-1], key=lambda x: abs(x - temp)
+            available_temps_hints(model, SDD_CALIBS)[::-1], key=lambda x: abs(x - temp)
         )
         calibration_path = SDD_CALIBS[(model, nearest_available_temperature)]
         calibration_df = read_report_from_excel(calibration_path)
         return calibration_df, (model, nearest_available_temperature)
 
-    if model in available_models(SDD_CALIBS) and (temp is None):
+    # if temperature is not specified use a default value.
+    if model in available_models_hints(SDD_CALIBS) and (temp is None):
         calibration_path = SDD_CALIBS[(model, ROOM_TEMP)]
         calibration_df = read_report_from_excel(calibration_path)
         return calibration_df, (model, ROOM_TEMP)

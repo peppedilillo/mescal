@@ -244,6 +244,7 @@ class Calibration:
         try:
             hint = self._fetch_hint()
         except err.DetectorModelNotFound:
+            self.console.log(":question_mark: Cannot find calibration hints for {}.".format(self.model))
             hint = None
 
         results = {}

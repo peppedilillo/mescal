@@ -16,6 +16,6 @@ _Example:_
 To launch `calibmake.py` over a calibration acquisition (FM1, radioactive sources 55Fe, 109Cd and 137Cs, temperature 20°C) located at path  "C:\somepath\sources_m20deg_85_LV0d5.fits":
 
 1. Move to the mescal directory.
-2. Launch `python calibmake.py --model=fm1 --temperature=-20 Fe,Cd,Cs "C:\somepath\sources_m20deg_85_LV0d5.fits""`
+2. Launch `python calibmake.py fm1 --temperature=-20 Fe,Cd,Cs "C:\somepath\sources_m20deg_85_LV0d5.fits""`
 
 For more informations and options regarding `calibmake.py`, try the helper via `python calibmake.py --help`.
