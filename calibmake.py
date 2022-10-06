@@ -18,7 +18,7 @@ from source.eventlist import (
 from source.inventory import get_couples, radsources_dicts
 from source.io import (
     get_writer,
-    pandas_from,
+    pandas_from_LV0d5,
     write_eventlist_to_fits,
     write_report_to_excel
 )
@@ -35,18 +35,18 @@ from source.plot import (
 
 RETRIGGER_TIME_IN_S = 20 * (10**-6)
 
-
-option = namedtuple("option", ["display", "reply", "promise"])
-terminate_mescal = option("Exit mescal.", "So soon?", lambda _: None)
-options = [terminate_mescal]
-
-
 description = (
     "A script to automatically calibrate HERMES-TP/SP "
     "acquisitions of known radioactive sources."
 )
 parser = argparse.ArgumentParser(description=description)
 
+parser.add_argument(
+    "model",
+    choices=['fm1', 'pfm', 'fm2'],
+    help="hermes flight model to calibrate. " 
+    "supported models: fm1, pfm, fm2."
+)
 parser.add_argument(
     "radsources",
     help="radioactive sources used for calibration. "
@@ -79,11 +79,6 @@ peak_hints_args = parser.add_argument_group(
     "on where to look for a peak. ",
 )
 peak_hints_args.add_argument(
-    "--model",
-    "--m",
-    help="hermes flight model to calibrate. " "supported models: fm1. ",
-)
-peak_hints_args.add_argument(
     "--temperature",
     "--temp",
     "--t",
@@ -91,10 +86,15 @@ peak_hints_args.add_argument(
     help="acquisition temperature in celsius degree. "
     "requires the use of the --model argument",
 )
+peak_hints_args.add_argument(
+    "--all",
+    default=False,
+    action="store_true",
+    help="save all output (may take time)",
+)
 
 
 def run(args):
-
     console = interface.hello()
 
     with console.status("Initializing.."):
@@ -102,12 +102,12 @@ def run(args):
         radsources = radsources_dicts(args.radsources)
 
     with console.status("Preprocessing.."):
-        scintillator_couples = get_couples()
+        scintillator_couples = get_couples(args.model)
         channels = infer_onchannels(data)
         data = preprocess(data, scintillator_couples, console)
 
     with console.status("Calibrating.."):
-        calibration = Calibration(
+        calibrated = Calibration(
             channels,
             scintillator_couples,
             radsources,
@@ -116,15 +116,18 @@ def run(args):
             console,
             systhreads,
         )
-        eventlist = calibration(data)
+        eventlist = calibrated(data)
 
     with console.status("Processing results.."):
-        process_results(calibration, eventlist, args.filepath, args.fmt, console)
+        process_results(calibrated, eventlist, args.filepath, args.fmt, console)
 
-    if any(calibration.flagged):
-        warn_about_flagged(calibration.flagged, channels, console)
+    if any(calibrated.flagged):
+        warn_about_flagged(calibrated.flagged, channels, console)
 
-    anything_else(options, console)
+    if args.all:
+        everything_else(options, console)
+    else:
+        anything_else(options, console)
 
     goodbye = interface.shutdown(console)
 
@@ -166,7 +169,7 @@ def get_from(fitspath: Path, console, use_cache=True):
         out = pd.read_pickle(cached)
         console.log("[bold red]:exclamation_mark: Data were loaded from cache.")
     elif fitspath.is_file():
-        out = pandas_from(fitspath)
+        out = pandas_from_LV0d5(fitspath)
         console.log(":open_book: Data loaded.")
         if use_cache:
             out.to_pickle(cached)
@@ -356,25 +359,11 @@ def _draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads):
     )
 
 
-def _draw_and_save_xdiagns(histograms, fit_results, path, nthreads):
-    return option(
-        display="Save X fit diagnostic plots.",
-        reply=":sparkles: Plots saved. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_diagns(
-                histograms,
-                fit_results,
-                path,
-                nthreads,
-            )
-        ),
-    )
-
 
 def _draw_and_save_lins(sdds_calibration, xfit_results, xradsources, path, nthreads):
     return option(
         display="Save X linearity plots.",
-        reply=":sparkles: Plots saved. :sparkles:",
+        reply=":sparkles: Saved linearity plot. :sparkles:",
         promise=promise(
             lambda: draw_and_save_lins(
                 sdds_calibration,
@@ -387,10 +376,25 @@ def _draw_and_save_lins(sdds_calibration, xfit_results, xradsources, path, nthre
     )
 
 
+def _draw_and_save_xdiagns(histograms, fit_results, path, nthreads):
+    return option(
+        display="Save X fit diagnostic plots.",
+        reply=":sparkles: Saved X diagnostic plots. :sparkles:",
+        promise=promise(
+            lambda: draw_and_save_diagns(
+                histograms,
+                fit_results,
+                path,
+                nthreads,
+            )
+        ),
+    )
+
+
 def _write_xfit_report(fit_results, path):
     return option(
         display="Save X fit results.",
-        reply=":sparkles: Fit table saved. :sparkles:",
+        reply=":sparkles: Saved X fit results. :sparkles:",
         promise=promise(
             lambda: write_report_to_excel(
                 fit_results,
@@ -403,7 +407,7 @@ def _write_xfit_report(fit_results, path):
 def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
     return option(
         display="Save S fit diagnostic plots.",
-        reply=":sparkles: Plots saved. :sparkles:",
+        reply=":sparkles: Saved gamma diagnostics plots. :sparkles:",
         promise=promise(
             lambda: draw_and_save_diagns(
                 histograms,
@@ -417,8 +421,8 @@ def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
 
 def _write_sfit_report(fit_results, path):
     return option(
-        display="Save S fit results.",
-        reply=":sparkles: Fit table saved. :sparkles:",
+        display="Saved S fit results.",
+        reply=":sparkles: Saved gamma fit table. :sparkles:",
         promise=promise(
             lambda: write_report_to_excel(
                 fit_results,
@@ -433,7 +437,7 @@ def _draw_and_save_channels_xspectra(
 ):
     return option(
         display="Save X channel spectra plots.",
-        reply=":sparkles: Plots saved. :sparkles:",
+        reply=":sparkles: Saved X spectra. :sparkles:",
         promise=promise(
             lambda: draw_and_save_channels_xspectra(
                 xhistograms,
@@ -456,7 +460,7 @@ def _draw_and_save_channels_sspectra(
 ):
     return option(
         display="Save S channel spectra plots.",
-        reply=":sparkles: Plots saved. :sparkles:",
+        reply=":sparkles: Saved gamma spectra. :sparkles:",
         promise=promise(
             lambda: draw_and_save_channels_sspectra(
                 shistograms,
@@ -473,7 +477,7 @@ def _draw_and_save_channels_sspectra(
 def _write_eventlist_to_fits(eventlist, path):
     return option(
         display="Write calibrated events to fits.",
-        reply=":sparkles: Event list saved. :sparkles:",
+        reply=":sparkles: Saved event list. :sparkles:",
         promise=promise(
             lambda: write_eventlist_to_fits(
                 eventlist,
@@ -486,7 +490,7 @@ def _write_eventlist_to_fits(eventlist, path):
 def _draw_and_save_spectra(eventlist, xradsources, sradsources, xpath, spath):
     return option(
         display="Save calibrated spectra.",
-        reply=":sparkles: Spectra plot saved :sparkle:",
+        reply=":sparkles: Saved spectra plot. :sparkles:",
         promise=promise(
             lambda: draw_and_save_spectrum(
                 eventlist,
@@ -512,10 +516,14 @@ def fulfill(opt):
         return cdr()
 
 
+option = namedtuple("option", ["display", "reply", "promise"])
+terminate_mescal = option("Exit mescal.", "So soon?", promise(lambda : None))
+options = [terminate_mescal]
+
+
 def anything_else(options, console):
     interface.print_rule(console, "[italic]Optional Outputs", align="center")
     console.print(interface.options_message(options))
-
     while True:
         answer = interface.prompt_user_about(options)
         if answer is terminate_mescal:
@@ -524,10 +532,20 @@ def anything_else(options, console):
         else:
             with console.status("Working.."):
                 if fulfill(answer.promise):
-                    console.print(answer.reply)
+                    console.log(answer.reply)
                 else:
                     console.print("[red]We already did that..")
+    interface.print_rule(console)
+    return True
 
+
+def everything_else(options, console):
+    interface.print_rule(console, "[italic]Optional Outputs", align="center")
+    for task in options:
+        with console.status("Working.."):
+            if task is not terminate_mescal:
+                fulfill(task.promise)
+                console.log(task.reply)
     interface.print_rule(console)
     return True
 

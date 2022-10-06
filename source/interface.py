@@ -66,7 +66,8 @@ def options_message(options):
 def prompt_user_about(options):
     message = Text("Select:")
     choices = [*range(len(options))]
-    return options[IntPrompt.ask(message, choices=[str(i) for i in choices])]
+    n = IntPrompt.ask(message, choices=[str(i) for i in choices])
+    return options[n]
 
 
 def print_rule(console, *args, **kwargs):

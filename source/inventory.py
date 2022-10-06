@@ -64,14 +64,24 @@ def fetch_default_sdd_calibration(model, temp):
         raise DetectorModelNotFound("model not available.")
 
 
-def get_quadrant_map(quad: str, arr_borders: bool = True):
+def get_quadrant_map(model: str, quad: str, arr_borders: bool = True):
+    if model == 'fm1':
+        detector_map = detectors.fm1
+    elif model == 'pfm':
+        detector_map = detectors.pfm
+    elif model == 'fm2':
+        detector_map = detectors.fm2
+    else:
+        raise ValueError("Model Unknown.")
+
     if quad in ["A", "B", "C", "D"]:
-        arr = detectors.map[quad]
+        arr = detector_map[quad]
     else:
         raise ValueError("Unknown quadrant key. Allowed keys are A,B,C,D")
 
     if arr_borders:
         return tuple(map(lambda x: (x[0] + int(x[0] / 2), x[1]), arr))
+
     return arr
 
 
@@ -91,12 +101,12 @@ def radsources_dicts(sources: list):
     return xdecays, sdecays
 
 
-def get_quad_couples(quad):
-    qmaparr = np.array(get_quadrant_map(quad))
+def get_quad_couples(model, quad):
+    qmaparr = np.array(get_quadrant_map(model, quad))
     arr = np.lexsort((qmaparr[:, 0], qmaparr[:, 1])).reshape(16, 2)[1:]
     dic = dict(arr)
     return dic
 
 
-def get_couples():
-    return {q: get_quad_couples(q) for q in "ABCD"}
+def get_couples(model):
+    return {q: get_quad_couples(model, q) for q in "ABCD"}

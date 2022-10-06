@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from lmfit.models import GaussianModel, LinearModel
+import matplotlib; matplotlib.use("TkAgg")
+import matplotlib.pyplot as plt
 
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
@@ -103,8 +105,10 @@ def linrange(start, stop, step):
 
 
 class Calibration:
-    adc_bins = linrange(15000, 28000, 10)
-    scint_bins = linrange(15000, 28000, 10)
+    #adc_bins = linrange(15000, 28000, 10)
+    adc_bins = linrange(1000, 2000, 1)
+    #scint_bins = linrange(15000, 28000, 10)
+    scint_bins = linrange(1000, 2000, 1)
     electron_bins = linrange(1000, 25000, 50)
     light_out_guess = (20.0, 30.0)
 
@@ -121,7 +125,7 @@ class Calibration:
         self.radsources = radsources
         self.channels = channels
         self.couples = couples
-        self.detector_model = detector_model
+        self.model = detector_model
         self.temperature = temperature
         self.xhistograms = None
         self.shistograms = None
@@ -188,7 +192,7 @@ class Calibration:
 
     def _fetch_hint(self):
         hint, key = fetch_default_sdd_calibration(
-            self.detector_model,
+            self.model,
             self.temperature,
         )
         self._print(":open_book: Loaded detection hints for {}@{}°C.".format(*key))
@@ -237,9 +241,9 @@ class Calibration:
         energies = [s.energy for s in radiation_sources.values()]
         constrains = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
         # TODO still don't like how we deal with hints
-        if self.detector_model:
+        try:
             hint = self._fetch_hint()
-        else:
+        except err.DetectorModelNotFound:
             hint = None
 
         results = {}

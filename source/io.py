@@ -74,15 +74,16 @@ def write_eventlist_to_fits(eventlist, path):
     return True
 
 
-def pandas_from(fits: Path):
+def pandas_from_LV0d5(fits: Path):
     fits_path = Path(fits)
-
     with fitsio.open(fits_path) as fits_file:
-        df = pd.DataFrame(np.array(fits_file[-1].data).byteswap().newbyteorder())
+        fits_data = fits_file[-1].data
+        df = pd.DataFrame(np.array(fits_data).byteswap().newbyteorder())
+    # fixes first buffer missing ABT
     start_t = floor(df[df["TIME"] > 1].iloc[0]["TIME"]) - 1
     df.loc[df["TIME"] < 1, "TIME"] += start_t
-    df = df.reset_index(level=0).rename({"index": "SID"}, axis="columns")
 
+    df = df.reset_index(level=0).rename({"index": "SID"}, axis="columns")
     columns = ["ADC", "CHN", "QUADID", "NMULT", "TIME", "SID"]
     types = ["int32", "int8", "string", "int8", "float64", "int32"]
     dtypes = {col: tp for col, tp in zip(columns, types)}
