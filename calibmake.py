@@ -172,6 +172,8 @@ def get_from(fitspath: Path, console, use_cache=True):
         out = pandas_from_LV0d5(fitspath)
         console.log(":open_book: Data loaded.")
         if use_cache:
+            # save data to cache
+            # TODO: saving to cache needs a dedicated function
             out.to_pickle(cached)
             console.log(":blue_book: Data saved to cache.")
     else:
@@ -204,6 +206,53 @@ def warn_about_flagged(flagged, channels, console):
     )
 
     console.print(message)
+    return True
+
+
+def promise(f):
+    return [0, f]
+
+
+def fulfill(opt):
+    car, cdr = opt
+    if car:
+        pass
+    else:
+        opt[0] = 1
+        return cdr()
+
+
+option = namedtuple("option", ["display", "reply", "promise"])
+terminate_mescal = option("Exit mescal.", "So soon?", promise(lambda : None))
+options = [terminate_mescal]
+
+
+def anything_else(options, console):
+    interface.print_rule(console, "[italic]Optional Outputs", align="center")
+    console.print(interface.options_message(options))
+    while True:
+        answer = interface.prompt_user_about(options)
+        if answer is terminate_mescal:
+            console.print(terminate_mescal.reply)
+            break
+        else:
+            with console.status("Working.."):
+                if fulfill(answer.promise):
+                    console.log(answer.reply)
+                else:
+                    console.print("[red]We already did that..")
+    interface.print_rule(console)
+    return True
+
+
+def everything_else(options, console):
+    interface.print_rule(console, "[italic]Optional Outputs", align="center")
+    for task in options:
+        with console.status("Working.."):
+            if task is not terminate_mescal:
+                fulfill(task.promise)
+                console.log(task.reply)
+    interface.print_rule(console)
     return True
 
 
@@ -501,53 +550,6 @@ def _draw_and_save_spectra(eventlist, xradsources, sradsources, xpath, spath):
             )
         ),
     )
-
-
-def promise(f):
-    return [0, f]
-
-
-def fulfill(opt):
-    car, cdr = opt
-    if car:
-        pass
-    else:
-        opt[0] = 1
-        return cdr()
-
-
-option = namedtuple("option", ["display", "reply", "promise"])
-terminate_mescal = option("Exit mescal.", "So soon?", promise(lambda : None))
-options = [terminate_mescal]
-
-
-def anything_else(options, console):
-    interface.print_rule(console, "[italic]Optional Outputs", align="center")
-    console.print(interface.options_message(options))
-    while True:
-        answer = interface.prompt_user_about(options)
-        if answer is terminate_mescal:
-            console.print(terminate_mescal.reply)
-            break
-        else:
-            with console.status("Working.."):
-                if fulfill(answer.promise):
-                    console.log(answer.reply)
-                else:
-                    console.print("[red]We already did that..")
-    interface.print_rule(console)
-    return True
-
-
-def everything_else(options, console):
-    interface.print_rule(console, "[italic]Optional Outputs", align="center")
-    for task in options:
-        with console.status("Working.."):
-            if task is not terminate_mescal:
-                fulfill(task.promise)
-                console.log(task.reply)
-    interface.print_rule(console)
-    return True
 
 
 if __name__ == "__main__":

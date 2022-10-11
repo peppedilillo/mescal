@@ -14,7 +14,7 @@ parser.add_argument("quadrant", action="store", type=int)
 parser.add_argument("outfile", action="store", type=str)
 parser.add_argument("infiles", action="store", type=str, nargs="+")
 
-# DT5740
+# refers to CAEN DT5740
 NCH = 32
 DEFAULT_PARS = {
     "time_unit_s": 8 * 10 ** -9,

@@ -1,5 +1,6 @@
 import logging
 from collections import namedtuple
+from math import floor, ceil
 
 import numpy as np
 import pandas as pd
@@ -104,12 +105,40 @@ def linrange(start, stop, step):
     return bins
 
 
+def find_adc_bins(data, maxmargin = 10, roundto = 100, clipquant = 0.995):
+    """
+    find binning for adc data, euristic.
+    not intended to use for binning scintillator electrons data.
+    Args:
+        maxmargin: ignores data larger than max - maxmargin
+        clipquant: ignore data above quantile (after max margin)
+        roundto: round to nearest
+        data: a dataframe with 'ADC' column
+
+    Returns: a numpy array
+
+    """
+    # remove eventual zeros
+    lo = data['ADC'][data['ADC'] > 0].min()
+    lo = floor(lo / roundto) * roundto
+    # remove saturated data
+    max = data['ADC'].max()
+    clipped_data = data['ADC'][data['ADC'] < max - maxmargin]
+    hi = clipped_data.quantile(clipquant)
+    hi = ceil(hi / roundto) * roundto
+    # guess ADC bit resolution to set step
+    if max <= 2 ** 12:
+        step = 1
+    elif max <= 2 ** 16:
+        step = 10
+    else:
+        raise ValueError("Can't find good binning. ADC values too high.")
+    bins = linrange(lo, hi, step)
+    return bins
+
+
 class Calibration:
-    #adc_bins = linrange(15000, 28000, 10)
-    adc_bins = linrange(1000, 2000, 1)
-    #scint_bins = linrange(15000, 28000, 10)
-    scint_bins = linrange(1000, 2000, 1)
-    electron_bins = linrange(1000, 25000, 50)
+    ebins = linrange(1000, 25000, 50)
     light_out_guess = (20.0, 30.0)
 
     def __init__(
@@ -127,6 +156,9 @@ class Calibration:
         self.couples = couples
         self.model = detector_model
         self.temperature = temperature
+        self.xbins = None
+        self.sbins = None
+        self.ebins = None
         self.xhistograms = None
         self.shistograms = None
         self.ehistograms = None
@@ -141,9 +173,14 @@ class Calibration:
         self.nthreads = nthreads
 
     def __call__(self, data):
+        bins = find_adc_bins(data)
+        self.xbins = bins
+        self.sbins = bins
         self.xhistograms = self._make_xhistograms(data)
         self.shistograms = self._make_shistograms(data)
-        self._print(":white_check_mark: Binned data.")
+        lost_events = len(data['ADC']) - sum(data['ADC'] < bins[-1])
+        self._print(":white_check_mark: Binned data. Lost {:.2f}% dataset."
+                    .format(100*lost_events/len(data['ADC'])))
 
         if not self._xradsources():
             return
@@ -200,7 +237,7 @@ class Calibration:
 
     def _make_xhistograms(self, data):
         value = "ADC"
-        bins = self.adc_bins
+        bins = self.xbins
         data = data[data["EVTYPE"] == "X"]
         histograms = compute_histogram(
             value,
@@ -212,7 +249,7 @@ class Calibration:
 
     def _make_shistograms(self, data):
         value = "ADC"
-        bins = self.scint_bins
+        bins = self.sbins
         data = data[data["EVTYPE"] == "S"]
         histograms = compute_histogram(
             value,
@@ -225,7 +262,7 @@ class Calibration:
     def _make_ehistograms(self, electron_evlist):
         value = "ELECTRONS"
         data = electron_evlist[electron_evlist["EVTYPE"] == "S"]
-        bins = self.electron_bins
+        bins = self.ebins
         histograms = compute_histogram(
             value,
             data,
