@@ -1,20 +1,23 @@
 import logging
 from collections import namedtuple
-from math import floor, ceil
+from math import floor, ceil, sqrt
 
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from lmfit.models import GaussianModel, LinearModel
-import matplotlib; matplotlib.use("TkAgg")
+import matplotlib;
+matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
 from source.eventlist import electrons_to_energy, make_electron_list
 from source.inventory import fetch_default_sdd_calibration
-from source.speaks import _estimate_peaks_from_guess, SPEAKS_DETECTION_PARAMETERS, EPEAKS_DETECTION_PARAMETERS
-from source.xpeaks import find_xlimits
+from source.peakfind import find_peaks
+
+# from source.speaks import _estimate_peaks_from_guess, SPEAKS_DETECTION_PARAMETERS, EPEAKS_DETECTION_PARAMETERS
+# from source.xpeaks import find_xlimits
 
 FIT_PARAMS = [
     "center",
@@ -105,7 +108,7 @@ def linrange(start, stop, step):
     return bins
 
 
-def find_adc_bins(data, maxmargin = 10, roundto = 100, clipquant = 0.995):
+def find_adc_bins(data, adcbitsize, maxmargin=10, roundto=100, clipquant=0.995):
     """
     find binning for adc data, euristic.
     not intended to use for binning scintillator electrons data.
@@ -113,23 +116,23 @@ def find_adc_bins(data, maxmargin = 10, roundto = 100, clipquant = 0.995):
         maxmargin: ignores data larger than max - maxmargin
         clipquant: ignore data above quantile (after max margin)
         roundto: round to nearest
-        data: a dataframe with 'ADC' column
+        data: an array of int adc readings
 
     Returns: a numpy array
 
     """
     # remove eventual zeros
-    lo = data['ADC'][data['ADC'] > 0].min()
+    lo = data[data > 0].min()
     lo = floor(lo / roundto) * roundto
     # remove saturated data
-    max = data['ADC'].max()
-    clipped_data = data['ADC'][data['ADC'] < max - maxmargin]
+    max = data.max()
+    clipped_data = data[data < max - maxmargin]
     hi = clipped_data.quantile(clipquant)
     hi = ceil(hi / roundto) * roundto
     # guess ADC bit resolution to set step
-    if max <= 2 ** 12:
+    if adcbitsize <= 12:
         step = 1
-    elif max <= 2 ** 16:
+    elif adcbitsize <= 16:
         step = 10
     else:
         raise ValueError("Can't find good binning. ADC values too high.")
@@ -137,22 +140,57 @@ def find_adc_bins(data, maxmargin = 10, roundto = 100, clipquant = 0.995):
     return bins
 
 
+def infer_adc_bitsize(data):
+    """
+    A function that returns a guess on the ADC digitizer bit size.
+
+    Args:
+        data: an array of int ADC readings
+
+    Returns: an int
+
+    """
+    max = data.max()
+    if max <= 2 ** 12:
+        bitsize = 12
+    elif max <= 2 ** 16:
+        bitsize = 16
+    else:
+        raise ValueError("Can't find good binning. ADC values too high.")
+    return bitsize
+
+
 class Calibration:
     ebins = linrange(1000, 25000, 50)
     light_out_guess = (20.0, 30.0)
+    sdd_guess_12bitadc = {
+        'gain_center': 15,
+        'gain_sigma': 5,
+        'offset_center': 1100,
+        'offset_sigma': 50,
+    }
+    sdd_guess_16bitadc = {
+        'gain_center': 170,
+        'gain_sigma': 30,
+        'offset_center': 15700,
+        'offset_sigma': 500,
+    }
 
     def __init__(
-        self,
-        channels,
-        couples,
-        radsources,
-        detector_model=None,
-        temperature=None,
-        console=None,
-        nthreads=1,
+            self,
+            channels,
+            couples,
+            radsources,
+            *,
+            adcbitsize=None,
+            detector_model=None,
+            temperature=None,
+            console=None,
+            nthreads=1,
     ):
         self.radsources = radsources
         self.channels = channels
+        self.adcbitsize = adcbitsize
         self.couples = couples
         self.model = detector_model
         self.temperature = temperature
@@ -173,42 +211,43 @@ class Calibration:
         self.nthreads = nthreads
 
     def __call__(self, data):
-        bins = find_adc_bins(data)
+        if not self.adcbitsize:
+            self.adcbitsize = infer_adc_bitsize(data['ADC'])
+        bins = find_adc_bins(data['ADC'], self.adcbitsize)
         self.xbins = bins
         self.sbins = bins
         self.xhistograms = self._make_xhistograms(data)
         self.shistograms = self._make_shistograms(data)
         lost_events = len(data['ADC']) - sum(data['ADC'] < bins[-1])
         self._print(":white_check_mark: Binned data. Lost {:.2f}% dataset."
-                    .format(100*lost_events/len(data['ADC'])))
-
+                    .format(100 * lost_events / len(data['ADC'])))
         if not self._xradsources():
             return
         self.xfit = self._fit_xradsources()
-        self.sdd_cal = self._calibrate_sdds()
-        self._print(":white_check_mark: Analyzed X events.")
-
-        if not self._sradsources():
-            return
-        self.sfit = self._fit_sradsources()
-        electron_evlist = make_electron_list(
-            data,
-            self.sdd_cal,
-            self.sfit,
-            self.couples,
-            self.nthreads,
-        )
-        self.ehistograms = self._make_ehistograms(electron_evlist)
-        self.efit = self._fit_gamma_electrons()
-        self.scint_cal = self._calibrate_scintillators()
-        self.optical_coupling = self._compute_effective_light_outputs()
-        self._print(":white_check_mark: Analyzed gamma events.")
-
-        if not self.scint_cal:
-            return
-        eventlist = electrons_to_energy(electron_evlist, self.scint_cal, self.couples)
-
-        return eventlist
+        # self.sdd_cal = self._calibrate_sdds()
+        # self._print(":white_check_mark: Analyzed X events.")
+        #
+        # if not self._sradsources():
+        #     return
+        # self.sfit = self._fit_sradsources()
+        # electron_evlist = make_electron_list(
+        #     data,
+        #     self.sdd_cal,
+        #     self.sfit,
+        #     self.couples,
+        #     self.nthreads,
+        # )
+        # self.ehistograms = self._make_ehistograms(electron_evlist)
+        # self.efit = self._fit_gamma_electrons()
+        # self.scint_cal = self._calibrate_scintillators()
+        # self.optical_coupling = self._compute_effective_light_outputs()
+        # self._print(":white_check_mark: Analyzed gamma events.")
+        #
+        # if not self.scint_cal:
+        #     return
+        # eventlist = electrons_to_energy(electron_evlist, self.scint_cal, self.couples)
+        #
+        # return eventlist
 
     def _print(self, message):
         if self.console:
@@ -271,6 +310,26 @@ class Calibration:
         )
         return histograms
 
+    def guess_params(self):
+        if self.adcbitsize == 12:
+            gain_center_guess   = self.sdd_guess_12bitadc['gain_center']
+            gain_sigma_guess    = self.sdd_guess_12bitadc['gain_sigma']
+            offset_center_guess = self.sdd_guess_12bitadc['offset_center']
+            offset_sigma_guess  = self.sdd_guess_12bitadc['offset_sigma']
+
+        elif self.adcbitsize == 16:
+            gain_center_guess   = self.sdd_guess_16bitadc['gain_center']
+            gain_sigma_guess    = self.sdd_guess_16bitadc['gain_sigma']
+            offset_center_guess = self.sdd_guess_16bitadc['offset_center']
+            offset_sigma_guess  = self.sdd_guess_16bitadc['offset_sigma']
+
+        else:
+            raise ValueError("Bad adcbitsize value.")
+
+        gain = (gain_center_guess, gain_sigma_guess)
+        offset = (offset_center_guess, offset_sigma_guess)
+        return gain, offset
+
     @as_fit_dataframe
     def _fit_xradsources(self):
         bins = self.xhistograms.bins
@@ -278,32 +337,33 @@ class Calibration:
         energies = [s.energy for s in radiation_sources.values()]
         constrains = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
         # TODO still don't like how we deal with hints
-        try:
-            hint = self._fetch_hint()
-        except err.DetectorModelNotFound:
-            self.console.log(":question_mark: Cannot find calibration hints for {}.".format(self.model))
-            hint = None
+        # try:
+        #     hint = self._fetch_hint()
+        # except err.DetectorModelNotFound:
+        #     self.console.log(":question_mark: Cannot find calibration hints for {}.".format(self.model))
+        #     hint = None
 
+        gain_guess, offset_guess = self.guess_params()
         results = {}
         for quad in self.channels.keys():
             for ch in self.channels[quad]:
+                print(quad, ch)
                 counts = self.xhistograms.counts[quad][ch]
 
-                if hint:
-                    try:
-                        gain_guess, offset_guess = hint[quad].loc[ch][
-                            ["gain", "offset"]
-                        ]
-                    except KeyError:
-                        message = err.warn_missing_defcal(quad, ch)
-                        logging.warning(message)
-                        self._flag(quad, ch, "defcal")
-                        continue
-                else:
-                    gain_guess, offset_guess = None, None
-
+                # if hint:
+                #    try:
+                #        gain_guess, gain_err, offset_guess, offset_err = hint[quad].loc[ch][
+                #            ["gain", "gain_err", "offset", "offset_err",]
+                #        ]
+                #    except KeyError:
+                #        message = err.warn_missing_defcal(quad, ch)
+                #        logging.warning(message)
+                #        self._flag(quad, ch, "defcal")
+                #        continue
+                # else:
+                #    gain_guess, gain_err, offset_guess, offset_err = default_sdd_parameters(self.adcbitsize)
                 try:
-                    limits = find_xlimits(
+                    limits = find_peaks(
                         bins,
                         counts,
                         energies,
@@ -320,24 +380,24 @@ class Calibration:
                     logging.warning(message)
                     self._flag(quad, ch, "xpeak")
                     continue
-
-                try:
-                    intervals, fit_results = self._fit_radsources_peaks(
-                        bins,
-                        counts,
-                        limits,
-                        constrains,
-                    )
-                except err.FailedFitError:
-                    meassage = err.warn_failed_peak_fit(quad, ch)
-                    logging.warning(meassage)
-                    self._flag(quad, ch, "xfit")
-                    continue
-
-                int_inf, int_sup = zip(*intervals)
-                results.setdefault(quad, {})[ch] = np.column_stack(
-                    (*fit_results, int_inf, int_sup)
-                ).flatten()
+                #
+                # try:
+                #     intervals, fit_results = self._fit_radsources_peaks(
+                #         bins,
+                #         counts,
+                #         energies,
+                #         peaks_guess,
+                #     )
+                # except err.FailedFitError:
+                #     meassage = err.warn_failed_peak_fit(quad, ch)
+                #     logging.warning(meassage)
+                #     self._flag(quad, ch, "xfit")
+                #     continue
+                #
+                # int_inf, int_sup = zip(*intervals)
+                # results.setdefault(quad, {})[ch] = np.column_stack(
+                #     (*fit_results, int_inf, int_sup)
+                # ).flatten()
         return results, radiation_sources
 
     @as_fit_dataframe
@@ -548,7 +608,7 @@ class Calibration:
         centers_comp = self.sfit[quad].loc[companion][:, "center"].values
         electron_err_cell = electron_error(centers_cell, *cell_cal)
         electron_err_companion = electron_error(centers_comp, *comp_cal)
-        electron_err_sum = np.sqrt(electron_err_cell**2 + electron_err_companion**2)
+        electron_err_sum = np.sqrt(electron_err_cell ** 2 + electron_err_companion ** 2)
         fit_error = self.efit[quad].loc[cell][:, "center_err"].values
         error = (electron_err_sum + fit_error) / energies
         return error
@@ -597,18 +657,18 @@ class Calibration:
                         self.sdd_cal[quad].loc[companion][["gain", "offset"]].values
                     )
                     centers_electrons_comp = (
-                        (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
+                            (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
                     )
 
                     effs = (
-                        lo
-                        * centers_electrons
-                        / (centers_electrons + centers_electrons_comp)
+                            lo
+                            * centers_electrons
+                            / (centers_electrons + centers_electrons_comp)
                     )
                     eff_errs = (
-                        lo_err
-                        * centers_electrons
-                        / (centers_electrons + centers_electrons_comp)
+                            lo_err
+                            * centers_electrons
+                            / (centers_electrons + centers_electrons_comp)
                     )
                     eff, eff_err = self._deal_with_multiple_gamma_decays(effs, eff_errs)
                     results.setdefault(quad, {})[ch] = np.array((eff, eff_err))
@@ -627,10 +687,10 @@ class Calibration:
         )
 
         errors = np.sqrt(
-            lo_err**2 * (centers / (centers + centers_companion)) ** 2
-            + centers_err**2
+            lo_err ** 2 * (centers / (centers + centers_companion)) ** 2
+            + centers_err ** 2
             * (lo * centers_companion / (centers + centers_companion) ** 2) ** 2
-            + centers_companion_err**2
+            + centers_companion_err ** 2
             * (lo * centers / (centers + centers_companion) ** 2) ** 2
         )
         return errors
@@ -638,7 +698,7 @@ class Calibration:
     @staticmethod
     def _deal_with_multiple_gamma_decays(light_outs, light_outs_errs):
         mean_lout = light_outs.mean()
-        mean_lout_err = np.sqrt(np.sum(light_outs_errs**2)) / len(light_outs_errs)
+        mean_lout_err = np.sqrt(np.sum(light_outs_errs ** 2)) / len(light_outs_errs)
         return mean_lout, mean_lout_err
 
 
@@ -682,7 +742,7 @@ def _peak_fitter(x, y, limits):
     start, stop = limits
     x_start = np.where(x >= start)[0][0]
     x_stop = np.where(x < stop)[0][-1]
-    x_fit = (x[x_start : x_stop + 1][1:] + x[x_start : x_stop + 1][:-1]) / 2
+    x_fit = (x[x_start: x_stop + 1][1:] + x[x_start: x_stop + 1][:-1]) / 2
     y_fit = y[x_start:x_stop]
     errors = np.clip(np.sqrt(y_fit), 1, None)
 
@@ -704,16 +764,16 @@ def _peak_fitter(x, y, limits):
 
 
 def electron_error(
-    adc,
-    gain,
-    gain_err,
-    offset,
-    offset_err,
+        adc,
+        gain,
+        gain_err,
+        offset,
+        offset_err,
 ):
     error = (
-        np.sqrt(
-            +((offset_err / gain) ** 2) + ((adc - offset) / gain**2) * (gain_err**2)
-        )
-        / PHOTOEL_PER_KEV
+            np.sqrt(
+                +((offset_err / gain) ** 2) + ((adc - offset) / gain ** 2) * (gain_err ** 2)
+            )
+            / PHOTOEL_PER_KEV
     )
     return error

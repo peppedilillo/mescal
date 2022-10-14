@@ -111,23 +111,23 @@ def run(args):
             channels,
             scintillator_couples,
             radsources,
-            args.model,
-            args.temperature,
-            console,
-            systhreads,
+            detector_model=args.model,
+            temperature=args.temperature,
+            console=console,
+            nthreads=systhreads,
         )
         eventlist = calibrated(data)
 
-    with console.status("Processing results.."):
-        process_results(calibrated, eventlist, args.filepath, args.fmt, console)
-
-    if any(calibrated.flagged):
-        warn_about_flagged(calibrated.flagged, channels, console)
-
-    if args.all:
-        everything_else(options, console)
-    else:
-        anything_else(options, console)
+    # with console.status("Processing results.."):
+    #     process_results(calibrated, eventlist, args.filepath, args.fmt, console)
+    #
+    # if any(calibrated.flagged):
+    #     warn_about_flagged(calibrated.flagged, channels, console)
+    #
+    # if args.all:
+    #     everything_else(options, console)
+    # else:
+    #     anything_else(options, console)
 
     goodbye = interface.shutdown(console)
 

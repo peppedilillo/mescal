@@ -279,6 +279,7 @@ if __name__ == "__main__":
         last_time += times[-1]
     dataframe = dataframe_from_table0d5(np.vstack(tables))
     save_to_fits(dataframe, args.outfile)
+    print("Done!")
 
     #table = np.vstack([
     #    table0d5_from_wftable(
