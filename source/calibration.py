@@ -14,7 +14,7 @@ import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
 from source.eventlist import electrons_to_energy, make_electron_list
 from source.inventory import fetch_default_sdd_calibration
-from source.peakfind import find_peaks
+from source.peakdetection import find_xpeaks
 
 # from source.speaks import _estimate_peaks_from_guess, SPEAKS_DETECTION_PARAMETERS, EPEAKS_DETECTION_PARAMETERS
 # from source.xpeaks import find_xlimits
@@ -349,7 +349,7 @@ class Calibration:
         results = {}
         for quad in self.channels.keys():
             for ch in self.channels[quad]:
-                print(quad, ch)
+                print("\n--------\n", quad, ch)
                 counts = self.xhistograms.counts[quad][ch]
 
                 # if hint:
@@ -365,7 +365,7 @@ class Calibration:
                 # else:
                 #    gain_guess, gain_err, offset_guess, offset_err = default_sdd_parameters(self.adcbitsize)
                 try:
-                    limits = find_peaks(
+                    limits = find_xpeaks(
                         bins,
                         counts,
                         energies,

@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib;
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
 
 MINSTAT = 200
 SMOOTHING = 5
@@ -54,7 +55,6 @@ def find_peaks(bins, counts, energies, gain_guess, offset_guess):
     pdfranking = np.argsort(np.argsort(logpdfs))
     print("logpdfs: ", logpdfs)
 
-    from sklearn.linear_model import LinearRegression
     model = LinearRegression(fit_intercept=True)
     linscores = []
     params = []
