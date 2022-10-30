@@ -2,8 +2,6 @@ from math import ceil
 from pathlib import Path
 import argparse
 
-import matplotlib; matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
 import astropy.io.fits as fitsio
 import numpy as np
 import pandas as pd
@@ -194,17 +192,7 @@ def transform_table(big_table):
         big_table_idCHNs_sortedADCs, sorting_by_idCHNs, axis=1,
     )
     big_table_sortedADCs = np.take_along_axis(
-        big_table_sortedADCs, sorting_by_idCHNs, axis=1,
-    )
-
-    output = (
-        np.dstack([big_table_idCHNs_sortedADCs, big_table_sortedADCs])
-        .reshape(len(big_table), 12)
-        .astype("int")
-    )
-    return output
-
-
+\
 def table0d5_from_wftable(quadid, times, big_table):
     # evtids = np.argwhere(~np.isnan(big_table))[:,0]
     nmults = np.sum(~np.isnan(big_table), axis=1)

@@ -108,7 +108,7 @@ def linrange(start, stop, step):
     return bins
 
 
-def find_adc_bins(data, adcbitsize, maxmargin=10, roundto=100, clipquant=0.995):
+def find_adc_bins(data, adcbitsize, maxmargin=10, roundto=500, clipquant=0.996):
     """
     find binning for adc data, euristic.
     not intended to use for binning scintillator electrons data.
@@ -121,10 +121,12 @@ def find_adc_bins(data, adcbitsize, maxmargin=10, roundto=100, clipquant=0.995):
     Returns: a numpy array
 
     """
-    # remove eventual zeros
-    lo = data[data > 0].min()
+    # _remove eventual zeros
+    min = data.min()
+    clipped_data = data[data > min + maxmargin]
+    lo = clipped_data.quantile(1 - clipquant)
     lo = floor(lo / roundto) * roundto
-    # remove saturated data
+    # _remove saturated data
     max = data.max()
     clipped_data = data[data < max - maxmargin]
     hi = clipped_data.quantile(clipquant)
@@ -165,9 +167,9 @@ class Calibration:
     light_out_guess = (20.0, 30.0)
     sdd_guess_12bitadc = {
         'gain_center': 15,
-        'gain_sigma': 5,
+        'gain_sigma': 3,
         'offset_center': 1100,
-        'offset_sigma': 50,
+        'offset_sigma': 200,
     }
     sdd_guess_16bitadc = {
         'gain_center': 170,
@@ -218,7 +220,7 @@ class Calibration:
         self.sbins = bins
         self.xhistograms = self._make_xhistograms(data)
         self.shistograms = self._make_shistograms(data)
-        lost_events = len(data['ADC']) - sum(data['ADC'] < bins[-1])
+        lost_events = len(data['ADC']) - sum((data['ADC'] < bins[-1]) & (data['ADC'] >= bins[0]))
         self._print(":white_check_mark: Binned data. Lost {:.2f}% dataset."
                     .format(100 * lost_events / len(data['ADC'])))
         if not self._xradsources():
