@@ -15,8 +15,7 @@ from source.constants import PHOTOEL_PER_KEV
 from source.eventlist import electrons_to_energy, make_electron_list
 from source.inventory import fetch_default_sdd_calibration
 from source.peakdetection import find_xpeaks
-
-# from source.speaks import _estimate_peaks_from_guess, SPEAKS_DETECTION_PARAMETERS, EPEAKS_DETECTION_PARAMETERS
+from source.speaks import _estimate_peaks_from_guess, SPEAKS_DETECTION_PARAMETERS, EPEAKS_DETECTION_PARAMETERS
 # from source.xpeaks import find_xlimits
 
 FIT_PARAMS = [
@@ -163,7 +162,6 @@ def infer_adc_bitsize(data):
 
 
 class Calibration:
-    ebins = linrange(1000, 25000, 50)
     light_out_guess = (20.0, 30.0)
     sdd_guess_12bitadc = {
         'gain_center': 15,
@@ -226,30 +224,31 @@ class Calibration:
         if not self._xradsources():
             return
         self.xfit = self._fit_xradsources()
-        # self.sdd_cal = self._calibrate_sdds()
-        # self._print(":white_check_mark: Analyzed X events.")
-        #
-        # if not self._sradsources():
-        #     return
-        # self.sfit = self._fit_sradsources()
-        # electron_evlist = make_electron_list(
-        #     data,
-        #     self.sdd_cal,
-        #     self.sfit,
-        #     self.couples,
-        #     self.nthreads,
-        # )
-        # self.ehistograms = self._make_ehistograms(electron_evlist)
-        # self.efit = self._fit_gamma_electrons()
-        # self.scint_cal = self._calibrate_scintillators()
-        # self.optical_coupling = self._compute_effective_light_outputs()
-        # self._print(":white_check_mark: Analyzed gamma events.")
-        #
-        # if not self.scint_cal:
-        #     return
-        # eventlist = electrons_to_energy(electron_evlist, self.scint_cal, self.couples)
-        #
-        # return eventlist
+        self.sdd_cal = self._calibrate_sdds()
+        self._print(":white_check_mark: Analyzed X events.")
+
+        if not self._sradsources():
+            return
+        self.sfit = self._fit_sradsources()
+        electron_evlist = make_electron_list(
+            data,
+            self.sdd_cal,
+            self.sfit,
+            self.couples,
+            self.nthreads,
+        )
+        self.ebins = linrange(1000, 25000, 50)
+        self.ehistograms = self._make_ehistograms(electron_evlist)
+        self.efit = self._fit_gamma_electrons()
+        self.scint_cal = self._calibrate_scintillators()
+        self.optical_coupling = self._compute_effective_light_outputs()
+        self._print(":white_check_mark: Analyzed gamma events.")
+
+        if not self.scint_cal:
+            return
+        eventlist = electrons_to_energy(electron_evlist, self.scint_cal, self.couples)
+
+        return eventlist
 
     def _print(self, message):
         if self.console:
@@ -337,7 +336,7 @@ class Calibration:
         bins = self.xhistograms.bins
         radiation_sources = self._xradsources()
         energies = [s.energy for s in radiation_sources.values()]
-        constrains = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
+        constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
         # TODO still don't like how we deal with hints
         # try:
         #     hint = self._fetch_hint()
@@ -349,7 +348,6 @@ class Calibration:
         results = {}
         for quad in self.channels.keys():
             for ch in self.channels[quad]:
-                print("\n--------\n", quad, ch)
                 counts = self.xhistograms.counts[quad][ch]
 
                 # if hint:
@@ -382,24 +380,25 @@ class Calibration:
                     logging.warning(message)
                     self._flag(quad, ch, "xpeak")
                     continue
-                #
-                # try:
-                #     intervals, fit_results = self._fit_radsources_peaks(
-                #         bins,
-                #         counts,
-                #         energies,
-                #         peaks_guess,
-                #     )
-                # except err.FailedFitError:
-                #     meassage = err.warn_failed_peak_fit(quad, ch)
-                #     logging.warning(meassage)
-                #     self._flag(quad, ch, "xfit")
-                #     continue
-                #
-                # int_inf, int_sup = zip(*intervals)
-                # results.setdefault(quad, {})[ch] = np.column_stack(
-                #     (*fit_results, int_inf, int_sup)
-                # ).flatten()
+
+                try:
+                    # fits to gaussians
+                    intervals, fit_results = self._fit_radsources_peaks(
+                        bins,
+                        counts,
+                        limits,
+                        constraints,
+                    )
+                except err.FailedFitError:
+                    meassage = err.warn_failed_peak_fit(quad, ch)
+                    logging.warning(meassage)
+                    self._flag(quad, ch, "xfit")
+                    continue
+
+                int_inf, int_sup = zip(*intervals)
+                results.setdefault(quad, {})[ch] = np.column_stack(
+                    (*fit_results, int_inf, int_sup)
+                ).flatten()
         return results, radiation_sources
 
     @as_fit_dataframe
@@ -507,10 +506,10 @@ class Calibration:
         return results, radiation_sources
 
     @staticmethod
-    def _fit_radsources_peaks(x, y, limits, constrains):
+    def _fit_radsources_peaks(x, y, limits, constraints):
         centers, _, fwhms, _, *_ = _fit_peaks(x, y, limits)
         sigmas = fwhms / 2.35
-        lower, upper = zip(*constrains)
+        lower, upper = zip(*constraints)
         intervals = [*zip(centers + sigmas * lower, centers + sigmas * upper)]
         fit_results = _fit_peaks(x, y, intervals)
         return intervals, fit_results

@@ -43,11 +43,14 @@ def find_xpeaks(bins, counts, energies, gain_guess, offset_guess):
     peaks, peaks_props = peaks_with_enough_stat(counts, MINCOUNTS, initial_search_pars)
 
     # crash and burn if not enough peaks.
-    # avoid calculations if peak number is right already.
     if len(peaks) < len(energies):
         raise err.DetectPeakError("not enough peaks!")
+    # avoid calculations if peak number is right already.
     elif len(peaks) == len(energies):
-        return peaks
+        best_peaks, best_peaks_props = peaks, peaks_props
+        limits = [(bins[floor(lo)], bins[ceil(hi)])
+                  for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])]
+        return limits
 
     # if we have many candidates we consider all the peak combinations
     k = len(energies)
@@ -87,19 +90,10 @@ def find_xpeaks(bins, counts, energies, gain_guess, offset_guess):
     best_peaks_args = np.argwhere(np.isin(peaks, best_peaks)).T[0]
     best_peaks_props = {key: value[best_peaks_args]
                         for key, value in peaks_props.items()}
-    debug_helper(
-        bins,
-        counts,
-        peaks_combo,
-        ['pdf', 'linearity', 'prominence', 'baseline', 'width'],
-        [pdfscores_, linscores_, promscores_, blscores_, widthscores_],
-        [pdfranking, linranking, promranking, baseranking, widthranking],
-        winner,
-        best_peaks,
-        best_peaks_props,
-        peaks,
-        peaks_props)
-    return best_peaks
+
+    limits = [(bins[floor(lo)], bins[ceil(hi)])
+              for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])]
+    return limits
 
 
 def widthscores(peaks_combinations, peaks_combinations_widths):
