@@ -14,9 +14,8 @@ import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
 from source.eventlist import electrons_to_energy, make_electron_list
 from source.inventory import fetch_default_sdd_calibration
-from source.peakdetection import find_xpeaks
+from source.xpeaks import find_xpeaks
 from source.speaks import _estimate_peaks_from_guess, SPEAKS_DETECTION_PARAMETERS, EPEAKS_DETECTION_PARAMETERS
-# from source.xpeaks import find_xlimits
 
 FIT_PARAMS = [
     "center",
@@ -109,15 +108,17 @@ def linrange(start, stop, step):
 
 def find_adc_bins(data, adcbitsize, maxmargin=10, roundto=500, clipquant=0.996):
     """
-    find binning for adc data, euristic.
+    find good binning for adc data, euristic.
     not intended to use for binning scintillator electrons data.
-    Args:
-        maxmargin: ignores data larger than max - maxmargin
-        clipquant: ignore data above quantile (after max margin)
-        roundto: round to nearest
-        data: an array of int adc readings
 
-    Returns: a numpy array
+    Args:
+        data: array of int, adc readings
+        adcbitsize: int, adc conversiong word size in bit
+        maxmargin: int, ignores data larger than max - maxmargin
+        roundto: int, round to nearest
+        clipquant: float, ignore data above quantile
+
+    Returns:
 
     """
     # _remove eventual zeros
@@ -131,69 +132,33 @@ def find_adc_bins(data, adcbitsize, maxmargin=10, roundto=500, clipquant=0.996):
     hi = clipped_data.quantile(clipquant)
     hi = ceil(hi / roundto) * roundto
     # guess ADC bit resolution to set step
-    if adcbitsize <= 12:
+    if adcbitsize == 12:
         step = 1
-    elif adcbitsize <= 16:
+    elif adcbitsize == 16:
         step = 10
     else:
         raise ValueError("Can't find good binning. ADC values too high.")
+
     bins = linrange(lo, hi, step)
     return bins
 
 
-def infer_adc_bitsize(data):
-    """
-    A function that returns a guess on the ADC digitizer bit size.
-
-    Args:
-        data: an array of int ADC readings
-
-    Returns: an int
-
-    """
-    max = data.max()
-    if max <= 2 ** 12:
-        bitsize = 12
-    elif max <= 2 ** 16:
-        bitsize = 16
-    else:
-        raise ValueError("Can't find good binning. ADC values too high.")
-    return bitsize
-
-
 class Calibration:
-    light_out_guess = (20.0, 30.0)
-    sdd_guess_12bitadc = {
-        'gain_center': 15,
-        'gain_sigma': 3,
-        'offset_center': 1100,
-        'offset_sigma': 200,
-    }
-    sdd_guess_16bitadc = {
-        'gain_center': 170,
-        'gain_sigma': 30,
-        'offset_center': 15700,
-        'offset_sigma': 500,
-    }
-
     def __init__(
             self,
             channels,
             couples,
             radsources,
-            *,
-            adcbitsize=None,
-            detector_model=None,
-            temperature=None,
+            detector_model,
+            configuration,
             console=None,
             nthreads=1,
     ):
         self.radsources = radsources
         self.channels = channels
-        self.adcbitsize = adcbitsize
         self.couples = couples
         self.model = detector_model
-        self.temperature = temperature
+        self.configuration = configuration
         self.xbins = None
         self.sbins = None
         self.ebins = None
@@ -211,9 +176,9 @@ class Calibration:
         self.nthreads = nthreads
 
     def __call__(self, data):
-        if not self.adcbitsize:
-            self.adcbitsize = infer_adc_bitsize(data['ADC'])
-        bins = find_adc_bins(data['ADC'], self.adcbitsize)
+        # prepare histograms for X and S events
+        bitsize = self.configuration["bitsize"]
+        bins = find_adc_bins(data['ADC'], bitsize)
         self.xbins = bins
         self.sbins = bins
         self.xhistograms = self._make_xhistograms(data)
@@ -221,15 +186,27 @@ class Calibration:
         lost_events = len(data['ADC']) - sum((data['ADC'] < bins[-1]) & (data['ADC'] >= bins[0]))
         self._print(":white_check_mark: Binned data. Lost {:.2f}% dataset."
                     .format(100 * lost_events / len(data['ADC'])))
+
+        # X calibration
         if not self._xradsources():
             return
-        self.xfit = self._fit_xradsources()
+        gain_center = self.configuration["gain_center"]
+        gain_sigma = self.configuration["gain_sigma"]
+        offset_center = self.configuration["offset_center"]
+        offset_sigma = self.configuration["offset_sigma"]
+        gain_guess = (gain_center, gain_sigma) # peak detection prior estimate
+        offset_guess = (offset_center, offset_sigma) # peak detection prior estimate
+        self.xfit = self._fit_xradsources(gain_guess, offset_guess)
         self.sdd_cal = self._calibrate_sdds()
         self._print(":white_check_mark: Analyzed X events.")
 
+        # S calibration
         if not self._sradsources():
             return
-        self.sfit = self._fit_sradsources()
+        lightout_center = self.configuration["lightout_center"]
+        lightout_sigma = self.configuration["lightout_sigma"]
+        lightout_guess = (lightout_center, lightout_sigma)
+        self.sfit = self._fit_sradsources(lightout_guess)
         electron_evlist = make_electron_list(
             data,
             self.sdd_cal,
@@ -239,7 +216,7 @@ class Calibration:
         )
         self.ebins = linrange(1000, 25000, 50)
         self.ehistograms = self._make_ehistograms(electron_evlist)
-        self.efit = self._fit_gamma_electrons()
+        self.efit = self._fit_gamma_electrons(lightout_guess)
         self.scint_cal = self._calibrate_scintillators()
         self.optical_coupling = self._compute_effective_light_outputs()
         self._print(":white_check_mark: Analyzed gamma events.")
@@ -266,14 +243,6 @@ class Calibration:
 
     def _flag(self, quad, chn, flag):
         self.flagged.setdefault(flag, []).append((quad, chn))
-
-    def _fetch_hint(self):
-        hint, key = fetch_default_sdd_calibration(
-            self.model,
-            self.temperature,
-        )
-        self._print(":open_book: Loaded detection hints for {}@{}°C.".format(*key))
-        return hint
 
     def _make_xhistograms(self, data):
         value = "ADC"
@@ -311,57 +280,18 @@ class Calibration:
         )
         return histograms
 
-    def guess_params(self):
-        if self.adcbitsize == 12:
-            gain_center_guess   = self.sdd_guess_12bitadc['gain_center']
-            gain_sigma_guess    = self.sdd_guess_12bitadc['gain_sigma']
-            offset_center_guess = self.sdd_guess_12bitadc['offset_center']
-            offset_sigma_guess  = self.sdd_guess_12bitadc['offset_sigma']
-
-        elif self.adcbitsize == 16:
-            gain_center_guess   = self.sdd_guess_16bitadc['gain_center']
-            gain_sigma_guess    = self.sdd_guess_16bitadc['gain_sigma']
-            offset_center_guess = self.sdd_guess_16bitadc['offset_center']
-            offset_sigma_guess  = self.sdd_guess_16bitadc['offset_sigma']
-
-        else:
-            raise ValueError("Bad adcbitsize value.")
-
-        gain = (gain_center_guess, gain_sigma_guess)
-        offset = (offset_center_guess, offset_sigma_guess)
-        return gain, offset
-
     @as_fit_dataframe
-    def _fit_xradsources(self):
+    def _fit_xradsources(self, gain_guess, offset_guess):
         bins = self.xhistograms.bins
         radiation_sources = self._xradsources()
         energies = [s.energy for s in radiation_sources.values()]
         constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
-        # TODO still don't like how we deal with hints
-        # try:
-        #     hint = self._fetch_hint()
-        # except err.DetectorModelNotFound:
-        #     self.console.log(":question_mark: Cannot find calibration hints for {}.".format(self.model))
-        #     hint = None
 
-        gain_guess, offset_guess = self.guess_params()
         results = {}
         for quad in self.channels.keys():
             for ch in self.channels[quad]:
                 counts = self.xhistograms.counts[quad][ch]
 
-                # if hint:
-                #    try:
-                #        gain_guess, gain_err, offset_guess, offset_err = hint[quad].loc[ch][
-                #            ["gain", "gain_err", "offset", "offset_err",]
-                #        ]
-                #    except KeyError:
-                #        message = err.warn_missing_defcal(quad, ch)
-                #        logging.warning(message)
-                #        self._flag(quad, ch, "defcal")
-                #        continue
-                # else:
-                #    gain_guess, gain_err, offset_guess, offset_err = default_sdd_parameters(self.adcbitsize)
                 try:
                     limits = find_xpeaks(
                         bins,
@@ -375,15 +305,10 @@ class Calibration:
                     logging.warning(message)
                     self._flag(quad, ch, "xpeak")
                     continue
-                except err.DefaultCalibNotFoundError as e:
-                    message = err.warn_missing_defcal(quad, ch)
-                    logging.warning(message)
-                    self._flag(quad, ch, "xpeak")
-                    continue
 
                 try:
                     # fits to gaussians
-                    intervals, fit_results = self._fit_radsources_peaks(
+                    intervals, fit_results = self._fit_gaussian_to_peaks(
                         bins,
                         counts,
                         limits,
@@ -402,11 +327,13 @@ class Calibration:
         return results, radiation_sources
 
     @as_fit_dataframe
-    def _fit_sradsources(self):
+    def _fit_sradsources(self,lightout_guess):
         bins = self.shistograms.bins
         radiation_sources = self._sradsources()
         energies = [s.energy for s in radiation_sources.values()]
         constrains = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
+        center, sigma = lightout_guess
+        lightout_lims = center + sigma, center - sigma
 
         results = {}
         for quad in self.sdd_cal.keys():
@@ -418,7 +345,7 @@ class Calibration:
                 guesses = [
                     [
                         (0.5 * lout_lim) * PHOTOEL_PER_KEV * lv * gain + offset
-                        for lout_lim in self.light_out_guess
+                        for lout_lim in lightout_lims
                     ]
                     for lv in energies
                 ]
@@ -428,7 +355,7 @@ class Calibration:
                         bins,
                         counts,
                         guess=guesses,
-                        find_peaks_params=SPEAKS_DETECTION_PARAMETERS
+                        find_peaks_params=SPEAKS_DETECTION_PARAMETERS,
                     )
                 except err.DetectPeakError:
                     message = err.warn_failed_peak_detection(quad, ch)
@@ -437,7 +364,7 @@ class Calibration:
                     continue
 
                 try:
-                    intervals, fit_results = self._fit_radsources_peaks(
+                    intervals, fit_results = self._fit_gaussian_to_peaks(
                         bins,
                         counts,
                         limits,
@@ -456,14 +383,14 @@ class Calibration:
         return results, radiation_sources
 
     @as_fit_dataframe
-    def _fit_gamma_electrons(self):
+    def _fit_gamma_electrons(self, lightout_guess):
         bins = self.ehistograms.bins
         radiation_sources = self._sradsources()
         energies = [s.energy for s in radiation_sources.values()]
         constrains = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
-        guesses = [
-            [lout_lim * lv for lout_lim in self.light_out_guess] for lv in energies
-        ]
+        center, sigma = lightout_guess
+        lightout_lims = center - sigma, center + sigma
+        guesses = [[lo * lv for lo in lightout_lims] for lv in energies]
 
         results = {}
         for quad in self.sfit.keys():
@@ -487,7 +414,7 @@ class Calibration:
                     continue
 
                 try:
-                    intervals, fit_results = self._fit_radsources_peaks(
+                    intervals, fit_results = self._fit_gaussian_to_peaks(
                         bins,
                         counts,
                         limits,
@@ -506,7 +433,7 @@ class Calibration:
         return results, radiation_sources
 
     @staticmethod
-    def _fit_radsources_peaks(x, y, limits, constraints):
+    def _fit_gaussian_to_peaks(x, y, limits, constraints):
         centers, _, fwhms, _, *_ = _fit_peaks(x, y, limits)
         sigmas = fwhms / 2.35
         lower, upper = zip(*constraints)

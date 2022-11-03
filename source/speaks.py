@@ -46,9 +46,6 @@ def _closest_peaks(guess, bins, peaks, peaks_infos):
 
 
 def _estimate_peaks_from_guess(bins, counts, guess, find_peaks_params=None):
-    if find_peaks_params is None:
-        find_peaks_params = PEAKS_DETECTION_PARAMETERS
-
     mm = move_mean(counts, SMOOTHING)
     many_peaks, many_peaks_info = find_peaks(mm, **find_peaks_params)
     if len(many_peaks) >= len(guess):

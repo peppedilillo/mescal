@@ -1,6 +1,7 @@
 import argparse
 import atexit
 import logging
+import configparser
 from collections import namedtuple
 from os import cpu_count
 from pathlib import Path
@@ -57,6 +58,15 @@ parser.add_argument(
     "filepath",
     help="input acquisition file in standard 0.5 fits format.",
 )
+
+parser.add_argument(
+    "--configuration",
+    choices=["default", "CAEN-DT5740"],
+    default="default",
+    help="select which configuration to use."
+    "default is designed for the integrated PL",
+)
+
 parser.add_argument(
     "--cache",
     default=False,
@@ -70,23 +80,7 @@ parser.add_argument(
     "supported formats: xslx, csv, fits. "
     "defaults to xslx.",
 )
-peak_hints_args = parser.add_argument_group(
-    "detection hints",
-    "to obtain more accurate peak detections a temperature "
-    "and a detector model arguments can be specified. "
-    "calibrate.py will search through a collection "
-    "of established results to get hints "
-    "on where to look for a peak. ",
-)
-peak_hints_args.add_argument(
-    "--temperature",
-    "--temp",
-    "--t",
-    type=float,
-    help="acquisition temperature in celsius degree. "
-    "requires the use of the --model argument",
-)
-peak_hints_args.add_argument(
+parser.add_argument(
     "--all",
     default=False,
     action="store_true",
@@ -96,6 +90,7 @@ peak_hints_args.add_argument(
 
 def run(args):
     console = interface.hello()
+    config_dict = unpack_configuration(args.configuration)
 
     with console.status("Initializing.."):
         data = get_from(args.filepath, console, use_cache=args.cache)
@@ -112,7 +107,7 @@ def run(args):
             scintillator_couples,
             radsources,
             detector_model=args.model,
-            temperature=args.temperature,
+            configuration=config_dict,
             console=console,
             nthreads=systhreads,
         )
@@ -160,6 +155,23 @@ def parse_args():
             "a model argument must be specified too "
         )
     return args
+
+
+def unpack_configuration(section):
+    config = configparser.ConfigParser()
+    config.read("./source/config.ini")
+    items = config[section]
+
+    out = {
+        "bitsize": items.getint("bitsize"),
+        "gain_center": items.getfloat("gain_center"),
+        "gain_sigma": items.getfloat("gain_sigma"),
+        "offset_center": items.getfloat("offset_center"),
+        "offset_sigma": items.getfloat("offset_sigma"),
+        "lightout_center": items.getfloat("lightout_center"),
+        "lightout_sigma": items.getfloat("lightout_sigma")
+    }
+    return out
 
 
 def get_from(fitspath: Path, console, use_cache=True):
@@ -233,12 +245,12 @@ def anything_else(options, console):
     while True:
         answer = interface.prompt_user_about(options)
         if answer is terminate_mescal:
-            console.print(terminate_mescal.reply)
+            print(terminate_mescal.reply)
             break
         else:
             with console.status("Working.."):
                 if fulfill(answer.promise):
-                    console.log(answer.reply)
+                    console.print(answer.reply)
                 else:
                     console.print("[red]We already did that..")
     interface.print_rule(console)
@@ -256,6 +268,7 @@ def everything_else(options, console):
     return True
 
 
+# boring stuff hereafter
 # noinspection PyTypeChecker
 def process_results(calibration, eventlist, filepath, output_format, console):
     xhistograms = calibration.xhistograms
@@ -408,7 +421,6 @@ def _draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads):
     )
 
 
-
 def _draw_and_save_lins(sdds_calibration, xfit_results, xradsources, path, nthreads):
     return option(
         display="Save X linearity plots.",
@@ -470,7 +482,7 @@ def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
 
 def _write_sfit_report(fit_results, path):
     return option(
-        display="Saved S fit results.",
+        display="Save S fit results.",
         reply=":sparkles: Saved gamma fit table. :sparkles:",
         promise=promise(
             lambda: write_report_to_excel(
