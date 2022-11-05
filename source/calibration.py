@@ -308,7 +308,7 @@ class Calibration:
 
                 try:
                     # fits to gaussians
-                    intervals, fit_results = self._fit_gaussian_to_peaks(
+                    intervals, fit_results = self._fit_gaussians_to_peaks(
                         bins,
                         counts,
                         limits,
@@ -331,7 +331,7 @@ class Calibration:
         bins = self.shistograms.bins
         radiation_sources = self._sradsources()
         energies = [s.energy for s in radiation_sources.values()]
-        constrains = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
+        constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
         center, sigma = lightout_guess
         lightout_lims = center + sigma, center - sigma
 
@@ -364,11 +364,11 @@ class Calibration:
                     continue
 
                 try:
-                    intervals, fit_results = self._fit_gaussian_to_peaks(
+                    intervals, fit_results = self._fit_gaussians_to_peaks(
                         bins,
                         counts,
                         limits,
-                        constrains,
+                        constraints,
                     )
                 except err.FailedFitError:
                     message = err.warn_failed_peak_fit(quad, ch)
@@ -387,7 +387,7 @@ class Calibration:
         bins = self.ehistograms.bins
         radiation_sources = self._sradsources()
         energies = [s.energy for s in radiation_sources.values()]
-        constrains = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
+        constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
         center, sigma = lightout_guess
         lightout_lims = center - sigma, center + sigma
         guesses = [[lo * lv for lo in lightout_lims] for lv in energies]
@@ -414,11 +414,11 @@ class Calibration:
                     continue
 
                 try:
-                    intervals, fit_results = self._fit_gaussian_to_peaks(
+                    intervals, fit_results = self._fit_gaussians_to_peaks(
                         bins,
                         counts,
                         limits,
-                        constrains,
+                        constraints,
                     )
                 except err.FailedFitError:
                     message = err.warn_failed_peak_fit(quad, scint)
@@ -433,7 +433,7 @@ class Calibration:
         return results, radiation_sources
 
     @staticmethod
-    def _fit_gaussian_to_peaks(x, y, limits, constraints):
+    def _fit_gaussians_to_peaks(x, y, limits, constraints):
         centers, _, fwhms, _, *_ = _fit_peaks(x, y, limits)
         sigmas = fwhms / 2.35
         lower, upper = zip(*constraints)

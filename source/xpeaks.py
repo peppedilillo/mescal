@@ -9,12 +9,13 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 
 import source.errors as err
+
 matplotlib.use("TkAgg")
 
 
 def find_xpeaks(bins, counts, energies, gain_guess, offset_guess, mincounts=200, width=5, distance=5, smoothing=5):
     """
-    given an histogram of channel counts, a list of energies
+    given a histogram of channel counts, a list of energies
     and a prior on the expected gain and offset parameters
     returns guesses on the respective spectral line positions.
 
@@ -176,7 +177,7 @@ def find_baseline(counts):
     return baseline
 
 
-def peaks_with_enough_stat(counts, mincounts, pars, smoothing=1, maxdepth = 20):
+def peaks_with_enough_stat(counts, mincounts, pars, smoothing=1, maxdepth=20):
     """
     Iterates scipy.signal.find_peaks() over counts
     until all peaks spans more than mincounts.
@@ -189,25 +190,24 @@ def peaks_with_enough_stat(counts, mincounts, pars, smoothing=1, maxdepth = 20):
         pars: dict, initial peak search parameters
         smoothing: int, window length for SMA smoothing
 
-    Returns:
+    Returns: peaks and peaks properties
 
     """
     smooth_counts = moving_average(counts, smoothing)
-    candidate_peaks, candidate_peaks_properties = scipy.signal.find_peaks(smooth_counts, **pars)
+    peaks, peaks_props = scipy.signal.find_peaks(smooth_counts, **pars)
     for i in range(maxdepth):
         pars["prominence"] = pars["prominence"] / 2
-        candidate_peaks, candidate_peaks_properties = scipy.signal.find_peaks(smooth_counts, **pars)
-        if not enough_statistics(mincounts, counts, candidate_peaks, candidate_peaks_properties):
+        peaks, peaks_props = scipy.signal.find_peaks(smooth_counts, **pars)
+        if not enough_statistics(mincounts, counts, peaks, peaks_props):
             # print("stopped at prominence {}".format(pars["prominence"]))
             break
     if i == maxdepth - 1:
         raise TimeoutError("reached max depth looking for peaks")
-    if candidate_peaks.any():
-        # print("candidate peaks: {} peaks".format(len(candidate_peaks)))
-        candidate_peaks, candidate_peaks_properties = remove_small_peaks(mincounts, counts, candidate_peaks,
-                                                                         candidate_peaks_properties)
-        # print("after small peaks filter: {} peaks".format(len(candidate_peaks)))
-    return candidate_peaks, candidate_peaks_properties
+    if peaks.any():
+        # print("candidate peaks: {} peaks".format(len(peaks)))
+        peaks, peaks_props = remove_small_peaks(mincounts, counts, peaks, peaks_props)
+        # print("after small peaks filter: {} peaks".format(len(peaks)))
+    return peaks, peaks_props
 
 
 def moving_average(arr, wlen):
@@ -297,7 +297,7 @@ def spans_counts(counts, parg, peaks, peaks_properties):
 def _remove(parg, peaks, peaks_properties):
     """
     remove elements from peaks and peaks_properties
-    see see scipy.signal.find_peaks() for more
+    see scipy.signal.find_peaks() for more
     info on peaks and peaks_properties.
 
     Args:
