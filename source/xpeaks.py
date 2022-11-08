@@ -13,7 +13,17 @@ import source.errors as err
 matplotlib.use("TkAgg")
 
 
-def find_xpeaks(bins, counts, energies, gain_guess, offset_guess, mincounts=200, width=5, distance=5, smoothing=5):
+def find_xpeaks(
+    bins,
+    counts,
+    energies,
+    gain_guess,
+    offset_guess,
+    mincounts=200,
+    width=5,
+    distance=5,
+    smoothing=5,
+):
     """
     given a histogram of channel counts, a list of energies
     and a prior on the expected gain and offset parameters
@@ -33,14 +43,16 @@ def find_xpeaks(bins, counts, energies, gain_guess, offset_guess, mincounts=200,
 
     """
     initial_search_pars = {
-        'prominence': sum(counts),
-        'width': width,
-        'distance': distance,
+        "prominence": sum(counts),
+        "width": width,
+        "distance": distance,
     }
 
     # look over the smoothed channel histogram counts for
     # peaks larger than a minimum.
-    peaks, peaks_props = peaks_with_enough_stat(counts, mincounts, initial_search_pars, smoothing=smoothing)
+    peaks, peaks_props = peaks_with_enough_stat(
+        counts, mincounts, initial_search_pars, smoothing=smoothing
+    )
 
     # crash and burn if not enough peaks.
     if len(peaks) < len(energies):
@@ -48,8 +60,12 @@ def find_xpeaks(bins, counts, energies, gain_guess, offset_guess, mincounts=200,
     # avoid calculations if peak number is right already.
     elif len(peaks) == len(energies):
         best_peaks, best_peaks_props = peaks, peaks_props
-        limits = [(bins[floor(lo)], bins[ceil(hi)])
-                  for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])]
+        limits = [
+            (bins[floor(lo)], bins[ceil(hi)])
+            for lo, hi in zip(
+                best_peaks_props["left_ips"], best_peaks_props["right_ips"]
+            )
+        ]
         return limits
 
     # if we have many candidates we consider all the peak combinations
@@ -88,11 +104,14 @@ def find_xpeaks(bins, counts, energies, gain_guess, offset_guess, mincounts=200,
 
     best_peaks = peaks_combo[winner]
     best_peaks_args = np.argwhere(np.isin(peaks, best_peaks)).T[0]
-    best_peaks_props = {key: value[best_peaks_args]
-                        for key, value in peaks_props.items()}
+    best_peaks_props = {
+        key: value[best_peaks_args] for key, value in peaks_props.items()
+    }
 
-    limits = [(bins[floor(lo)], bins[ceil(hi)])
-              for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])]
+    limits = [
+        (bins[floor(lo)], bins[ceil(hi)])
+        for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])
+    ]
     return limits
 
 
@@ -102,7 +121,7 @@ def widthscores(peaks_combinations, peaks_combinations_widths):
     """
     scores = []
     for peaks, widths in zip(peaks_combinations, peaks_combinations_widths):
-        scores.append(- np.std(widths) / np.mean(widths))
+        scores.append(-np.std(widths) / np.mean(widths))
     return scores
 
 
@@ -111,8 +130,10 @@ def baselinescores(bins, counts, fitpars_combinations, thr_energy=2.0):
     evaluates threshold energy given fit parameters of peak combinations.
     """
     baseline = find_baseline(counts)
-    scores = [-((bins[baseline] - offset) / gain - thr_energy) ** 2
-              for offset, gain in fitpars_combinations]
+    scores = [
+        -(((bins[baseline] - offset) / gain - thr_energy) ** 2)
+        for offset, gain in fitpars_combinations
+    ]
     return scores
 
 
@@ -157,9 +178,16 @@ def pdfscores(bins, peaks_combinations, energies, gain_guess, offset_guess):
     gain_center, gain_sigma = gain_guess
     offset_center, offset_sigma = offset_guess
     mus = [gain_center * energy + offset_center for energy in energies]
-    covmat = [[gain_sigma ** 2 * energyi * energyj + offset_sigma ** 2
-               for energyj in energies] for energyi in energies]
-    scores = scipy.stats.multivariate_normal(mean=mus, cov=covmat, allow_singular=True).logpdf(bins[peaks_combinations])
+    covmat = [
+        [
+            gain_sigma**2 * energyi * energyj + offset_sigma**2
+            for energyj in energies
+        ]
+        for energyi in energies
+    ]
+    scores = scipy.stats.multivariate_normal(
+        mean=mus, cov=covmat, allow_singular=True
+    ).logpdf(bins[peaks_combinations])
     return scores
 
 
@@ -315,8 +343,19 @@ def _remove(parg, peaks, peaks_properties):
     return peaks, properties
 
 
-def debug_helper(bins, counts, peaks_combo, labels, scores, rankings, winner, winpeaks, winpeaks_props, peaks,
-                 peaks_props):
+def debug_helper(
+    bins,
+    counts,
+    peaks_combo,
+    labels,
+    scores,
+    rankings,
+    winner,
+    winpeaks,
+    winpeaks_props,
+    peaks,
+    peaks_props,
+):
     """
     for debuggin purpose
 
@@ -345,7 +384,9 @@ def debug_helper(bins, counts, peaks_combo, labels, scores, rankings, winner, wi
     baseline = np.argwhere((counts[1:] != 0) & (counts[:-1] != 0))[0][0]
     plt.axvline(bins[baseline])
     for peak, lo, hi in zip(peaks, peaks_props["left_ips"], peaks_props["right_ips"]):
-        plt.axvspan(bins[int(lo)], bins[int(hi)], alpha=0.2, color='grey')
-    for peak, lo, hi in zip(winpeaks, winpeaks_props["left_ips"], winpeaks_props["right_ips"]):
-        plt.axvspan(bins[int(lo)], bins[int(hi)], alpha=0.2, color='red')
+        plt.axvspan(bins[int(lo)], bins[int(hi)], alpha=0.2, color="grey")
+    for peak, lo, hi in zip(
+        winpeaks, winpeaks_props["left_ips"], winpeaks_props["right_ips"]
+    ):
+        plt.axvspan(bins[int(lo)], bins[int(hi)], alpha=0.2, color="red")
     plt.show()

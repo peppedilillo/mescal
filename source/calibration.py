@@ -1,6 +1,6 @@
 import logging
 from collections import namedtuple
-from math import floor, ceil, sqrt
+from math import floor, ceil
 
 import numpy as np
 import pandas as pd
@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
 from source.eventlist import electrons_to_energy, make_electron_list
-from source.inventory import fetch_default_sdd_calibration
 from source.xpeaks import find_xpeaks
-from source.speaks import _estimate_peaks_from_guess, SPEAKS_DETECTION_PARAMETERS, EPEAKS_DETECTION_PARAMETERS
+from source.speaks import find_speaks, find_epeaks
+
 
 FIT_PARAMS = [
     "center",
@@ -327,13 +327,11 @@ class Calibration:
         return results, radiation_sources
 
     @as_fit_dataframe
-    def _fit_sradsources(self,lightout_guess):
+    def _fit_sradsources(self, lightout_guess):
         bins = self.shistograms.bins
         radiation_sources = self._sradsources()
         energies = [s.energy for s in radiation_sources.values()]
         constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
-        center, sigma = lightout_guess
-        lightout_lims = center + sigma, center - sigma
 
         results = {}
         for quad in self.sdd_cal.keys():
@@ -342,20 +340,14 @@ class Calibration:
                 gain = self.sdd_cal[quad].loc[ch]["gain"]
                 offset = self.sdd_cal[quad].loc[ch]["offset"]
 
-                guesses = [
-                    [
-                        (0.5 * lout_lim) * PHOTOEL_PER_KEV * lv * gain + offset
-                        for lout_lim in lightout_lims
-                    ]
-                    for lv in energies
-                ]
-
                 try:
-                    limits = _estimate_peaks_from_guess(
+                    limits = find_speaks(
                         bins,
                         counts,
-                        guess=guesses,
-                        find_peaks_params=SPEAKS_DETECTION_PARAMETERS,
+                        energies,
+                        gain,
+                        offset,
+                        lightout_guess,
                     )
                 except err.DetectPeakError:
                     message = err.warn_failed_peak_detection(quad, ch)
@@ -388,9 +380,6 @@ class Calibration:
         radiation_sources = self._sradsources()
         energies = [s.energy for s in radiation_sources.values()]
         constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
-        center, sigma = lightout_guess
-        lightout_lims = center - sigma, center + sigma
-        guesses = [[lo * lv for lo in lightout_lims] for lv in energies]
 
         results = {}
         for quad in self.sfit.keys():
@@ -398,14 +387,14 @@ class Calibration:
                 if ch not in self.couples[quad].keys():
                     continue
                 scint = ch
-
                 counts = self.ehistograms.counts[quad][scint]
+
                 try:
-                    limits = _estimate_peaks_from_guess(
+                    limits = find_epeaks(
                         bins,
                         counts,
-                        guess=guesses,
-                        find_peaks_params=EPEAKS_DETECTION_PARAMETERS
+                        energies,
+                        lightout_guess,
                     )
                 except err.DetectPeakError:
                     message = err.warn_failed_peak_detection(quad, scint)
