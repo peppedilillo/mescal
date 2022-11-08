@@ -43,7 +43,7 @@ def find_xpeaks(
 
     """
     initial_search_pars = {
-        "prominence": sum(counts),
+        "prominence": max(counts),
         "width": width,
         "distance": distance,
     }
