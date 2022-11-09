@@ -5,6 +5,7 @@ from rich.console import Console
 from rich.prompt import IntPrompt
 from rich.table import Table
 from rich.text import Text
+from rich.rule import Rule
 
 from source.upaths import LOGOPATH
 
@@ -31,7 +32,7 @@ def hello():
             justify="center",
         )
         sleep(0.1)
-    print_rule(console, hdr_text)
+    sections_rule(console, hdr_text)
     return console
 
 
@@ -70,8 +71,12 @@ def prompt_user_about(options):
     return options[n]
 
 
-def print_rule(console, *args, **kwargs):
+def sections_rule(console, *args, **kwargs):
     sleep(0.2)
     console.print()
     console.rule(*args, **kwargs)
     console.print()
+
+
+def rule(console, width, *args, **kwargs):
+    console.print(Rule(*args, **kwargs), width=width)

@@ -194,6 +194,7 @@ class Calibration:
         self.sdd_cal = {}
         self.scint_cal = {}
         self.optical_coupling = {}
+        self.eventlist = None
         self.flagged = {}
         self.console = console
         self.nthreads = nthreads
@@ -216,7 +217,7 @@ class Calibration:
         )
 
         # X calibration
-        if not self._xradsources():
+        if not self.xradsources():
             return
         gain_center = self.configuration["gain_center"]
         gain_sigma = self.configuration["gain_sigma"]
@@ -233,7 +234,7 @@ class Calibration:
         self._print(":white_check_mark: Analyzed X events.")
 
         # S calibration
-        if not self._sradsources():
+        if not self.sradsources():
             return
         lightout_center = self.configuration["lightout_center"]
         lightout_sigma = self.configuration["lightout_sigma"]
@@ -253,11 +254,11 @@ class Calibration:
 
         if not self.scint_cal:
             return
-        eventlist = electrons_to_energy(
+        self.eventlist = electrons_to_energy(
             electron_evlist, self.scint_cal, self.couples
         )
 
-        return eventlist
+        return self.eventlist
 
     def _print(self, message):
         if self.console:
@@ -265,11 +266,11 @@ class Calibration:
         else:
             print(message)
 
-    def _xradsources(self):
+    def xradsources(self):
         xradsources, _ = self.radsources
         return xradsources
 
-    def _sradsources(self):
+    def sradsources(self):
         _, sradsources = self.radsources
         return sradsources
 
@@ -343,7 +344,7 @@ class Calibration:
     @as_peaks_dataframe
     def _detect_xpeaks(self, gain_guess, offset_guess):
         bins = self.xhistograms.bins
-        radiation_sources = self._xradsources()
+        radiation_sources = self.xradsources()
         energies = [s.energy for s in radiation_sources.values()]
 
         results = {}
@@ -370,7 +371,7 @@ class Calibration:
     @as_fit_dataframe
     def _fit_xradsources(self):
         bins = self.xhistograms.bins
-        radiation_sources = self._xradsources()
+        radiation_sources = self.xradsources()
         constraints = [
             (s.low_lim, s.hi_lim) for s in radiation_sources.values()
         ]
@@ -401,7 +402,7 @@ class Calibration:
     @as_peaks_dataframe
     def _detect_speaks(self, lightout_guess):
         bins = self.shistograms.bins
-        radiation_sources = self._sradsources()
+        radiation_sources = self.sradsources()
         energies = [s.energy for s in radiation_sources.values()]
 
         results = {}
@@ -435,7 +436,7 @@ class Calibration:
     @as_fit_dataframe
     def _fit_sradsources(self):
         bins = self.shistograms.bins
-        radiation_sources = self._sradsources()
+        radiation_sources = self.sradsources()
         constraints = [
             (s.low_lim, s.hi_lim) for s in radiation_sources.values()
         ]
@@ -467,7 +468,7 @@ class Calibration:
     @as_peaks_dataframe
     def _detect_epeaks(self, lightout_guess):
         bins = self.ehistograms.bins
-        radiation_sources = self._sradsources()
+        radiation_sources = self.sradsources()
         energies = [s.energy for s in radiation_sources.values()]
 
         results = {}
@@ -498,7 +499,7 @@ class Calibration:
     @as_fit_dataframe
     def _fit_gamma_electrons(self):
         bins = self.ehistograms.bins
-        radiation_sources = self._sradsources()
+        radiation_sources = self.sradsources()
         constraints = [
             (s.low_lim, s.hi_lim) for s in radiation_sources.values()
         ]
@@ -534,7 +535,7 @@ class Calibration:
     @as_cal_dataframe
     def _calibrate_sdds(self):
         fits = self.xfit
-        energies = [s.energy for s in self._xradsources().values()]
+        energies = [s.energy for s in self.xradsources().values()]
 
         results = {}
         for quad in fits.keys():
@@ -557,7 +558,7 @@ class Calibration:
 
     @as_slo_dataframe
     def _calibrate_scintillators(self):
-        radiation_sources = self._sradsources()
+        radiation_sources = self.sradsources()
         energies = [s.energy for s in radiation_sources.values()]
 
         results = {}

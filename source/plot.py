@@ -123,7 +123,7 @@ def draw_and_save_channels_sspectra(
     return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_slo.keys())
 
 
-def draw_and_save_spectrum(
+def draw_and_save_calibrated_spectra(
     calibrated_events, xradsources: dict, sradsources: dict, xpath, spath
 ):
     draw_and_save_xspectrum(calibrated_events, xradsources, xpath)

@@ -30,7 +30,7 @@ from source.plot import (
     draw_and_save_lins,
     draw_and_save_qlooks,
     draw_and_save_slo,
-    draw_and_save_spectrum,
+    draw_and_save_calibrated_spectra,
     draw_and_save_uncalibrated
 )
 
@@ -208,7 +208,7 @@ def preprocess(data, detector_couples, console):
 
 
 def warn_about_flagged(flagged, channels, console):
-    interface.print_rule(console, "[bold italic]Warning", style="red", align="center")
+    interface.sections_rule(console, "[bold italic]Warning", style="red", align="center")
 
     num_flagged = len(set([item for sublist in flagged.values() for item in sublist]))
     num_channels = len([item for sublist in channels.values() for item in sublist])
@@ -240,7 +240,7 @@ options = [terminate_mescal]
 
 
 def anything_else(options, console):
-    interface.print_rule(console, "[italic]Optional Outputs", align="center")
+    interface.sections_rule(console, "[italic]Optional Outputs", align="center")
     console.print(interface.options_message(options))
     while True:
         answer = interface.prompt_user_about(options)
@@ -253,18 +253,18 @@ def anything_else(options, console):
                     console.print(answer.reply)
                 else:
                     console.print("[red]We already did that..")
-    interface.print_rule(console)
+    interface.sections_rule(console)
     return True
 
 
 def everything_else(options, console):
-    interface.print_rule(console, "[italic]Optional Outputs", align="center")
+    interface.sections_rule(console, "[italic]Optional Outputs", align="center")
     for task in options:
         with console.status("Working.."):
             if task is not terminate_mescal:
                 fulfill(task.promise)
                 console.log(task.reply)
-    interface.print_rule(console)
+    interface.sections_rule(console)
     return True
 
 
@@ -273,8 +273,8 @@ def everything_else(options, console):
 def process_results(calibration, eventlist, filepath, output_format, console):
     xhistograms = calibration.xhistograms
     shistograms = calibration.shistograms
-    xradsources = calibration._xradsources()
-    sradsources = calibration._sradsources()
+    xradsources = calibration.xradsources()
+    sradsources = calibration.sradsources()
     xfit_results = calibration.xfit
     sfit_results = calibration.sfit
     sdd_calibration = calibration.sdd_cal
@@ -553,7 +553,7 @@ def _draw_and_save_spectra(eventlist, xradsources, sradsources, xpath, spath):
         display="Save calibrated spectra.",
         reply=":sparkles: Saved spectra plot. :sparkles:",
         promise=promise(
-            lambda: draw_and_save_spectrum(
+            lambda: draw_and_save_calibrated_spectra(
                 eventlist,
                 xradsources,
                 sradsources,
