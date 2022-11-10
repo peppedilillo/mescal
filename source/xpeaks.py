@@ -42,6 +42,8 @@ def find_xpeaks(
     Returns: array of 2-tuples, peaks guess limits indeces.
 
     """
+    assert len(energies) > 1
+
     initial_search_pars = {
         "prominence": max(counts),
         "width": width,

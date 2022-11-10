@@ -335,11 +335,11 @@ class Cmd:
     def print_topics(self, header, cmds):
         if cmds:
             self.console.print("\n%s"%str(header))
-            columns = int(self.console.width/2)
+            columns = len(self.doc_header)
             if self.ruler:
                 interface.rule(self.console, width=columns)
                 #self.console.print("%s"%str(self.ruler * columns))
-            self.columnize(cmds, columns - 1)
+            self.columnize(cmds, columns)
 
     def columnize(self, list, displaywidth=80):
         """Display a list of strings as a compact set of columns.
@@ -391,10 +391,21 @@ class Cmd:
                     x = ""
                 else:
                     x = list[i]
-                texts.append(x)
+                    texts.append(x)
             while texts and not texts[-1]:
                 del texts[-1]
             for col in range(len(texts)):
                 texts[col] = texts[col].ljust(colwidths[col])
+            # markup in red unavailable commands
+            for i, x in enumerate(texts):
+                if not self.can(x):
+                    texts[i] = "[red]" + x +'[/]'
             self.console.print("%s"%str("  ".join(texts)))
         self.console.print()
+
+    def can(self, x):
+        if 'can_' + x not in dir(self.__class__):
+            return True
+        else:
+            func = getattr(self, 'can_' + x)
+            return func()

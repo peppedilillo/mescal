@@ -14,6 +14,10 @@ class DefaultCalibNotFoundError(Exception):
     """An error when missing default calibration."""
 
 
+class FewLinesError(Exception):
+    """Badly constrained sources to fit."""
+
+
 class DetectPeakError(Exception):
     """An error while finding peaks."""
 

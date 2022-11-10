@@ -51,7 +51,7 @@ def draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads=1):
     )
 
 
-def draw_and_save_diagns(histograms, res_fit, path, nthreads=1):
+def draw_and_save_diagns(histograms, res_fit, path, margin=500, nthreads=1):
     def helper(quad):
         for ch in res_fit[quad].index:
             fig, ax = _diagnostics(
@@ -65,6 +65,7 @@ def draw_and_save_diagns(histograms, res_fit, path, nthreads=1):
                 .loc[:, ["lim_low", "lim_high"]]
                 .values.reshape(2, -1)
                 .T,
+                margin = margin,
                 figsize=(9, 4.5),
                 dpi=150,
             )
@@ -216,9 +217,9 @@ normal = (
 )
 
 
-def _diagnostics(bins, counts, centers, amps, fwhms, limits, **kwargs):
+def _diagnostics(bins, counts, centers, amps, fwhms, limits, margin=500, **kwargs):
     low_lims, high_lims = [*zip(*limits)]
-    min_xlim, max_xlim = min(low_lims) - 500, max(high_lims) + 500
+    min_xlim, max_xlim = min(low_lims) - margin, max(high_lims) + margin
     start = np.where(bins >= min_xlim)[0][0]
     stop = np.where(bins < max_xlim)[0][-1]
     min_ylim, max_ylim = 0, max(counts[start:stop]) * 1.1
