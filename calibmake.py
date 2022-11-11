@@ -423,7 +423,7 @@ def process_results(calibration, eventlist, filepath, output_format, console):
         write_report(
             calibration.en_res, path=paths.RESREPORT(filepath),
         )
-        console.log(":blue_book: Wrote SDD calibration results.")
+        console.log(":blue_book: Wrote energy resolution results.")
         draw_and_save_qlooks(
             calibration.sdd_cal, path=paths.QLKPLOT(filepath), nthreads=systhreads,
         )

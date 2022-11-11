@@ -305,7 +305,7 @@ def _linearity(
         fmt="o",
         capsize=5,
     )
-    axs[0].set_ylabel("Measured Energy [keV]")
+    axs[0].set_ylabel("ADC")
     axs[1].set_ylabel("Residual [%]")
     axs[2].set_ylabel("Prediction error [%]")
     axs[2].set_xlabel("Energy [keV]")
@@ -313,19 +313,20 @@ def _linearity(
 
 
 def _quicklook(calres, **kwargs):
-    gainpercs = np.percentile(calres["gain"], [30, 70])
-    offsetpercs = np.percentile(calres["offset"], [30, 70])
+    percentiles = (25, 75)
+    gainpercs = np.percentile(calres["gain"], percentiles)
+    offsetpercs = np.percentile(calres["offset"], percentiles)
 
     fig, axs = plt.subplots(2, 1, sharex=True, **kwargs)
     axs[0].errorbar(calres.index, calres["gain"], yerr=calres["gain_err"], fmt="o")
-    axs[0].axhspan(*gainpercs, color="red", alpha=0.1, label="$30$-$70$ percentiles")
+    axs[0].axhspan(*gainpercs, color="red", alpha=0.1, label="${}$-${}$ percentiles".format(*percentiles),)
     for vg in gainpercs:
         axs[0].axhline(vg, color="r", lw=1)
     axs[0].set_ylabel("Gain")
     axs[0].set_xlim((0, 32))
     axs[0].legend()
 
-    axs[1].errorbar(calres.index, calres["offset"], yerr=calres["offset_err"], fmt="o")
+    axs[1].errorbar(calres.index, calres["offset"], yerr=calres["offset_err"], fmt="o",)
     axs[1].axhspan(*offsetpercs, color="red", alpha=0.1)
     for vo in offsetpercs:
         axs[1].axhline(vo, color="r", lw=1)
@@ -337,14 +338,16 @@ def _quicklook(calres, **kwargs):
 
 
 def _sloplot(res_slo, **kwargs):
+    percentiles = (25, 75)
+
     x = res_slo.index
     y = res_slo["light_out"]
     yerr = res_slo["light_out_err"]
-    ypercs = np.percentile(y, [30, 70])
+    ypercs = np.percentile(y, percentiles)
 
     fig, ax = plt.subplots(1, 1, **kwargs)
     ax.errorbar(x, y, yerr=yerr, fmt="o")
-    ax.axhspan(*ypercs, color="red", alpha=0.1, label="$30$-$70$ percentiles")
+    ax.axhspan(*ypercs, color="red", alpha=0.1, label="${}$-${}$ percentiles".format(*percentiles),)
     for vg in ypercs:
         ax.axhline(vg, color="r", lw=1)
     ax.set_xlabel("Channel")

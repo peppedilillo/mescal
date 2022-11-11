@@ -88,6 +88,23 @@ def as_fit_dataframe(f):
     return wrapper
 
 
+def as_enres_dataframe(f):
+    def wrapper(*args):
+        nested_dict, radsources = f(*args)
+        quadrants = nested_dict.keys()
+        index = pd.MultiIndex.from_product(
+            (radsources.keys(), RES_PARAMS), names=["source", "parameters"],
+        )
+
+        dict_of_dfs = {
+            q: pd.DataFrame(nested_dict[q], index=index, ).T.rename_axis("channel")
+            for q in quadrants
+        }
+        return dict_of_dfs
+
+    return wrapper
+
+
 def as_cal_dataframe(f):
     def wrapper(*args):
         nested_dict = f(*args)
@@ -109,23 +126,6 @@ def as_slo_dataframe(f):
 
         dict_of_dfs = {
             q: pd.DataFrame(nested_dict[q], index=LO_PARAMS, ).T.rename_axis("channel")
-            for q in quadrants
-        }
-        return dict_of_dfs
-
-    return wrapper
-
-
-def as_enres_dataframe(f):
-    def wrapper(*args):
-        nested_dict, radsources = f(*args)
-        quadrants = nested_dict.keys()
-        index = pd.MultiIndex.from_product(
-            (radsources.keys(), RES_PARAMS), names=["source", "parameters"],
-        )
-
-        dict_of_dfs = {
-            q: pd.DataFrame(nested_dict[q], index=index, ).T.rename_axis("channel")
             for q in quadrants
         }
         return dict_of_dfs
