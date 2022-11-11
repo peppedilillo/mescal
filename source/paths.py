@@ -107,6 +107,7 @@ LOGFILE = (lambda filepath: RESDIR(filepath).joinpath("log.txt"))
 XFTREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_xfit.xlsx"))
 SFTREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_sfit.xlsx"))
 CALREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_cal.xlsx"))
+RESREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_res.xlsx"))
 SLOREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_slo.xlsx"))
 
 XSPPLOT = (lambda filepath: PLTDIR(filepath).joinpath("spectrum_x.png"))

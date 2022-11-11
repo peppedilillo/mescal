@@ -359,7 +359,7 @@ def debug_helper(
     peaks_props,
 ):
     """
-    for debuggin purpose
+    for debugging purpose
 
     ex. call:
     debug_helper(

@@ -85,7 +85,7 @@ parser.add_argument(
 
 class MescalShell(cmd.Cmd):
     intro = (
-        "This is [bold purple]mescal[/] new shell. "
+        "This is [bold purple]mescal[/] shell. "
         "Type help or ? to list commands.\n"
     )
     prompt = "[mescal] "
@@ -420,7 +420,10 @@ def process_results(calibration, eventlist, filepath, output_format, console):
             calibration.sdd_cal, path=paths.CALREPORT(filepath),
         )
         console.log(":blue_book: Wrote SDD calibration results.")
-
+        write_report(
+            calibration.en_res, path=paths.RESREPORT(filepath),
+        )
+        console.log(":blue_book: Wrote SDD calibration results.")
         draw_and_save_qlooks(
             calibration.sdd_cal, path=paths.QLKPLOT(filepath), nthreads=systhreads,
         )
