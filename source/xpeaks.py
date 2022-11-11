@@ -182,7 +182,7 @@ def pdfscores(bins, peaks_combinations, energies, gain_guess, offset_guess):
     mus = [gain_center * energy + offset_center for energy in energies]
     covmat = [
         [
-            gain_sigma**2 * energyi * energyj + offset_sigma**2
+            gain_sigma ** 2 * energyi * energyj + offset_sigma ** 2
             for energyj in energies
         ]
         for energyi in energies

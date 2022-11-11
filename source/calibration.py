@@ -59,9 +59,7 @@ def as_peaks_dataframe(f):
         )
 
         dict_of_dfs = {
-            q: pd.DataFrame(nested_dict[q], index=index,).T.rename_axis(
-                "channel"
-            )
+            q: pd.DataFrame(nested_dict[q], index=index,).T.rename_axis("channel")
             for q in quadrants
         }
         return dict_of_dfs
@@ -78,9 +76,7 @@ def as_fit_dataframe(f):
         )
 
         dict_of_dfs = {
-            q: pd.DataFrame(nested_dict[q], index=index,).T.rename_axis(
-                "channel"
-            )
+            q: pd.DataFrame(nested_dict[q], index=index,).T.rename_axis("channel")
             for q in quadrants
         }
         return dict_of_dfs
@@ -94,9 +90,7 @@ def as_cal_dataframe(f):
         quadrants = nested_dict.keys()
 
         dict_of_dfs = {
-            q: pd.DataFrame(nested_dict[q], index=CAL_PARAMS,).T.rename_axis(
-                "channel"
-            )
+            q: pd.DataFrame(nested_dict[q], index=CAL_PARAMS,).T.rename_axis("channel")
             for q in quadrants
         }
         return dict_of_dfs
@@ -110,9 +104,7 @@ def as_slo_dataframe(f):
         quadrants = nested_dict.keys()
 
         dict_of_dfs = {
-            q: pd.DataFrame(nested_dict[q], index=LO_PARAMS,).T.rename_axis(
-                "channel"
-            )
+            q: pd.DataFrame(nested_dict[q], index=LO_PARAMS,).T.rename_axis("channel")
             for q in quadrants
         }
         return dict_of_dfs
@@ -127,9 +119,7 @@ def linrange(start, stop, step):
     return bins
 
 
-def find_adc_bins(
-    data, adcbitsize, maxmargin=10, roundto=500, clipquant=0.996
-):
+def find_adc_bins(data, adcbitsize, maxmargin=10, roundto=500, clipquant=0.996):
     """
     find good binning for adc data, euristic.
     not intended to use for binning scintillator electrons data.
@@ -217,7 +207,7 @@ class Calibration:
         )
 
         # X calibration
-        if not self.xradsources():
+        if len(self.xradsources()) < 2:
             return
         gain_center = self.configuration["gain_center"]
         gain_sigma = self.configuration["gain_sigma"]
@@ -318,27 +308,21 @@ class Calibration:
         value = "ADC"
         bins = self.xbins
         data = data[data["EVTYPE"] == "X"]
-        histograms = compute_histogram(
-            value, data, bins, nthreads=self.nthreads,
-        )
+        histograms = compute_histogram(value, data, bins, nthreads=self.nthreads,)
         return histograms
 
     def _make_shistograms(self, data):
         value = "ADC"
         bins = self.sbins
         data = data[data["EVTYPE"] == "S"]
-        histograms = compute_histogram(
-            value, data, bins, nthreads=self.nthreads,
-        )
+        histograms = compute_histogram(value, data, bins, nthreads=self.nthreads,)
         return histograms
 
     def _make_ehistograms(self, electron_evlist):
         value = "ELECTRONS"
         data = electron_evlist[electron_evlist["EVTYPE"] == "S"]
         bins = self.ebins
-        histograms = compute_histogram(
-            value, data, bins, nthreads=self.nthreads,
-        )
+        histograms = compute_histogram(value, data, bins, nthreads=self.nthreads,)
         return histograms
 
     @as_peaks_dataframe
@@ -363,26 +347,24 @@ class Calibration:
                     continue
 
                 inf, sup = zip(*limits)
-                results.setdefault(quad, {})[ch] = np.column_stack(
-                    (inf, sup)
-                ).flatten()
+                results.setdefault(quad, {})[ch] = np.column_stack((inf, sup)).flatten()
         return results, radiation_sources
 
     @as_fit_dataframe
     def _fit_xradsources(self):
         bins = self.xhistograms.bins
         radiation_sources = self.xradsources()
-        constraints = [
-            (s.low_lim, s.hi_lim) for s in radiation_sources.values()
-        ]
+        constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
 
         results = {}
         for quad in self.xpeaks.keys():
             for ch in self.xpeaks[quad].index:
                 row = self.xpeaks[quad].loc[ch]
                 counts = self.xhistograms.counts[quad][ch]
-                limits = [(row[source]["lim_low"], row[source]["lim_high"])
-                          for source in radiation_sources.keys()]
+                limits = [
+                    (row[source]["lim_low"], row[source]["lim_high"])
+                    for source in radiation_sources.keys()
+                ]
 
                 try:
                     intervals, fit_results = self._fit_gaussians_to_peaks(
@@ -428,26 +410,24 @@ class Calibration:
                     continue
 
                 inf, sup = zip(*limits)
-                results.setdefault(quad, {})[ch] = np.column_stack(
-                    (inf, sup)
-                ).flatten()
+                results.setdefault(quad, {})[ch] = np.column_stack((inf, sup)).flatten()
         return results, radiation_sources
 
     @as_fit_dataframe
     def _fit_sradsources(self):
         bins = self.shistograms.bins
         radiation_sources = self.sradsources()
-        constraints = [
-            (s.low_lim, s.hi_lim) for s in radiation_sources.values()
-        ]
+        constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
 
         results = {}
         for quad in self.speaks.keys():
             for ch in self.speaks[quad].index:
                 counts = self.shistograms.counts[quad][ch]
                 row = self.speaks[quad].loc[ch]
-                limits = [(row[source]["lim_low"], row[source]["lim_high"])
-                          for source in radiation_sources.keys()]
+                limits = [
+                    (row[source]["lim_low"], row[source]["lim_high"])
+                    for source in radiation_sources.keys()
+                ]
 
                 try:
                     intervals, fit_results = self._fit_gaussians_to_peaks(
@@ -481,9 +461,7 @@ class Calibration:
                 counts = self.ehistograms.counts[quad][scint]
 
                 try:
-                    limits = find_epeaks(
-                        bins, counts, energies, lightout_guess,
-                    )
+                    limits = find_epeaks(bins, counts, energies, lightout_guess,)
                 except err.DetectPeakError:
                     message = err.warn_peak_detection(quad, scint)
                     logging.warning(message)
@@ -500,9 +478,7 @@ class Calibration:
     def _fit_gamma_electrons(self):
         bins = self.ehistograms.bins
         radiation_sources = self.sradsources()
-        constraints = [
-            (s.low_lim, s.hi_lim) for s in radiation_sources.values()
-        ]
+        constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
 
         results = {}
         for quad in self.epeaks.keys():
@@ -513,8 +489,10 @@ class Calibration:
                 scint = ch
                 counts = self.ehistograms.counts[quad][scint]
                 row = self.epeaks[quad].loc[ch]
-                limits = [(row[source]["lim_low"], row[source]["lim_high"])
-                          for source in radiation_sources.keys()]
+                limits = [
+                    (row[source]["lim_low"], row[source]["lim_high"])
+                    for source in radiation_sources.keys()
+                ]
 
                 try:
                     intervals, fit_results = self._fit_gaussians_to_peaks(
@@ -544,9 +522,7 @@ class Calibration:
                 center_errs = fits[quad].loc[ch][:, "center_err"].values
 
                 try:
-                    cal_results = self._calibrate_chn(
-                        centers, energies, center_errs,
-                    )
+                    cal_results = self._calibrate_chn(centers, energies, center_errs,)
                 except err.FailedFitError:
                     message = err.warn_failed_linearity_fit(quad, ch)
                     logging.warning(message)
@@ -567,9 +543,7 @@ class Calibration:
                 los = self.efit[quad].loc[scint][:, "center"].values / energies
                 lo_errs = self._scintillator_lout_error(quad, scint, energies)
 
-                lo, lo_err = self._deal_with_multiple_gamma_decays(
-                    los, lo_errs
-                )
+                lo, lo_err = self._deal_with_multiple_gamma_decays(los, lo_errs)
                 results.setdefault(quad, {})[scint] = np.array((lo, lo_err))
         return results
 
@@ -581,7 +555,6 @@ class Calibration:
         intervals = [*zip(centers + sigmas * lower, centers + sigmas * upper)]
         fit_results = _fit_peaks(x, y, intervals)
         return intervals, fit_results
-
 
     @staticmethod
     def _calibrate_chn(centers, radsources: list, weights=None):
@@ -617,9 +590,7 @@ class Calibration:
         centers_comp = self.sfit[quad].loc[companion][:, "center"].values
         electron_err_cell = electron_error(centers_cell, *cell_cal)
         electron_err_companion = electron_error(centers_comp, *comp_cal)
-        electron_err_sum = np.sqrt(
-            electron_err_cell ** 2 + electron_err_companion ** 2
-        )
+        electron_err_sum = np.sqrt(electron_err_cell ** 2 + electron_err_companion ** 2)
         fit_error = self.efit[quad].loc[cell][:, "center_err"].values
         error = (electron_err_sum + fit_error) / energies
         return error
@@ -647,25 +618,17 @@ class Calibration:
 
                 else:
                     centers = self.sfit[quad].loc[ch][:, "center"].values
-                    gain, offset = (
-                        self.sdd_cal[quad].loc[ch][["gain", "offset"]].values
-                    )
-                    centers_electrons = (
-                        (centers - offset) / gain / PHOTOEL_PER_KEV
-                    )
+                    gain, offset = self.sdd_cal[quad].loc[ch][["gain", "offset"]].values
+                    centers_electrons = (centers - offset) / gain / PHOTOEL_PER_KEV
 
                     centers_companion = (
                         self.sfit[quad].loc[companion][:, "center"].values
                     )
                     gain_comp, offset_comp = (
-                        self.sdd_cal[quad]
-                        .loc[companion][["gain", "offset"]]
-                        .values
+                        self.sdd_cal[quad].loc[companion][["gain", "offset"]].values
                     )
                     centers_electrons_comp = (
-                        (centers_companion - offset_comp)
-                        / gain_comp
-                        / PHOTOEL_PER_KEV
+                        (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
                     )
 
                     effs = (
@@ -678,9 +641,7 @@ class Calibration:
                         * centers_electrons
                         / (centers_electrons + centers_electrons_comp)
                     )
-                    eff, eff_err = self._deal_with_multiple_gamma_decays(
-                        effs, eff_errs
-                    )
+                    eff, eff_err = self._deal_with_multiple_gamma_decays(effs, eff_errs)
                     results.setdefault(quad, {})[ch] = np.array((eff, eff_err))
         return results
 
@@ -691,9 +652,7 @@ class Calibration:
         lo_err = self.scint_cal[quad].loc[scint]["light_out_err"]
         centers = self.sfit[quad].loc[ch][:, "center"].to_numpy()
         centers_err = self.sfit[quad].loc[ch][:, "center_err"].to_numpy()
-        centers_companion = (
-            self.sfit[quad].loc[companion][:, "center"].to_numpy()
-        )
+        centers_companion = self.sfit[quad].loc[companion][:, "center"].to_numpy()
         centers_companion_err = (
             self.sfit[quad].loc[companion][:, "center_err"].to_numpy()
         )
@@ -701,8 +660,7 @@ class Calibration:
         errors = np.sqrt(
             lo_err ** 2 * (centers / (centers + centers_companion)) ** 2
             + centers_err ** 2
-            * (lo * centers_companion / (centers + centers_companion) ** 2)
-            ** 2
+            * (lo * centers_companion / (centers + centers_companion) ** 2) ** 2
             + centers_companion_err ** 2
             * (lo * centers / (centers + centers_companion) ** 2) ** 2
         )
@@ -711,9 +669,7 @@ class Calibration:
     @staticmethod
     def _deal_with_multiple_gamma_decays(light_outs, light_outs_errs):
         mean_lout = light_outs.mean()
-        mean_lout_err = np.sqrt(np.sum(light_outs_errs ** 2)) / len(
-            light_outs_errs
-        )
+        mean_lout_err = np.sqrt(np.sum(light_outs_errs ** 2)) / len(light_outs_errs)
         return mean_lout, mean_lout_err
 
 
@@ -727,9 +683,7 @@ def compute_histogram(value, data, bins, nthreads=1):
             hist_quads[ch] = ys
         return quad, hist_quads
 
-    results = Parallel(n_jobs=nthreads)(
-        delayed(helper)(quad) for quad in "ABCD"
-    )
+    results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in "ABCD")
     counts = {key: value for key, value in results}
     return histogram(bins, counts)
 
@@ -745,9 +699,7 @@ def _fit_peaks(x, y, limits):
 
     for i in range(n_peaks):
         lowlim, hilim = limits[i]
-        result, start, stop, x_fine, fitting_curve = _peak_fitter(
-            x, y, (lowlim, hilim)
-        )
+        result, start, stop, x_fine, fitting_curve = _peak_fitter(x, y, (lowlim, hilim))
         centers[i] = result.params["center"].value
         center_errs[i] = result.params["center"].stderr
         fwhms[i] = result.params["fwhm"].value
@@ -769,9 +721,9 @@ def _peak_fitter(x, y, limits):
     errors = np.clip(np.sqrt(y_fit), 1, None)
 
     mod = GaussianModel()
-    mod.set_param_hint('center', min=start, max=stop)
-    mod.set_param_hint('height', value=max(y_fit))
-    mod.set_param_hint('sigma', max=stop-start)
+    mod.set_param_hint("center", min=start, max=stop)
+    mod.set_param_hint("height", value=max(y_fit))
+    mod.set_param_hint("sigma", max=stop - start)
     pars = mod.guess(y_fit, x=x_fit)
     try:
         result = mod.fit(y_fit, pars, x=x_fit, weights=1 / errors)
@@ -793,8 +745,7 @@ def electron_error(
 ):
     error = (
         np.sqrt(
-            +((offset_err / gain) ** 2)
-            + ((adc - offset) / gain ** 2) * (gain_err ** 2)
+            +((offset_err / gain) ** 2) + ((adc - offset) / gain ** 2) * (gain_err ** 2)
         )
         / PHOTOEL_PER_KEV
     )

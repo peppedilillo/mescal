@@ -5,12 +5,13 @@ import configparser
 import sys
 from collections import namedtuple
 from os import cpu_count
+from time import sleep
 from pathlib import Path
 import cmd
 import pandas as pd
 
 from source import cmd
-from source import interface, upaths
+from source import interface, paths
 from source.calibration import Calibration
 from source.eventlist import (
     add_evtype_tag,
@@ -47,18 +48,16 @@ parser = argparse.ArgumentParser(description=description)
 parser.add_argument(
     "model",
     choices=["fm1", "pfm", "fm2"],
-    help="hermes flight model to calibrate. "
-         "supported models: fm1, pfm, fm2.",
+    help="hermes flight model to calibrate. " "supported models: fm1, pfm, fm2.",
 )
 parser.add_argument(
     "radsources",
     help="radioactive sources used for calibration. "
-         "separated by comma, e.g. `Fe,Cd,Cs`."
-         "currently supported sources: Fe, Cd, Am, Cs.",
+    "separated by comma, e.g. `Fe,Cd,Cs`."
+    "currently supported sources: Fe, Cd, Am, Cs.",
 )
 parser.add_argument(
-    "filepath",
-    help="input acquisition file in standard 0.5 fits format.",
+    "filepath", help="input acquisition file in standard 0.5 fits format.",
 )
 
 parser.add_argument(
@@ -66,7 +65,7 @@ parser.add_argument(
     choices=["default", "CAEN-DT5740"],
     default="default",
     help="select which configuration to use."
-         "default is designed for the integrated PL",
+    "default is designed for the integrated PL",
 )
 
 parser.add_argument(
@@ -79,8 +78,8 @@ parser.add_argument(
     "--fmt",
     default="xslx",
     help="set output format for calibration tables. "
-         "supported formats: xslx, csv, fits. "
-         "defaults to xslx.",
+    "supported formats: xslx, csv, fits. "
+    "defaults to xslx.",
 )
 
 
@@ -109,7 +108,7 @@ class MescalShell(cmd.Cmd):
             draw_and_save_uncalibrated(
                 self.calibration.xhistograms,
                 self.calibration.shistograms,
-                upaths.UNCPLOT(self.filename),
+                paths.UNCPLOT(self.filename),
                 self.threads,
             )
 
@@ -127,7 +126,7 @@ class MescalShell(cmd.Cmd):
             draw_and_save_diagns(
                 self.calibration.xhistograms,
                 self.calibration.xfit,
-                upaths.XDNPLOT(self.filename),
+                paths.XDNPLOT(self.filename),
                 self.config["margin_diag_plot"],
                 self.threads,
             )
@@ -144,8 +143,7 @@ class MescalShell(cmd.Cmd):
             return False
         with self.console.status(self.spinner_message):
             write_report_to_excel(
-                self.calibration.xfit,
-                upaths.XFTREPORT(self.filename),
+                self.calibration.xfit, paths.XFTREPORT(self.filename),
             )
 
     def can_save_xspectra_plots(self):
@@ -163,7 +161,7 @@ class MescalShell(cmd.Cmd):
                 self.calibration.xhistograms,
                 self.calibration.sdd_cal,
                 self.calibration.xradsources(),
-                upaths.XCSPLOT(self.filename),
+                paths.XCSPLOT(self.filename),
                 self.threads,
             )
 
@@ -182,7 +180,7 @@ class MescalShell(cmd.Cmd):
                 self.calibration.sdd_cal,
                 self.calibration.xfit,
                 self.calibration.xradsources(),
-                upaths.LINPLOT(self.filename),
+                paths.LINPLOT(self.filename),
                 self.threads,
             )
 
@@ -200,7 +198,7 @@ class MescalShell(cmd.Cmd):
             draw_and_save_diagns(
                 self.calibration.shistograms,
                 self.calibration.sfit,
-                upaths.SDNPLOT(self.filename),
+                paths.SDNPLOT(self.filename),
                 self.config["margin_diag_plot"],
                 self.threads,
             )
@@ -217,8 +215,7 @@ class MescalShell(cmd.Cmd):
             return False
         with self.console.status(self.spinner_message):
             write_report_to_excel(
-                self.calibration.sfit,
-                upaths.SFTREPORT(self.filename),
+                self.calibration.sfit, paths.SFTREPORT(self.filename),
             )
 
     def can_save_sspectra_plots(self):
@@ -237,7 +234,7 @@ class MescalShell(cmd.Cmd):
                 self.calibration.sdd_cal,
                 self.calibration.optical_coupling,
                 self.calibration.sradsources(),
-                upaths.SCSPLOT(self.filename),
+                paths.SCSPLOT(self.filename),
                 self.threads,
             )
 
@@ -253,20 +250,20 @@ class MescalShell(cmd.Cmd):
             return False
         with self.console.status(self.spinner_message):
             write_eventlist_to_fits(
-                self.calibration.eventlist,
-                upaths.EVLFITS(self.filename),
+                self.calibration.eventlist, paths.EVLFITS(self.filename),
             )
 
     def do_all(self, arg):
         """Executes every executable command."""
-        cmds = [cmd[4:] for cmd in dir(self.__class__) if cmd[:4] == 'can_']
+        cmds = [cmd[4:] for cmd in dir(self.__class__) if cmd[:4] == "can_"]
         for cmd in cmds:
             if self.can(cmd):
-                do = getattr(self, 'do_' + cmd)
-                do('')
+                do = getattr(self, "do_" + cmd)
+                do("")
 
     def do_quit(self, arg):
         """Quit mescal."""
+        self.console.print("Ciao! :wave:\n")
         return True
 
 
@@ -274,6 +271,7 @@ def run(args):
     console = interface.hello()
     config_dict = unpack_configuration(args.configuration)
 
+    sections_rule(console, "[bold italic]Calibration log", style="green")
     with console.status("Initializing.."):
         data = get_from(args.filepath, console, use_cache=args.cache)
         radsources = radsources_dicts(args.radsources)
@@ -296,19 +294,23 @@ def run(args):
         eventlist = calibrated(data)
 
     with console.status("Processing results.."):
-        process_results(
-            calibrated, eventlist, args.filepath, args.fmt, console
-        )
+        process_results(calibrated, eventlist, args.filepath, args.fmt, console)
 
     if any(calibrated.flagged):
+        sections_rule(console, "[bold italic]Warning", style="red")
         warn_about_flagged(calibrated.flagged, channels, console)
 
+    sections_rule(console, "[bold italic]Shell", style="green")
     shell = MescalShell(console, args.filepath, config_dict, calibrated, systhreads)
     shell.cmdloop()
-
-    goodbye = interface.shutdown(console)
-
     return True
+
+
+def sections_rule(console, *args, **kwargs):
+    sleep(0.2)
+    console.print()
+    console.rule(*args, **kwargs)
+    console.print()
 
 
 def start_log(filepath):
@@ -317,7 +319,7 @@ def start_log(filepath):
         filemode="w",
         level=logging.INFO,
         format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
-               "%(levelname)s: %(message)s",
+        "%(levelname)s: %(message)s",
     )
     return True
 
@@ -352,19 +354,17 @@ def unpack_configuration(section):
         "offset_sigma": items.getfloat("offset_sigma"),
         "lightout_center": items.getfloat("lightout_center"),
         "lightout_sigma": items.getfloat("lightout_sigma"),
-        "margin_diag_plot": items.getint("margin_diag_plot")
+        "margin_diag_plot": items.getint("margin_diag_plot"),
     }
     return out
 
 
 def get_from(fitspath: Path, console, use_cache=True):
     console.log(":question_mark: Looking for data..")
-    cached = upaths.CACHEDIR().joinpath(fitspath.name).with_suffix(".pkl.gz")
+    cached = paths.CACHEDIR().joinpath(fitspath.name).with_suffix(".pkl.gz")
     if cached.is_file() and use_cache:
         out = pd.read_pickle(cached)
-        console.log(
-            "[bold yellow]:yellow_circle: Data were loaded from cache."
-        )
+        console.log("[bold yellow]:yellow_circle: Data were loaded from cache.")
     elif fitspath.is_file():
         out = pandas_from_LV0d5(fitspath)
         console.log(":open_book: Data loaded.")
@@ -383,9 +383,7 @@ def preprocess(data, detector_couples, console):
     console.log(":white_check_mark: Tagged X and S events.")
     events_pre_filter = len(data)
     data = filter_delay(filter_spurious(data), RETRIGGER_TIME_IN_S)
-    filtered_percentual = (
-            100 * (events_pre_filter - len(data)) / events_pre_filter
-    )
+    filtered_percentual = 100 * (events_pre_filter - len(data)) / events_pre_filter
     console.log(
         ":white_check_mark: Filtered out {:.1f}% of the events.".format(
             filtered_percentual
@@ -395,16 +393,8 @@ def preprocess(data, detector_couples, console):
 
 
 def warn_about_flagged(flagged, channels, console):
-    interface.sections_rule(
-        console, "[bold italic]Warning", style="red", align="center"
-    )
-
-    num_flagged = len(
-        set([item for sublist in flagged.values() for item in sublist])
-    )
-    num_channels = len(
-        [item for sublist in channels.values() for item in sublist]
-    )
+    num_flagged = len(set([item for sublist in flagged.values() for item in sublist]))
+    num_channels = len([item for sublist in channels.values() for item in sublist])
     message = (
         "In total, {} channels out of {} were flagged.\n"
         "For more details, see the log file.".format(num_flagged, num_channels)
@@ -419,41 +409,31 @@ def process_results(calibration, eventlist, filepath, output_format, console):
     write_report = get_writer(output_format)
 
     if not calibration.sdd_cal and not calibration.optical_coupling:
-        console.log(
-            "[bold red]:red_circle: Calibration failed."
-        )
+        console.log("[bold red]:red_circle: Calibration failed.")
     elif not calibration.sdd_cal or not calibration.optical_coupling:
-        console.log(
-            "[bold yellow]:yellow_circle: Calibration partially completed. "
-        )
+        console.log("[bold yellow]:yellow_circle: Calibration partially completed. ")
     else:
-        console.log(
-            ":green_circle: Calibration complete."
-        )
+        console.log(":green_circle: Calibration complete.")
 
     if calibration.sdd_cal:
         write_report(
-            calibration.sdd_cal,
-            path=upaths.CALREPORT(filepath),
+            calibration.sdd_cal, path=paths.CALREPORT(filepath),
         )
         console.log(":blue_book: Wrote SDD calibration results.")
 
         draw_and_save_qlooks(
-            calibration.sdd_cal,
-            path=upaths.QLKPLOT(filepath),
-            nthreads=systhreads,
+            calibration.sdd_cal, path=paths.QLKPLOT(filepath), nthreads=systhreads,
         )
         console.log(":chart_increasing: Saved X fit quicklook plots.")
 
     if calibration.optical_coupling:
         write_report(
-            calibration.optical_coupling,
-            path=upaths.SLOREPORT(filepath),
+            calibration.optical_coupling, path=paths.SLOREPORT(filepath),
         )
         console.log(":blue_book: Wrote scintillators calibration results.")
         draw_and_save_slo(
             calibration.optical_coupling,
-            path=upaths.SLOPLOT(filepath),
+            path=paths.SLOPLOT(filepath),
             nthreads=systhreads,
         )
         console.log(":chart_increasing: Saved light-output plots.")
@@ -463,8 +443,8 @@ def process_results(calibration, eventlist, filepath, output_format, console):
             eventlist,
             calibration.xradsources(),
             calibration.sradsources(),
-            upaths.XSPPLOT(filepath),
-            upaths.SSPPLOT(filepath),
+            paths.XSPPLOT(filepath),
+            paths.SSPPLOT(filepath),
         )
         console.log(":chart_increasing: Saved calibrated spectra plots.")
     return True
@@ -473,5 +453,5 @@ def process_results(calibration, eventlist, filepath, output_format, console):
 if __name__ == "__main__":
     args = parse_args()
     systhreads = min(8, cpu_count())
-    start_log(upaths.LOGFILE(args.filepath))
+    start_log(paths.LOGFILE(args.filepath))
     run(args)

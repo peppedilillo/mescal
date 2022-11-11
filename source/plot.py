@@ -65,7 +65,7 @@ def draw_and_save_diagns(histograms, res_fit, path, margin=500, nthreads=1):
                 .loc[:, ["lim_low", "lim_high"]]
                 .values.reshape(2, -1)
                 .T,
-                margin = margin,
+                margin=margin,
                 figsize=(9, 4.5),
                 dpi=150,
             )
@@ -212,7 +212,7 @@ def _uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
 
 normal = (
     lambda x, amp, sigma, x0: amp
-    * np.exp(-((x - x0) ** 2) / (2 * sigma**2))
+    * np.exp(-((x - x0) ** 2) / (2 * sigma ** 2))
     / (sigma * sqrt(2 * pi))
 )
 
@@ -270,13 +270,13 @@ def _linearity(
 ):
     radsources_energies = np.array([l.energy for l in radsources.values()])
     measured_energies_err = np.sqrt(
-        (adcs_err**2) * (1 / gain) ** 2
-        + (gain_err**2) * ((adcs - offset) / gain**2) ** 2
-        + (offset_err**2) * (1 / gain) ** 2
+        (adcs_err ** 2) * (1 / gain) ** 2
+        + (gain_err ** 2) * ((adcs - offset) / gain ** 2) ** 2
+        + (offset_err ** 2) * (1 / gain) ** 2
     )
     residual = gain * radsources_energies + offset - adcs
     res_err = np.sqrt(
-        (gain_err**2) * (radsources_energies**2) + offset_err**2 + adcs_err**2
+        (gain_err ** 2) * (radsources_energies ** 2) + offset_err ** 2 + adcs_err ** 2
     )
     perc_residual = 100 * residual / adcs
     perc_residual_err = 100 * res_err / adcs

@@ -9,9 +9,9 @@ from pathlib import Path
 
 prjpath = Path(__file__).parent.parent
 
+VERPATH = prjpath.joinpath("version.txt")
 ASSETDIR = prjpath.joinpath("assets")
 LOGOPATH = ASSETDIR.joinpath("logo.txt")
-
 
 DEFCALDIR = ASSETDIR.joinpath("default_calibrations")
 

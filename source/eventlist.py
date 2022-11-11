@@ -63,11 +63,7 @@ def electrons_to_energy(data, scint_calibrations, couples):
 
 
 def make_electron_list(
-    data,
-    calibrated_sdds,
-    sfit_results,
-    scintillator_couples,
-    nthreads=1,
+    data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=1,
 ):
     columns = ["TIME", "ELECTRONS", "EVTYPE", "CHN", "QUADID"]
     types = ["float64", "float32", "U1", "int8", "U1"]

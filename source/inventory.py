@@ -1,6 +1,6 @@
 import numpy as np
 
-import source.upaths as paths
+import source.paths as paths
 from assets import detectors
 from assets.radsources_db import Am, Am_x60, Cd, Cs, Fe, Fe_kbeta
 from source.errors import DetectorModelNotFound, SourceNotFoundError
@@ -69,11 +69,11 @@ def fetch_default_sdd_calibration(model, temp):
 
 
 def get_quadrant_map(model: str, quad: str, arr_borders: bool = True):
-    if model == 'fm1':
+    if model == "fm1":
         detector_map = detectors.fm1
-    elif model == 'pfm':
+    elif model == "pfm":
         detector_map = detectors.pfm
-    elif model == 'fm2':
+    elif model == "fm2":
         detector_map = detectors.fm2
     else:
         raise ValueError("Model Unknown.")
