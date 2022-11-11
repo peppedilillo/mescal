@@ -2,12 +2,15 @@ import argparse
 import atexit
 import logging
 import configparser
+import sys
 from collections import namedtuple
 from os import cpu_count
+from time import sleep
 from pathlib import Path
-
+import cmd
 import pandas as pd
 
+from source import cmd
 from source import interface, paths
 from source.calibration import Calibration
 from source.eventlist import (
@@ -78,15 +81,197 @@ parser.add_argument(
     "supported formats: xslx, csv, fits. "
     "defaults to xslx.",
 )
-parser.add_argument(
-    "--all", default=False, action="store_true", help="save all output (may take time)",
-)
+
+
+class MescalShell(cmd.Cmd):
+    intro = (
+        "This is [bold purple]mescal[/] new shell. "
+        "Type help or ? to list commands.\n"
+    )
+    prompt = "[mescal] "
+    failure = "[red]Cannnot execute with present calibration."
+    spinner_message = "Working.."
+
+    def __init__(self, console, filename, config, calibration, threads):
+        super().__init__(console)
+        self.calibration = calibration
+        self.filename = filename
+        self.threads = threads
+        self.config = config
+
+    def can_save_rawhist_plots(self):
+        return True
+
+    def do_save_rawhist_plots(self, arg):
+        """Save raw acquisition histogram plots."""
+        with self.console.status(self.spinner_message):
+            draw_and_save_uncalibrated(
+                self.calibration.xhistograms,
+                self.calibration.shistograms,
+                paths.UNCPLOT(self.filename),
+                self.threads,
+            )
+
+    def can_save_xdiagns_plots(self):
+        if self.calibration.xfit:
+            return True
+        return False
+
+    def do_save_xdiagns_plots(self, arg):
+        """Save X peak detection diagnostics plots."""
+        if not self.can_save_xdiagns_plots():
+            self.console.print(self.failure)
+            return False
+        with self.console.status(self.spinner_message):
+            draw_and_save_diagns(
+                self.calibration.xhistograms,
+                self.calibration.xfit,
+                paths.XDNPLOT(self.filename),
+                self.config["margin_diag_plot"],
+                self.threads,
+            )
+
+    def can_save_xfit_table(self):
+        if self.calibration.xfit:
+            return True
+        return False
+
+    def do_save_xfit_table(self, arg):
+        """Save X fit tables."""
+        if not self.can_save_xfit_table():
+            self.console.print(self.failure)
+            return False
+        with self.console.status(self.spinner_message):
+            write_report_to_excel(
+                self.calibration.xfit, paths.XFTREPORT(self.filename),
+            )
+
+    def can_save_xspectra_plots(self):
+        if self.calibration.sdd_cal:
+            return True
+        return False
+
+    def do_save_xspectra_plots(self, arg):
+        """Save X sources fit tables."""
+        if not self.can_save_xspectra_plots():
+            self.console.print(self.failure)
+            return False
+        with self.console.status(self.spinner_message):
+            draw_and_save_channels_xspectra(
+                self.calibration.xhistograms,
+                self.calibration.sdd_cal,
+                self.calibration.xradsources(),
+                paths.XCSPLOT(self.filename),
+                self.threads,
+            )
+
+    def can_save_xlin_plots(self):
+        if self.calibration.sdd_cal:
+            return True
+        return False
+
+    def do_save_xlin_plots(self, args):
+        """Save SDD linearity plots."""
+        if not self.can_save_xlin_plots():
+            self.console.print(self.failure)
+            return False
+        with self.console.status(self.spinner_message):
+            draw_and_save_lins(
+                self.calibration.sdd_cal,
+                self.calibration.xfit,
+                self.calibration.xradsources(),
+                paths.LINPLOT(self.filename),
+                self.threads,
+            )
+
+    def can_save_sdiagns_plots(self):
+        if self.calibration.sfit:
+            return True
+        return False
+
+    def do_save_sdiagns_plots(self, args):
+        """Save S peak detection diagnostics plots."""
+        if not self.can_save_sdiagns_plots():
+            self.console.print(self.failure)
+            return False
+        with self.console.status(self.spinner_message):
+            draw_and_save_diagns(
+                self.calibration.shistograms,
+                self.calibration.sfit,
+                paths.SDNPLOT(self.filename),
+                self.config["margin_diag_plot"],
+                self.threads,
+            )
+
+    def can_save_sfit_table(self):
+        if self.calibration.sfit:
+            return True
+        return False
+
+    def do_save_sfit_table(self, arg):
+        """Save gamma sources fit tables."""
+        if not self.can_save_sfit_table():
+            self.console.print(self.failure)
+            return False
+        with self.console.status(self.spinner_message):
+            write_report_to_excel(
+                self.calibration.sfit, paths.SFTREPORT(self.filename),
+            )
+
+    def can_save_sspectra_plots(self):
+        if self.calibration.optical_coupling:
+            return True
+        return False
+
+    def do_save_sspectra_plots(self, arg):
+        """Save gamma sources fit tables."""
+        if not self.can_save_sspectra_plots():
+            self.console.print(self.failure)
+            return False
+        with self.console.status(self.spinner_message):
+            draw_and_save_channels_sspectra(
+                self.calibration.shistograms,
+                self.calibration.sdd_cal,
+                self.calibration.optical_coupling,
+                self.calibration.sradsources(),
+                paths.SCSPLOT(self.filename),
+                self.threads,
+            )
+
+    def can_save_event_fits(self):
+        if self.calibration.eventlist is not None:
+            return True
+        return False
+
+    def do_save_event_fits(self, arg):
+        """Save calibrated events to fits file."""
+        if not self.can_save_event_fits():
+            self.console.print(self.failure)
+            return False
+        with self.console.status(self.spinner_message):
+            write_eventlist_to_fits(
+                self.calibration.eventlist, paths.EVLFITS(self.filename),
+            )
+
+    def do_all(self, arg):
+        """Executes every executable command."""
+        cmds = [cmd[4:] for cmd in dir(self.__class__) if cmd[:4] == "can_"]
+        for cmd in cmds:
+            if self.can(cmd):
+                do = getattr(self, "do_" + cmd)
+                do("")
+
+    def do_quit(self, arg):
+        """Quit mescal."""
+        self.console.print("Ciao! :wave:\n")
+        return True
 
 
 def run(args):
     console = interface.hello()
     config_dict = unpack_configuration(args.configuration)
 
+    sections_rule(console, "[bold italic]Calibration log", style="green")
     with console.status("Initializing.."):
         data = get_from(args.filepath, console, use_cache=args.cache)
         radsources = radsources_dicts(args.radsources)
@@ -112,16 +297,20 @@ def run(args):
         process_results(calibrated, eventlist, args.filepath, args.fmt, console)
 
     if any(calibrated.flagged):
+        sections_rule(console, "[bold italic]Warning", style="red")
         warn_about_flagged(calibrated.flagged, channels, console)
 
-    if args.all:
-        everything_else(options, console)
-    else:
-        anything_else(options, console)
-
-    goodbye = interface.shutdown(console)
-
+    sections_rule(console, "[bold italic]Shell", style="green")
+    shell = MescalShell(console, args.filepath, config_dict, calibrated, systhreads)
+    shell.cmdloop()
     return True
+
+
+def sections_rule(console, *args, **kwargs):
+    sleep(0.2)
+    console.print()
+    console.rule(*args, **kwargs)
+    console.print()
 
 
 def start_log(filepath):
@@ -165,16 +354,17 @@ def unpack_configuration(section):
         "offset_sigma": items.getfloat("offset_sigma"),
         "lightout_center": items.getfloat("lightout_center"),
         "lightout_sigma": items.getfloat("lightout_sigma"),
+        "margin_diag_plot": items.getint("margin_diag_plot"),
     }
     return out
 
 
 def get_from(fitspath: Path, console, use_cache=True):
     console.log(":question_mark: Looking for data..")
-    cached = upaths.CACHEDIR().joinpath(fitspath.name).with_suffix(".pkl.gz")
+    cached = paths.CACHEDIR().joinpath(fitspath.name).with_suffix(".pkl.gz")
     if cached.is_file() and use_cache:
         out = pd.read_pickle(cached)
-        console.log("[bold red]:exclamation_mark: Data were loaded from cache.")
+        console.log("[bold yellow]:yellow_circle: Data were loaded from cache.")
     elif fitspath.is_file():
         out = pandas_from_LV0d5(fitspath)
         console.log(":open_book: Data loaded.")
@@ -203,10 +393,6 @@ def preprocess(data, detector_couples, console):
 
 
 def warn_about_flagged(flagged, channels, console):
-    interface.sections_rule(
-        console, "[bold italic]Warning", style="red", align="center"
-    )
-
     num_flagged = len(set([item for sublist in flagged.values() for item in sublist]))
     num_channels = len([item for sublist in channels.values() for item in sublist])
     message = (
@@ -218,276 +404,54 @@ def warn_about_flagged(flagged, channels, console):
     return True
 
 
-def promise(f):
-    return [0, f]
-
-
-def fulfill(opt):
-    car, cdr = opt
-    if car:
-        pass
-    else:
-        opt[0] = 1
-        return cdr()
-
-
-option = namedtuple("option", ["display", "reply", "promise"])
-terminate_mescal = option("Exit mescal.", "So soon?", promise(lambda: None))
-options = [terminate_mescal]
-
-
-def anything_else(options, console):
-    interface.sections_rule(console, "[italic]Optional Outputs", align="center")
-    console.print(interface.options_message(options))
-    while True:
-        answer = interface.prompt_user_about(options)
-        if answer is terminate_mescal:
-            print(terminate_mescal.reply)
-            break
-        else:
-            with console.status("Working.."):
-                if fulfill(answer.promise):
-                    console.print(answer.reply)
-                else:
-                    console.print("[red]We already did that..")
-    interface.sections_rule(console)
-    return True
-
-
-def everything_else(options, console):
-    interface.sections_rule(console, "[italic]Optional Outputs", align="center")
-    for task in options:
-        with console.status("Working.."):
-            if task is not terminate_mescal:
-                fulfill(task.promise)
-                console.log(task.reply)
-    interface.sections_rule(console)
-    return True
-
-
-# boring stuff hereafter
 # noinspection PyTypeChecker
 def process_results(calibration, eventlist, filepath, output_format, console):
-    xhistograms = calibration.xhistograms
-    shistograms = calibration.shistograms
-    xradsources = calibration.xradsources()
-    sradsources = calibration.sradsources()
-    xfit_results = calibration.xfit
-    sfit_results = calibration.sfit
-    sdd_calibration = calibration.sdd_cal
-    effective_louts = calibration.optical_coupling
     write_report = get_writer(output_format)
 
-    if not sdd_calibration and not effective_louts:
+    if not calibration.sdd_cal and not calibration.optical_coupling:
         console.log("[bold red]:red_circle: Calibration failed.")
-    elif not sdd_calibration or not effective_louts:
+    elif not calibration.sdd_cal or not calibration.optical_coupling:
         console.log("[bold yellow]:yellow_circle: Calibration partially completed. ")
     else:
         console.log(":green_circle: Calibration complete.")
 
-    if True:
-        options.append(
-            _draw_and_save_uncalibrated(
-                xhistograms, shistograms, upaths.UNCPLOT(filepath), systhreads,
-            )
-        )
-
-    if xfit_results:
-        options.append(
-            _draw_and_save_xdiagns(
-                xhistograms, xfit_results, upaths.XDNPLOT(filepath), systhreads,
-            )
-        )
-        options.append(_write_xfit_report(xfit_results, upaths.XFTREPORT(filepath),))
-
-    if sdd_calibration:
+    if calibration.sdd_cal:
         write_report(
-            sdd_calibration, path=upaths.CALREPORT(filepath),
+            calibration.sdd_cal, path=paths.CALREPORT(filepath),
         )
         console.log(":blue_book: Wrote SDD calibration results.")
 
         draw_and_save_qlooks(
-            sdd_calibration, path=upaths.QLKPLOT(filepath), nthreads=systhreads,
+            calibration.sdd_cal, path=paths.QLKPLOT(filepath), nthreads=systhreads,
         )
         console.log(":chart_increasing: Saved X fit quicklook plots.")
 
-        options.append(
-            _draw_and_save_channels_xspectra(
-                xhistograms,
-                sdd_calibration,
-                xradsources,
-                upaths.XCSPLOT(filepath),
-                systhreads,
-            )
-        )
-        options.append(
-            _draw_and_save_lins(
-                sdd_calibration,
-                xfit_results,
-                xradsources,
-                upaths.LINPLOT(filepath),
-                systhreads,
-            )
-        )
-
-    if sfit_results:
-        options.append(
-            _draw_and_save_sdiagns(
-                shistograms, sfit_results, upaths.SDNPLOT(filepath), systhreads,
-            )
-        )
-        options.append(_write_sfit_report(sfit_results, upaths.SFTREPORT(filepath),))
-
-    if effective_louts:
+    if calibration.optical_coupling:
         write_report(
-            effective_louts, path=upaths.SLOREPORT(filepath),
+            calibration.optical_coupling, path=paths.SLOREPORT(filepath),
         )
         console.log(":blue_book: Wrote scintillators calibration results.")
         draw_and_save_slo(
-            effective_louts, path=upaths.SLOPLOT(filepath), nthreads=systhreads,
+            calibration.optical_coupling,
+            path=paths.SLOPLOT(filepath),
+            nthreads=systhreads,
         )
         console.log(":chart_increasing: Saved light-output plots.")
 
-        options.append(
-            _draw_and_save_channels_sspectra(
-                shistograms,
-                sdd_calibration,
-                effective_louts,
-                sradsources,
-                upaths.SCSPLOT(filepath),
-                systhreads,
-            )
+    if eventlist is not None:
+        draw_and_save_calibrated_spectra(
+            eventlist,
+            calibration.xradsources(),
+            calibration.sradsources(),
+            paths.XSPPLOT(filepath),
+            paths.SSPPLOT(filepath),
         )
-
-    if not eventlist is None:
-        options.append(_write_eventlist_to_fits(eventlist, upaths.EVLFITS(filepath),))
-        options.append(
-            _draw_and_save_spectra(
-                eventlist,
-                xradsources,
-                sradsources,
-                upaths.XSPPLOT(filepath),
-                upaths.SSPPLOT(filepath),
-            )
-        )
+        console.log(":chart_increasing: Saved calibrated spectra plots.")
     return True
-
-
-def _draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads):
-    return option(
-        display="Save uncalibrated plots.",
-        reply=":sparkles: Saved uncalibrated plots. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_uncalibrated(
-                xhistograms, shistograms, path, nthreads,
-            )
-        ),
-    )
-
-
-def _draw_and_save_lins(sdds_calibration, xfit_results, xradsources, path, nthreads):
-    return option(
-        display="Save X linearity plots.",
-        reply=":sparkles: Saved linearity plot. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_lins(
-                sdds_calibration, xfit_results, xradsources, path, nthreads,
-            )
-        ),
-    )
-
-
-def _draw_and_save_xdiagns(histograms, fit_results, path, nthreads):
-    return option(
-        display="Save X fit diagnostic plots.",
-        reply=":sparkles: Saved X diagnostic plots. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_diagns(histograms, fit_results, path, nthreads,)
-        ),
-    )
-
-
-def _write_xfit_report(fit_results, path):
-    return option(
-        display="Save X fit results.",
-        reply=":sparkles: Saved X fit results. :sparkles:",
-        promise=promise(lambda: write_report_to_excel(fit_results, path,)),
-    )
-
-
-def _draw_and_save_sdiagns(histograms, fit_results, path, nthreads):
-    return option(
-        display="Save S fit diagnostic plots.",
-        reply=":sparkles: Saved gamma diagnostics plots. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_diagns(histograms, fit_results, path, nthreads,)
-        ),
-    )
-
-
-def _write_sfit_report(fit_results, path):
-    return option(
-        display="Save S fit results.",
-        reply=":sparkles: Saved gamma fit table. :sparkles:",
-        promise=promise(lambda: write_report_to_excel(fit_results, path,)),
-    )
-
-
-def _draw_and_save_channels_xspectra(
-    xhistograms, sdds_calibration, xradsources, path, nthreads
-):
-    return option(
-        display="Save X channel spectra plots.",
-        reply=":sparkles: Saved X spectra. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_channels_xspectra(
-                xhistograms, sdds_calibration, xradsources, path, nthreads,
-            )
-        ),
-    )
-
-
-def _draw_and_save_channels_sspectra(
-    shistograms, sdds_calibration, scintillators_lightout, sradsources, path, nthreads,
-):
-    return option(
-        display="Save S channel spectra plots.",
-        reply=":sparkles: Saved gamma spectra. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_channels_sspectra(
-                shistograms,
-                sdds_calibration,
-                scintillators_lightout,
-                sradsources,
-                path,
-                nthreads,
-            )
-        ),
-    )
-
-
-def _write_eventlist_to_fits(eventlist, path):
-    return option(
-        display="Write calibrated events to fits.",
-        reply=":sparkles: Saved event list. :sparkles:",
-        promise=promise(lambda: write_eventlist_to_fits(eventlist, path,)),
-    )
-
-
-def _draw_and_save_spectra(eventlist, xradsources, sradsources, xpath, spath):
-    return option(
-        display="Save calibrated spectra.",
-        reply=":sparkles: Saved spectra plot. :sparkles:",
-        promise=promise(
-            lambda: draw_and_save_calibrated_spectra(
-                eventlist, xradsources, sradsources, xpath, spath,
-            )
-        ),
-    )
 
 
 if __name__ == "__main__":
     args = parse_args()
-    systhreads = min(4, cpu_count())
-    start_log(upaths.LOGFILE(args.filepath))
+    systhreads = min(8, cpu_count())
+    start_log(paths.LOGFILE(args.filepath))
     run(args)
