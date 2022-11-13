@@ -84,10 +84,15 @@ def find_xpeaks(
     pcombo_widths = pcombo_widths[permutation]
 
     # for each combination we compute some metrics
+    # posterior of peaks position
     pdfscores_ = pdfscores(bins, peaks_combo, energies, gain_guess, offset_guess)
+    # peaks linearity
     linscores_, fitparameters = linscores(bins, energies, peaks_combo)
+    # peaks prominence
     promscores_ = promscores(pcombo_prom)
+    # baseline distance from 2keV
     blscores_ = baselinescores(bins, counts, fitparameters)
+    # width coefficient of variation
     widthscores_ = widthscores(peaks_combo, pcombo_widths)
 
     # we rank the combinations by each metric score
@@ -98,12 +103,18 @@ def find_xpeaks(
     widthranking = np.argsort(np.argsort(widthscores_))
 
     # best combination is the one with best ranking across metrics
-    combined_score = linranking + pdfranking + promranking + widthranking + baseranking
+    combined_score = pdfranking + promranking + widthranking + baseranking
+    solve_ties_by = pdfscores_
+    if len(energies) > 2:
+        # when we have just two peaks scoring linearity makes no sense
+        combined_score += linranking
+        solve_ties_by = linscores_
     best_score = max(combined_score)
-    # solve ties by linearity
+    # solve ties
     tied_for_win = np.argwhere(combined_score == best_score).T[0]
-    winner = tied_for_win[np.argmax(np.array(linscores_)[tied_for_win])]
+    winner = tied_for_win[np.argmax(np.array(solve_ties_by)[tied_for_win])]
 
+    # some packaging
     best_peaks = peaks_combo[winner]
     best_peaks_args = np.argwhere(np.isin(peaks, best_peaks)).T[0]
     best_peaks_props = {

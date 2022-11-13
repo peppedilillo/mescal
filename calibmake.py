@@ -2,16 +2,14 @@ import argparse
 import atexit
 import logging
 import configparser
-import sys
-from collections import namedtuple
+
 from os import cpu_count
 from time import sleep
 from pathlib import Path
-import cmd
 import pandas as pd
 
-from source import cmd
 from source import interface, paths
+from source.cmd import MescalShell
 from source.calibration import Calibration
 from source.eventlist import (
     add_evtype_tag,
@@ -23,18 +21,11 @@ from source.inventory import get_couples, radsources_dicts
 from source.io import (
     get_writer,
     pandas_from_LV0d5,
-    write_eventlist_to_fits,
-    write_report_to_excel,
 )
 from source.plot import (
-    draw_and_save_channels_sspectra,
-    draw_and_save_channels_xspectra,
-    draw_and_save_diagns,
-    draw_and_save_lins,
     draw_and_save_qlooks,
     draw_and_save_slo,
     draw_and_save_calibrated_spectra,
-    draw_and_save_uncalibrated,
 )
 
 RETRIGGER_TIME_IN_S = 20 * (10 ** -6)
@@ -81,190 +72,6 @@ parser.add_argument(
     "supported formats: xslx, csv, fits. "
     "defaults to xslx.",
 )
-
-
-class MescalShell(cmd.Cmd):
-    intro = (
-        "This is [bold purple]mescal[/] shell. "
-        "Type help or ? to list commands.\n"
-    )
-    prompt = "[mescal] "
-    failure = "[red]Cannnot execute with present calibration."
-    spinner_message = "Working.."
-
-    def __init__(self, console, filename, config, calibration, threads):
-        super().__init__(console)
-        self.calibration = calibration
-        self.filename = filename
-        self.threads = threads
-        self.config = config
-
-    def can_save_rawhist_plots(self):
-        return True
-
-    def do_save_rawhist_plots(self, arg):
-        """Save raw acquisition histogram plots."""
-        with self.console.status(self.spinner_message):
-            draw_and_save_uncalibrated(
-                self.calibration.xhistograms,
-                self.calibration.shistograms,
-                paths.UNCPLOT(self.filename),
-                self.threads,
-            )
-
-    def can_save_xdiagns_plots(self):
-        if self.calibration.xfit:
-            return True
-        return False
-
-    def do_save_xdiagns_plots(self, arg):
-        """Save X peak detection diagnostics plots."""
-        if not self.can_save_xdiagns_plots():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_diagns(
-                self.calibration.xhistograms,
-                self.calibration.xfit,
-                paths.XDNPLOT(self.filename),
-                self.config["margin_diag_plot"],
-                self.threads,
-            )
-
-    def can_save_xfit_table(self):
-        if self.calibration.xfit:
-            return True
-        return False
-
-    def do_save_xfit_table(self, arg):
-        """Save X fit tables."""
-        if not self.can_save_xfit_table():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            write_report_to_excel(
-                self.calibration.xfit, paths.XFTREPORT(self.filename),
-            )
-
-    def can_save_xspectra_plots(self):
-        if self.calibration.sdd_cal:
-            return True
-        return False
-
-    def do_save_xspectra_plots(self, arg):
-        """Save X sources fit tables."""
-        if not self.can_save_xspectra_plots():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_channels_xspectra(
-                self.calibration.xhistograms,
-                self.calibration.sdd_cal,
-                self.calibration.xradsources(),
-                paths.XCSPLOT(self.filename),
-                self.threads,
-            )
-
-    def can_save_xlin_plots(self):
-        if self.calibration.sdd_cal:
-            return True
-        return False
-
-    def do_save_xlin_plots(self, args):
-        """Save SDD linearity plots."""
-        if not self.can_save_xlin_plots():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_lins(
-                self.calibration.sdd_cal,
-                self.calibration.xfit,
-                self.calibration.xradsources(),
-                paths.LINPLOT(self.filename),
-                self.threads,
-            )
-
-    def can_save_sdiagns_plots(self):
-        if self.calibration.sfit:
-            return True
-        return False
-
-    def do_save_sdiagns_plots(self, args):
-        """Save S peak detection diagnostics plots."""
-        if not self.can_save_sdiagns_plots():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_diagns(
-                self.calibration.shistograms,
-                self.calibration.sfit,
-                paths.SDNPLOT(self.filename),
-                self.config["margin_diag_plot"],
-                self.threads,
-            )
-
-    def can_save_sfit_table(self):
-        if self.calibration.sfit:
-            return True
-        return False
-
-    def do_save_sfit_table(self, arg):
-        """Save gamma sources fit tables."""
-        if not self.can_save_sfit_table():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            write_report_to_excel(
-                self.calibration.sfit, paths.SFTREPORT(self.filename),
-            )
-
-    def can_save_sspectra_plots(self):
-        if self.calibration.optical_coupling:
-            return True
-        return False
-
-    def do_save_sspectra_plots(self, arg):
-        """Save gamma sources fit tables."""
-        if not self.can_save_sspectra_plots():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_channels_sspectra(
-                self.calibration.shistograms,
-                self.calibration.sdd_cal,
-                self.calibration.optical_coupling,
-                self.calibration.sradsources(),
-                paths.SCSPLOT(self.filename),
-                self.threads,
-            )
-
-    def can_save_event_fits(self):
-        if self.calibration.eventlist is not None:
-            return True
-        return False
-
-    def do_save_event_fits(self, arg):
-        """Save calibrated events to fits file."""
-        if not self.can_save_event_fits():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            write_eventlist_to_fits(
-                self.calibration.eventlist, paths.EVLFITS(self.filename),
-            )
-
-    def do_all(self, arg):
-        """Executes every executable command."""
-        cmds = [cmd[4:] for cmd in dir(self.__class__) if cmd[:4] == "can_"]
-        for cmd in cmds:
-            if self.can(cmd):
-                do = getattr(self, "do_" + cmd)
-                do("")
-
-    def do_quit(self, arg):
-        """Quit mescal."""
-        self.console.print("Ciao! :wave:\n")
-        return True
 
 
 def run(args):

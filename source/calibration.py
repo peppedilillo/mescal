@@ -17,12 +17,12 @@ from source.eventlist import electrons_to_energy, make_electron_list
 from source.xpeaks import find_xpeaks
 from source.speaks import find_speaks, find_epeaks
 
-PEAKS_PARAMS = [
+PEAKS_PARAMS = (
     "lim_low",
     "lim_high",
-]
+)
 
-FIT_PARAMS = [
+FIT_PARAMS = (
     "center",
     "center_err",
     "fwhm",
@@ -31,25 +31,25 @@ FIT_PARAMS = [
     "amp_err",
     "lim_low",
     "lim_high",
-]
+)
 
-CAL_PARAMS = [
+CAL_PARAMS = (
     "gain",
     "gain_err",
     "offset",
     "offset_err",
     "chi2",
-]
+)
 
-LO_PARAMS = [
+LO_PARAMS = (
     "light_out",
     "light_out_err",
-]
+)
 
-RES_PARAMS = [
+RES_PARAMS = (
     "resolution",
     "resolution_err",
-]
+)
 
 histogram = namedtuple("histogram", ["bins", "counts"])
 
@@ -199,6 +199,9 @@ class Calibration:
         self.xhistograms = None
         self.shistograms = None
         self.ehistograms = None
+        self.xpeaks = None
+        self.speaks = None
+        self.epeaks = None
         self.xfit = {}
         self.sfit = {}
         self.efit = {}
@@ -212,6 +215,13 @@ class Calibration:
         self.nthreads = nthreads
 
     def __call__(self, data):
+        lost = self._bin_data(data)
+        lost_fraction = 100 * len(lost) / len(data["ADC"])
+        self._print(":white_check_mark: Binned data. Lost {:.2f}% dataset.".format(lost_fraction))
+        self._run_calibration()
+        return self.eventlist
+
+    def _bin_data(self, data):
         # prepare histograms for X and S events
         bitsize = self.configuration["bitsize"]
         bins = find_adc_bins(data["ADC"], bitsize)
@@ -219,14 +229,13 @@ class Calibration:
         self.sbins = bins
         self.xhistograms = self._make_xhistograms(data)
         self.shistograms = self._make_shistograms(data)
-        out_of_bins = (data["ADC"] < bins[-1]) & (data["ADC"] >= bins[0])
-        lost_events = len(data["ADC"]) - sum(out_of_bins)
-        lost_fraction = 100 * lost_events / len(data["ADC"])
-        self._print(":white_check_mark: Binned data. Lost {:.2f}% dataset.".format(lost_fraction))
+        lost = (data["ADC"] >= bins[-1]) | (data["ADC"] < bins[0])
+        return data[lost]
 
+    def _run_calibration(self):
         # X calibration
         if len(self.xradsources()) < 2:
-            return
+            return False
         gain_center = self.configuration["gain_center"]
         gain_sigma = self.configuration["gain_sigma"]
         offset_center = self.configuration["offset_center"]
@@ -236,15 +245,15 @@ class Calibration:
             offset_center,
             offset_sigma,
         )  # peak detection prior estimate
-        self.xpeaks = self._detect_xpeaks(gain_guess, offset_guess)
+        if self.xpeaks is None:
+            self.xpeaks = self._detect_xpeaks(gain_guess, offset_guess)
         self.xfit = self._fit_xradsources()
         self.sdd_cal = self._calibrate_sdds()
         self.en_res = self._compute_energy_resolution()
-        self._print(":white_check_mark: Analyzed X events.")
 
         # S calibration
         if not self.sradsources():
-            return
+            return False
         lightout_center = self.configuration["lightout_center"]
         lightout_sigma = self.configuration["lightout_sigma"]
         lightout_guess = (lightout_center, lightout_sigma)
@@ -259,15 +268,13 @@ class Calibration:
         self.efit = self._fit_gamma_electrons()
         self.scint_cal = self._calibrate_scintillators()
         self.optical_coupling = self._compute_effective_light_outputs()
-        self._print(":white_check_mark: Analyzed gamma events.")
 
         if not self.scint_cal:
-            return
+            return False
         self.eventlist = electrons_to_energy(
             electron_evlist, self.scint_cal, self.couples
         )
-
-        return self.eventlist
+        return True
 
     def _print(self, message):
         if self.console:
@@ -393,6 +400,7 @@ class Calibration:
                     message = err.warn_peak_fit(quad, ch)
                     logging.warning(message)
                     self._flag(quad, ch, "xfit")
+                    continue
 
                 int_inf, int_sup = zip(*intervals)
                 results.setdefault(quad, {})[ch] = np.column_stack(
