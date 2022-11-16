@@ -85,7 +85,9 @@ def find_xpeaks(
 
     # for each combination we compute some metrics
     # posterior of peaks position
-    pdfscores_ = pdfscores(bins, peaks_combo, energies, gain_guess, offset_guess)
+    pdfscores_ = pdfscores(
+        bins, peaks_combo, energies, gain_guess, offset_guess
+    )
     # peaks linearity
     linscores_, fitparameters = linscores(bins, energies, peaks_combo)
     # peaks prominence
@@ -123,7 +125,9 @@ def find_xpeaks(
 
     limits = [
         (bins[floor(lo)], bins[ceil(hi)])
-        for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])
+        for lo, hi in zip(
+            best_peaks_props["left_ips"], best_peaks_props["right_ips"]
+        )
     ]
     return limits
 
@@ -193,7 +197,7 @@ def pdfscores(bins, peaks_combinations, energies, gain_guess, offset_guess):
     mus = [gain_center * energy + offset_center for energy in energies]
     covmat = [
         [
-            gain_sigma ** 2 * energyi * energyj + offset_sigma ** 2
+            gain_sigma**2 * energyi * energyj + offset_sigma**2
             for energyj in energies
         ]
         for energyi in energies
@@ -243,10 +247,15 @@ def peaks_with_enough_stat(counts, mincounts, pars, smoothing=1, maxdepth=20):
             # print("stopped at prominence {}".format(pars["prominence"]))
             break
     if i == maxdepth - 1:
-        raise TimeoutError("reached max depth looking for peaks")
+        raise TimeoutError(
+            "reached max depth looking for peaks."
+            "are you using the right ADC configuration?"
+        )
     if peaks.any():
         # print("candidate peaks: {} peaks".format(len(peaks)))
-        peaks, peaks_props = remove_small_peaks(mincounts, counts, peaks, peaks_props)
+        peaks, peaks_props = remove_small_peaks(
+            mincounts, counts, peaks, peaks_props
+        )
         # print("after small peaks filter: {} peaks".format(len(peaks)))
     return peaks, peaks_props
 
@@ -391,12 +400,18 @@ def debug_helper(
         print("{}:".format(label))
         # print(score)
         # print(ranking)
-        print(">> winner ranking: {}/{}".format(ranking[winner], len(peaks_combo)))
+        print(
+            ">> winner ranking: {}/{}".format(
+                ranking[winner], len(peaks_combo)
+            )
+        )
 
     plt.plot(bins[:-1], counts)
     baseline = np.argwhere((counts[1:] != 0) & (counts[:-1] != 0))[0][0]
     plt.axvline(bins[baseline])
-    for peak, lo, hi in zip(peaks, peaks_props["left_ips"], peaks_props["right_ips"]):
+    for peak, lo, hi in zip(
+        peaks, peaks_props["left_ips"], peaks_props["right_ips"]
+    ):
         plt.axvspan(bins[int(lo)], bins[int(hi)], alpha=0.2, color="grey")
     for peak, lo, hi in zip(
         winpeaks, winpeaks_props["left_ips"], winpeaks_props["right_ips"]

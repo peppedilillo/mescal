@@ -1,6 +1,8 @@
 # fmt: off
 from collections import namedtuple
 
+from source.errors import SourceNotFoundError
+
 Decay = namedtuple('Decay', ['energy', 'low_lim', 'hi_lim'])
 
 Fe = {
@@ -35,3 +37,35 @@ Am_x60 = {
 Cs = {
     'Cs 662 keV': Decay(661.6, -1., +2.),
 }
+
+X_SOURCES = {
+    "FE": Fe,
+    "FE_KBETA": Fe_kbeta,
+    "CD": Cd,
+    "AM": Am,
+    "AM_X60": Am_x60,
+}
+
+
+GAMMA_SOURCES = {
+    "CS": Cs,
+}
+
+def radsources_dicts(sources: list):
+    xdecays = {}
+    sdecays = {}
+    for element in sources:
+        if element in X_SOURCES:
+            xdecays.update(X_SOURCES[element])
+        elif element in GAMMA_SOURCES:
+            sdecays.update(GAMMA_SOURCES[element])
+        else:
+            raise SourceNotFoundError("unknown calibration source source.")
+
+    xdecays = {
+        k: v for k, v in sorted(xdecays.items(), key=lambda item: item[1])
+    }
+    sdecays = {
+        k: v for k, v in sorted(sdecays.items(), key=lambda item: item[1])
+    }
+    return xdecays, sdecays

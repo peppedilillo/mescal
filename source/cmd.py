@@ -1,32 +1,13 @@
-import matplotlib
-matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
-
-from source import paths
-from source.calibration import PEAKS_PARAMS
-from source.io import (
-    write_eventlist_to_fits,
-    write_report_to_excel,
-)
-from source.plot import (
-    _uncalibrated,
-    draw_and_save_channels_sspectra,
-    draw_and_save_channels_xspectra,
-    draw_and_save_diagns,
-    draw_and_save_lins,
-    draw_and_save_uncalibrated,
-)
-
 import string, sys
 from rich.rule import Rule
 
 
 class Cmd:
     """
-    This class belongs to python's standard library. See All rights reserved.
+    This class belongs to python's standard library.
     For more info, see: https://docs.python.org/3/library/cmd.html.
-    The code was adapter to use the rich's console protocol in place of
-     stdin and stdout.
+    The code was adapted to use the rich's console protocol in place of
+    stdin and stdout.
 
     ~Peppe
 
@@ -43,7 +24,7 @@ class Cmd:
 
     """
 
-    prompt =  "(Cmd) "
+    prompt = "(Cmd) "
     identchars = string.ascii_letters + string.digits + "_"
     ruler = "-"
     lastcmd = ""
@@ -212,7 +193,7 @@ class Cmd:
         returns.
 
         """
-        self.console.print("*** Unknown syntax: %s" % line)
+        self.console.print("[bold red]Unknown syntax[/]: %s" % line)
 
     def completedefault(self, *ignored):
         """Method called to complete an input line when no command-specific
@@ -224,6 +205,8 @@ class Cmd:
         return []
 
     def completenames(self, text, *ignored):
+        if text == "":
+            return []
         dotext = "do_" + text
         return [a[3:] for a in self.get_names() if a.startswith(dotext)]
 
@@ -265,7 +248,9 @@ class Cmd:
 
     def complete_help(self, *args):
         commands = set(self.completenames(*args))
-        topics = set(a[5:] for a in self.get_names() if a.startswith("help_" + args[0]))
+        topics = set(
+            a[5:] for a in self.get_names() if a.startswith("help_" + args[0])
+        )
         return list(commands | topics)
 
     def do_help(self, arg):
@@ -335,10 +320,13 @@ class Cmd:
             self.console.print("<empty>\n")
             return
 
-        nonstrings = [i for i in range(len(list)) if not isinstance(list[i], str)]
+        nonstrings = [
+            i for i in range(len(list)) if not isinstance(list[i], str)
+        ]
         if nonstrings:
             raise TypeError(
-                "list[i] not a string for i in %s" % ", ".join(map(str, nonstrings))
+                "list[i] not a string for i in %s"
+                % ", ".join(map(str, nonstrings))
             )
         size = len(list)
         if size == 1:
@@ -395,289 +383,3 @@ class Cmd:
         else:
             func = getattr(self, "can_" + x)
             return func()
-
-
-INVALID_ENTRY = 0
-
-
-def parse_chns(arg):
-    quadrants = ['A', 'B', 'C', 'D']
-    chn_strings = ["{0:02d}".format(i) for i in range(32)]
-    stripped_arg = arg.strip()
-    if (
-            arg
-        and (arg[0].upper() in quadrants)
-        and (arg[1:3] in chn_strings)
-        and len(stripped_arg) == 3
-    ):
-        quad = arg[0]
-        ch = int(arg[1:3])
-        return quad, ch
-    else:
-        print("Invalid entry.\n"
-        "Channel ID not in standard form.\n" 
-        "(e.g., d04, A31, B02)"
-        )
-        return INVALID_ENTRY
-
-
-def parse_limits(arg):
-    if arg == "":
-        return None
-
-    arglist = arg.strip().split(" ")
-    if (
-            len(arglist) == 2
-            and arglist[0].isdigit()
-            and arglist[1].isdigit()
-            and int(arglist[0]) < int(arglist[1])
-    ):
-        botlim = int(arglist[0])
-        toplim = int(arglist[1])
-        return botlim, toplim
-    else:
-        print("Invalid entry.\n"
-        "Entry must be two, different positive integers.\n"
-        "Largest integers must follow the smallest.\n"
-        "Example: '19800 20100'."
-        )
-        return INVALID_ENTRY
-
-
-class MescalShell(Cmd):
-    intro = (
-        "This is [bold purple]mescal[/] shell. "
-        "Type help or ? to list commands.\n"
-    )
-    prompt = "[mescal] "
-    failure = "[red]Cannnot execute with present calibration."
-    spinner_message = "Working.."
-
-    def __init__(self, console, filename, config, calibration, threads):
-        super().__init__(console)
-        self.calibration = calibration
-        self.filename = filename
-        self.threads = threads
-        self.config = config
-
-    def do_set_xfit_lims(self, arg):
-        """Reset channel X peaks position."""
-        parsed_arg = parse_chns(arg)
-        if parsed_arg is INVALID_ENTRY:
-            return False
-
-        quad, ch = parsed_arg
-        for source, decay in self.calibration.xradsources().items():
-            arg = self.console.input(source + ": ")
-            parsed_arg = parse_limits(arg)
-            if parsed_arg is INVALID_ENTRY:
-                return False
-            elif parsed_arg is None:
-                continue
-            else:
-                lim_lo, lim_hi = parsed_arg
-                label_lo, label_hi = PEAKS_PARAMS
-                self.calibration.xpeaks[quad].loc[ch, (source, label_lo)] = int(lim_lo)
-                self.calibration.xpeaks[quad].loc[ch, (source, label_hi)] = int(lim_hi)
-
-    def do_retry(self, arg):
-        """Launches calibration again."""
-        with self.console.status(self.spinner_message):
-            self.calibration._run_calibration()
-
-    def do_plot(self, arg):
-        """Plots uncalibrated data from a channel."""
-        parsed_arg = parse_chns(arg)
-        if parsed_arg is not None:
-            quad, ch = parsed_arg
-            fig, ax = _uncalibrated(
-                self.calibration.xhistograms.bins,
-                self.calibration.xhistograms.counts[quad][ch],
-                self.calibration.shistograms.bins,
-                self.calibration.shistograms.counts[quad][ch],
-                figsize=(9, 4.5),
-            )
-            ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
-            plt.show(block=False)
-
-    def can_save_rawhist_plots(self):
-        return True
-
-    def do_save_rawhist_plots(self, arg):
-        """Save raw acquisition histogram plots."""
-        with self.console.status(self.spinner_message):
-            draw_and_save_uncalibrated(
-                self.calibration.xhistograms,
-                self.calibration.shistograms,
-                paths.UNCPLOT(self.filename),
-                self.threads,
-            )
-
-    def can_save_xdiagns_plots(self):
-        if self.calibration.xfit:
-            return True
-        return False
-
-    def do_save_xdiagns_plots(self, arg):
-        """Save X peak detection diagnostics plots."""
-        if not self.can_save_xdiagns_plots():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_diagns(
-                self.calibration.xhistograms,
-                self.calibration.xfit,
-                paths.XDNPLOT(self.filename),
-                self.config["margin_diag_plot"],
-                self.threads,
-            )
-
-    def can_save_xfit_table(self):
-        if self.calibration.xfit:
-            return True
-        return False
-
-    def do_save_xfit_table(self, arg):
-        """Save X fit tables."""
-        if not self.can_save_xfit_table():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            write_report_to_excel(
-                self.calibration.xfit, paths.XFTREPORT(self.filename),
-            )
-
-    def can_save_speak_table(self):
-        if self.calibration.speaks:
-            return True
-        return False
-
-    def do_save_speak_table(self, arg):
-        """Save X peak tables."""
-        if not self.can_save_speak_table():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            write_report_to_excel(
-                self.calibration.speaks, paths.XFTREPORT(self.filename),
-            )
-
-    def can_save_xspectra_plots(self):
-        if self.calibration.sdd_cal:
-            return True
-        return False
-
-    def do_save_xspectra_plots(self, arg):
-        """Save X sources fit tables."""
-        if not self.can_save_xspectra_plots():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_channels_xspectra(
-                self.calibration.xhistograms,
-                self.calibration.sdd_cal,
-                self.calibration.xradsources(),
-                paths.XCSPLOT(self.filename),
-                self.threads,
-            )
-
-    def can_save_xlin_plots(self):
-        if self.calibration.sdd_cal:
-            return True
-        return False
-
-    def do_save_xlin_plots(self, args):
-        """Save SDD linearity plots."""
-        if not self.can_save_xlin_plots():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_lins(
-                self.calibration.sdd_cal,
-                self.calibration.xfit,
-                self.calibration.xradsources(),
-                paths.LINPLOT(self.filename),
-                self.threads,
-            )
-
-    def can_save_sdiagns_plots(self):
-        if self.calibration.sfit:
-            return True
-        return False
-
-    def do_save_sdiagns_plots(self, args):
-        """Save S peak detection diagnostics plots."""
-        if not self.can_save_sdiagns_plots():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_diagns(
-                self.calibration.shistograms,
-                self.calibration.sfit,
-                paths.SDNPLOT(self.filename),
-                self.config["margin_diag_plot"],
-                self.threads,
-            )
-
-    def can_save_sfit_table(self):
-        if self.calibration.sfit:
-            return True
-        return False
-
-    def do_save_sfit_table(self, arg):
-        """Save gamma sources fit tables."""
-        if not self.can_save_sfit_table():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            write_report_to_excel(
-                self.calibration.sfit, paths.SFTREPORT(self.filename),
-            )
-
-    def can_save_sspectra_plots(self):
-        if self.calibration.optical_coupling:
-            return True
-        return False
-
-    def do_save_sspectra_plots(self, arg):
-        """Save gamma sources fit tables."""
-        if not self.can_save_sspectra_plots():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_channels_sspectra(
-                self.calibration.shistograms,
-                self.calibration.sdd_cal,
-                self.calibration.optical_coupling,
-                self.calibration.sradsources(),
-                paths.SCSPLOT(self.filename),
-                self.threads,
-            )
-
-    def can_save_event_fits(self):
-        if self.calibration.eventlist is not None:
-            return True
-        return False
-
-    def do_save_event_fits(self, arg):
-        """Save calibrated events to fits file."""
-        if not self.can_save_event_fits():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            write_eventlist_to_fits(
-                self.calibration.eventlist, paths.EVLFITS(self.filename),
-            )
-
-    def do_all(self, arg):
-        """Executes every executable command."""
-        cmds = [cmd[4:] for cmd in dir(self.__class__) if cmd[:4] == "can_"]
-        for cmd in cmds:
-            if self.can(cmd):
-                do = getattr(self, "do_" + cmd)
-                do("")
-
-    def do_quit(self, arg):
-        """Quit mescal."""
-        self.console.print("Ciao! :wave:\n")
-        return True

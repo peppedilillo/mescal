@@ -2,6 +2,8 @@ from math import ceil
 from pathlib import Path
 import argparse
 
+import matplotlib; matplotlib.use("TkAgg")
+import matplotlib.pyplot as plt
 import astropy.io.fits as fitsio
 import numpy as np
 import pandas as pd
@@ -192,7 +194,17 @@ def transform_table(big_table):
         big_table_idCHNs_sortedADCs, sorting_by_idCHNs, axis=1,
     )
     big_table_sortedADCs = np.take_along_axis(
-\
+        big_table_sortedADCs, sorting_by_idCHNs, axis=1,
+    )
+
+    output = (
+        np.dstack([big_table_idCHNs_sortedADCs, big_table_sortedADCs])
+        .reshape(len(big_table), 12)
+        .astype("int")
+    )
+    return output
+
+
 def table0d5_from_wftable(quadid, times, big_table):
     # evtids = np.argwhere(~np.isnan(big_table))[:,0]
     nmults = np.sum(~np.isnan(big_table), axis=1)
@@ -267,29 +279,3 @@ if __name__ == "__main__":
         last_time += times[-1]
     dataframe = dataframe_from_table0d5(np.vstack(tables))
     save_to_fits(dataframe, args.outfile)
-    print("Done!")
-
-    #table = np.vstack([
-    #    table0d5_from_wftable(
-    #        args.quadrant, *table_from_wfs(
-    #            Path(filepath)))
-    #    for filepath in args.infiles])
-    #dataframe = dataframe_from_table0d5(table)
-    #save_to_fits(dataframe, args.outfile)
-
-    #QUADID = 1
-    #filepath = Path(
-    #    "D:/IAPSDATA/FM2/20220927/20220927_03_FM2_T19deg_QUADA_THR110_DAC120_SingleCH_HV123_no_CH02_03_04_06_09_24_25_Cd109.fits"
-    #)
-    #out_filepath = Path(
-    #    "D:/IAPSDATA/FM2/20220927/0d5_20220927_03_FM2_T19deg_QUADA_THR110_DAC120_SingleCH_HV123_no_CH02_03_04_06_09_24_25_Cd109.fits"
-    #)
-#
-    #tic = time.time()
-    #times = get_times(filepath) * DEFAULT_PARS["time_unit_s"]
-    #times, big_table = table_from_wfs(filepath)
-    #small_table = table0d5_from_wftable(times, big_table)
-    #small_dataframe = dataframe_from_table0d5(small_table)
-    #save_to_fits(small_dataframe, out_filepath)
-    #toc = time.time()
-    #print("execution time: {:.2f}s".format(toc - tic))

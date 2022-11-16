@@ -48,7 +48,6 @@ def warn_peak_detection_offcomp(quad, ch, companion):
         " appears to be off.".format(quad, ch, companion)
     )
 
-
 def warn_missing_defcal(quad, ch):
     return "missing default calibration for channel {}{:02d}.".format(quad, ch)
 
