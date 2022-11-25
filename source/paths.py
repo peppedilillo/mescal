@@ -9,9 +9,9 @@ from pathlib import Path
 
 prjpath = Path(__file__).parent.parent
 
+VERPATH = prjpath.joinpath("version.txt")
 ASSETDIR = prjpath.joinpath("assets")
 LOGOPATH = ASSETDIR.joinpath("logo.txt")
-
 
 DEFCALDIR = ASSETDIR.joinpath("default_calibrations")
 
@@ -30,7 +30,7 @@ PFMTp20DIR = PFMCALDIR.joinpath("20220804_pfm_55Fe109Cd137Cs_20deg_thr105_LV0d5"
 PFMTp10DIR = PFMCALDIR.joinpath("20220805_pfm_55Fe109Cd137Cs_10deg_thr105_LV0d5")
 PFMTp00DIR = PFMCALDIR.joinpath("20220805_pfm_55Fe109Cd137Cs_00deg_thr105_LV0d5")
 PFMTm10DIR = PFMCALDIR.joinpath("20220808_pfm_55Fe109Cd137Cs_m10deg_105thr_LV0d5")
-PFMTm20DIR = PFMCALDIR.joinpath("20220808_pfm_55Fe109Cd137Cs_m20deg_95thr_LV0d5")
+PFMTm20DIR = PFMCALDIR.joinpath("20220808_pfm_55Fe109Cd137Cs_m20deg_105thr_LV0d5")
 PFMTp20CAL = PFMTp20DIR.joinpath("report_cal.xlsx")
 PFMTp10CAL = PFMTp10DIR.joinpath("report_cal.xlsx")
 PFMTp00CAL = PFMTp00DIR.joinpath("report_cal.xlsx")
@@ -107,6 +107,7 @@ LOGFILE = (lambda filepath: RESDIR(filepath).joinpath("log.txt"))
 XFTREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_xfit.xlsx"))
 SFTREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_sfit.xlsx"))
 CALREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_cal.xlsx"))
+RESREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_res.xlsx"))
 SLOREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_slo.xlsx"))
 
 XSPPLOT = (lambda filepath: PLTDIR(filepath).joinpath("spectrum_x.png"))

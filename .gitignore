@@ -5,6 +5,7 @@ output/
 data/
 cache/
 tests/
+todolist.txt
 __pycache__
 
 # jetbrains IDE stuff

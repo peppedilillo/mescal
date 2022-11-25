@@ -34,7 +34,9 @@ def _convert_x_events(data):
 def _convert_gamma_events(data, scint_calibrations, couples):
     out = data[:]
     qm = out["QUADID"].map({key: 100 * s2i(key) for key in "ABCD"})
-    inverted_couples = {key: {v: k for k, v in d.items()} for key, d in couples.items()}
+    inverted_couples = {
+        key: {v: k for k, v in d.items()} for key, d in couples.items()
+    }
     companion_to_channel = dict(
         np.concatenate(
             [
@@ -47,7 +49,9 @@ def _convert_gamma_events(data, scint_calibrations, couples):
     scint_ucid = channel.map(companion_to_channel).fillna(channel)
     ucid_calibs = _as_ucid_dataframe(scint_calibrations)
     if scint_ucid.isin(ucid_calibs.index).all():
-        energies = out["ELECTRONS"] / ucid_calibs.loc[scint_ucid]["light_out"].values
+        energies = (
+            out["ELECTRONS"] / ucid_calibs.loc[scint_ucid]["light_out"].values
+        )
     else:
         raise err.CalibratedEventlistError("failed event calibration.")
     out.insert(0, "ENERGY", energies)
@@ -58,7 +62,11 @@ def _convert_gamma_events(data, scint_calibrations, couples):
 def electrons_to_energy(data, scint_calibrations, couples):
     x_events = _convert_x_events(data)
     gamma_events = _convert_gamma_events(data, scint_calibrations, couples)
-    out = pd.concat((x_events, gamma_events)).sort_values("TIME").reset_index(drop=True)
+    out = (
+        pd.concat((x_events, gamma_events))
+        .sort_values("TIME")
+        .reset_index(drop=True)
+    )
     return out
 
 
@@ -75,7 +83,11 @@ def make_electron_list(
     container = np.recarray(shape=0, dtype=[*dtypes.items()])
 
     disorganized_events = _get_calibrated_events(
-        data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=nthreads
+        data,
+        calibrated_sdds,
+        sfit_results,
+        scintillator_couples,
+        nthreads=nthreads,
     )
 
     for quadrant in disorganized_events.keys():
@@ -152,11 +164,15 @@ def _extract_gamma_events(quadrant_data, scintillator_couples):
     gamma_events = quadrant_data[quadrant_data["EVTYPE"] == "S"]
     channels = gamma_events["CHN"]
     companion_to_chn = {k: v for v, k in scintillator_couples.items()}
-    same_value_if_coupled = gamma_events["CHN"].map(companion_to_chn).fillna(channels)
+    same_value_if_coupled = (
+        gamma_events["CHN"].map(companion_to_chn).fillna(channels)
+    )
     gamma_events = gamma_events.assign(CHN=same_value_if_coupled)
 
     simultaneous_scintillator_events = gamma_events.groupby(["TIME", "CHN"])
-    times, channels = np.array([*simultaneous_scintillator_events.groups.keys()]).T
+    times, channels = np.array(
+        [*simultaneous_scintillator_events.groups.keys()]
+    ).T
 
     electrons_sum = simultaneous_scintillator_events.sum()["ELECTRONS"].values
     calibrated_gamma_events = np.column_stack((times, electrons_sum, channels))
@@ -208,13 +224,19 @@ def add_evtype_tag(data, couples):
 
 
 def filter_spurious(data):
-    return data[(data["NMULT"] < 2) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))]
+    return data[
+        (data["NMULT"] < 2) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))
+    ]
 
 
 def filter_delay(data, hold_time):
     unique_times = data.TIME.unique()
-    bad_events = unique_times[np.where(np.diff(unique_times) < hold_time)[0] + 1]
-    return data.drop(data.index[data["TIME"].isin(bad_events)]).reset_index(drop=True)
+    bad_events = unique_times[
+        np.where(np.diff(unique_times) < hold_time)[0] + 1
+    ]
+    return data.drop(data.index[data["TIME"].isin(bad_events)]).reset_index(
+        drop=True
+    )
 
 
 def infer_onchannels(data):
