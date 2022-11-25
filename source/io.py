@@ -29,12 +29,16 @@ def write_report_to_excel(result_df, path):
 
 
 def read_report_from_excel(from_path, kind):
-    if kind == 'calib':
+    if kind == "calib":
         return pd.read_excel(from_path, index_col=0, sheet_name=None)
-    elif kind == 'peaks':
-        return pd.read_excel(from_path, header=[0,1], index_col=0, sheet_name=None)
-    elif kind == 'fits':
-        return pd.read_excel(from_path, header=[0,1], index_col=0, sheet_name=None)
+    elif kind == "peaks":
+        return pd.read_excel(
+            from_path, header=[0, 1], index_col=0, sheet_name=None
+        )
+    elif kind == "fits":
+        return pd.read_excel(
+            from_path, header=[0, 1], index_col=0, sheet_name=None
+        )
     else:
         raise ValueError("kind must be either 'calib', 'peaks', or 'fits'.")
 

@@ -224,6 +224,7 @@ def draw_and_save_qlooks(res_cal, path, nthreads=1):
         delayed(helper)(quad) for quad in res_cal.keys()
     )
 
+
 def _grid(n, margin, spacing):
     """
     generates boundaries arrays for map plots
@@ -231,59 +232,68 @@ def _grid(n, margin, spacing):
     assert 0 < margin < 1
     assert spacing > 0
     w = 1 - margin
-    op = [(w + margin/2)*i for i in range(n)]
-    cl = [(w - margin/2) + (w + margin/2)*i for i in range(n)]
+    op = [(w + margin / 2) * i for i in range(n)]
+    cl = [(w - margin / 2) + (w + margin / 2) * i for i in range(n)]
     opcl = np.dstack((op, cl)).reshape(-1)
     axis = np.concatenate((opcl, opcl + n + spacing))
     return axis
+
 
 def _transf(mat):
     """
     transform a 12x10 matrix of values into a 24x20 matrix.
     used in map plots.
     """
-    m1 = np.dstack((mat, -np.ones((12,10)))).reshape((12,20))
-    m2 = np.hstack((m1, -np.ones((12,20)))).reshape((24,20))
-    m2 = m2[:-1,:-1]
+    m1 = np.dstack((mat, -np.ones((12, 10)))).reshape((12, 20))
+    m2 = np.hstack((m1, -np.ones((12, 20)))).reshape((24, 20))
+    m2 = m2[:-1, :-1]
     return m2
 
-def mapenres(source, en_res, detmap, **kwargs):
+
+def _chtext(detmap):
     from source.detectors import UNBOND
 
-    mat = np.zeros((12, 10))
     chtext = np.zeros((12, 10)).astype(int)
-    quadtext = np.zeros((12, 10)).astype(int)
-
     for i, quad, (tx, ty) in zip(
-            [0, 1, 2, 3],
-            ['A', 'B', 'C', 'D'],
-            [(0, 0), (5, 0), (0, 6), (5, 6)]
+        [0, 1, 2, 3], ["A", "B", "C", "D"], [(0, 0), (5, 0), (0, 6), (5, 6)]
     ):
-        if quad in en_res.keys():
-            quadmap = np.array(detmap[quad])
-            channels = en_res[quad][source].index
-            chns_indeces = quadmap[channels]
-            values = en_res[quad][source]['resolution'].values
-            rows, cols = chns_indeces.T
-            mat[rows + ty, cols + tx] = values
-            rows, cols = quadmap[
-                (quadmap != UNBOND)[:, 0]
-                & (quadmap != UNBOND)[:, 1]
-                ].T
-            chtext[rows + ty, cols + tx] = np.arange(len(quadmap))[
-                (quadmap != UNBOND)[:, 0]
-                & (quadmap != UNBOND)[:, 1]
-                ]
-            quadtext[rows + ty, cols + tx] = i
+        quadmap = np.array(detmap[quad])
+        rows, cols = quadmap[
+            (quadmap != UNBOND)[:, 0] & (quadmap != UNBOND)[:, 1]
+            ].T
+        chtext[rows + ty, cols + tx] = np.arange(len(quadmap))[
+            (quadmap != UNBOND)[:, 0] & (quadmap != UNBOND)[:, 1]
+            ]
+    return chtext
 
+
+quadtext = np.array(
+    [[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+     [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+     [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+     [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+     [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+     [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+     [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+     [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+     [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+     [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+     [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+     [2, 2, 2, 2, 2, 3, 3, 3, 3, 3]]
+).astype(int)
+
+
+def _mapplot(mat, detmap, maskvalue=None, **kwargs):
     xs = _grid(5, margin=0.1, spacing=0.5)
     ys = _grid(6, margin=0.1, spacing=0.3)
+    chtext = _chtext(detmap)
     zs = _transf(mat)
-    zm = np.ma.masked_less(np.ma.masked_greater(zs[::-1], 0.01), 0)
 
     fig, ax = plt.subplots(**kwargs)
     pos = ax.pcolormesh(xs, ys, zs[::-1], vmin=zs[zs > 0].min())
-    plt.pcolor(xs, ys, zm, hatch='///', alpha=0.)
+    if maskvalue is not None:
+        zm = np.ma.masked_not_equal(zs, 0)
+        plt.pcolor(xs, ys, zm[::-1], hatch="///", alpha=0.0)
     wx = xs[2] - xs[1]
     wy = ys[2] - ys[1]
     for i in range(10):
@@ -293,13 +303,40 @@ def mapenres(source, en_res, detmap, **kwargs):
                 (xs[2 * i] + xs[2 * i + 1]) / 2 - wx,
                 ys[2 * j] + wy,
                 "{}{:02d}".format(
-                    ['A', 'B', 'C', 'D'][quad],
-                    chtext[::-1][j, i]
-                )
+                    ["A", "B", "C", "D"][quad], chtext[::-1][j, i]
+                ),
             )
     ax.set_axis_off()
-    fig.colorbar(pos, label='Energy resolution [keV]', ax=ax, aspect=30, pad=wy / 10, location='bottom')
+    fig.colorbar(
+        pos,
+        label="Energy resolution [keV]",
+        ax=ax,
+        aspect=30,
+        pad=wy / 10,
+        location="bottom",
+    )
     return fig, ax
+
+
+def mapenres(source, en_res, detmap, **kwargs):
+    mat = np.zeros((12, 10))
+
+    for i, quad, (tx, ty) in zip(
+        [0, 1, 2, 3],
+        ["A", "B", "C", "D"],
+        [(0, 0), (5, 0), (0, 6), (5, 6)],
+    ):
+        if quad in en_res.keys():
+            quadmap = np.array(detmap[quad])
+            channels = en_res[quad][source].index
+            chns_indeces = quadmap[channels]
+            values = en_res[quad][source]["resolution"].values
+            rows, cols = chns_indeces.T
+            mat[rows + ty, cols + tx] = values
+
+    fig, ax = _mapplot(mat, detmap, maskvalue=0)
+    return fig, ax
+
 
 def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
     fig, ax = plt.subplots(1, 1, **kwargs)
@@ -496,10 +533,8 @@ def _sloplot(res_slo, **kwargs):
     ax.set_xlabel("Channel")
     ax.set_ylabel("Light Output [ph/keV]")
     ax.set_xticks(res_slo.index)
-    ax.set_xticklabels(res_slo.index, rotation=45, ha='right')
+    ax.set_xticklabels(res_slo.index, rotation=45, ha="right")
     ax.minorticks_off()
     ax.set_xlim((0, 32))
     ax.legend()
     return fig, ax
-
-

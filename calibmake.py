@@ -52,14 +52,16 @@ parser = argparse.ArgumentParser(description=description)
 parser.add_argument(
     "model",
     choices=["fm1", "pfm", "fm2", "fm3"],
-    help="hermes flight model to calibrate. "
+    help="hermes flight model to calibrate. ",
 )
+
 parser.add_argument(
     "radsources",
     help="radioactive sources used for calibration. "
     "separated by comma, e.g. `Fe,Cd,Cs`."
     "currently supported sources: Fe, Cd, Am, Cs.",
 )
+
 parser.add_argument(
     "filepath",
     help="input acquisition file in standard 0.5 fits format.",
@@ -69,8 +71,7 @@ parser.add_argument(
     "--adc",
     choices=["LYRA-BE", "CAEN-DT5740"],
     default="LYRA-BE",
-    help="select which adc configuration to use."
-    "defaults to LYRA-BE.",
+    help="select which adc configuration to use." "defaults to LYRA-BE.",
 )
 
 parser.add_argument(
@@ -119,7 +120,7 @@ def parse_args():
 def unpack_configuration(adc):
     config = configparser.ConfigParser()
     config.read("./source/config.ini")
-    general = config['general']
+    general = config["general"]
     adcitems = config[adc]
     out = {
         "retrigger_delay": general.getfloat("retrigger_delay"),
@@ -214,7 +215,7 @@ class Mescal(Cmd):
     prompt = "[mescal] "
     failure = "[red]Cannnot execute with present calibration."
     spinner_message = "Working.."
-    xenres_source = 'Fe 5.9 keV'
+    xenres_source = "Fe 5.9 keV"
 
     def __init__(self, args, threads):
         console = interface.hello()
@@ -341,19 +342,17 @@ class Mescal(Cmd):
         return True
 
     # commands callable from the user
-    def do_save_all(self, arg):
+    def do_svall(self, arg):
         """Export all exportable tables and figures.
-           Will not export calibrated event list."""
+        Will not export calibrated event list."""
         cmds = [
-            "save_hist_plots",
-            "save_xdiagns_plots",
-            "save_xfit_table",
-            "save_xspectra_plots",
-            "save_xlin_plots",
-            "save_sdiagns_plots",
-            "save_sfit_table",
-            "save_sspectra_plots",
-            "save_sspectra_plots",
+            "svhistplot",
+            "svdiags",
+            "svtabfit",
+            "svxplots",
+            "svlinplots",
+            "svsplots",
+            "svsplots",
         ]
         for cmd in cmds:
             if self.can(cmd):
@@ -368,12 +367,14 @@ class Mescal(Cmd):
     def do_retry(self, arg):
         """Launches calibration again."""
         with self.console.status(self.spinner_message):
-            sections_rule(self.console, "[bold italic]Calibration log", style="green")
+            sections_rule(
+                self.console, "[bold italic]Calibration log", style="green"
+            )
             self.calibration._calibrate()
             self._process_results(self.args.fmt, self.args.filepath)
             sections_rule(self.console, "[bold italic]Shell", style="green")
 
-    def do_set_xfit_lims(self, arg):
+    def do_setxlim(self, arg):
         """Reset channel X peaks position."""
         parsed_arg = parse_chns(arg)
         if parsed_arg is INVALID_ENTRY:
@@ -397,7 +398,7 @@ class Mescal(Cmd):
                     ch, (source, label_hi)
                 ] = int(lim_hi)
 
-    def do_show_hist(self, arg):
+    def do_plothist(self, arg):
         """Plots uncalibrated data from a channel."""
         parsed_arg = parse_chns(arg)
         if parsed_arg is INVALID_ENTRY:
@@ -414,14 +415,16 @@ class Mescal(Cmd):
         ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
         plt.show(block=False)
 
-    def can_show_xenres(self):
-        if (self.xenres_source in self.calibration.xradsources().keys()
-                and self.calibration.en_res is not None):
+    def can_mapres(self):
+        if (
+            self.xenres_source in self.calibration.xradsources().keys()
+            and self.calibration.en_res is not None
+        ):
             return True
 
-    def do_show_xenres(self, arg):
+    def do_mapres(self, arg):
         """Plots X energy resolution map."""
-        if not self.can_show_xenres():
+        if not self.can_mapres():
             self.console.print(self.failure)
             return False
         fig, ax = mapenres(
@@ -433,10 +436,10 @@ class Mescal(Cmd):
         ax.set_title("Energy resolution")
         plt.show(block=False)
 
-    def can_save_hist_plots(self):
+    def can_svhistplot(self):
         return True
 
-    def do_save_hist_plots(self, arg):
+    def do_svhistplot(self, arg):
         """Save raw acquisition histogram plots."""
         with self.console.status(self.spinner_message):
             draw_and_save_uncalibrated(
@@ -446,49 +449,65 @@ class Mescal(Cmd):
                 self.threads,
             )
 
-    def can_save_xdiagns_plots(self):
-        if self.calibration.xfit:
+    def can_svdiags(self):
+        if self.calibration.xfit or self.calibration.sfit:
             return True
         return False
 
-    def do_save_xdiagns_plots(self, arg):
+    def do_svdiags(self, arg):
         """Save X peak detection diagnostics plots."""
-        if not self.can_save_xdiagns_plots():
+        if not self.can_svdiags():
             self.console.print(self.failure)
             return False
         with self.console.status(self.spinner_message):
-            draw_and_save_diagns(
-                self.calibration.xhistograms,
-                self.calibration.xfit,
-                paths.XDNPLOT(self.args.filepath),
-                self.config["margin_diag_plot"],
-                self.threads,
-            )
+            if self.calibration.xfit:
+                draw_and_save_diagns(
+                    self.calibration.xhistograms,
+                    self.calibration.xfit,
+                    paths.XDNPLOT(self.args.filepath),
+                    self.config["margin_diag_plot"],
+                    self.threads,
+                )
+            if self.calibration.sfit:
+                draw_and_save_diagns(
+                    self.calibration.shistograms,
+                    self.calibration.sfit,
+                    paths.SDNPLOT(self.args.filepath),
+                    self.config["margin_diag_plot"],
+                    self.threads,
+                )
 
-    def can_save_xfit_table(self):
-        if self.calibration.xfit:
+    def can_svtabfit(self):
+        if self.calibration.xfit or self.calibration.sfit:
             return True
         return False
 
-    def do_save_xfit_table(self, arg):
+    def do_svtabfit(self, arg):
         """Save X fit tables."""
-        if not self.can_save_xfit_table():
+        if not self.can_svtabfit():
             self.console.print(self.failure)
             return False
         with self.console.status(self.spinner_message):
-            write_report_to_excel(
-                self.calibration.xfit,
-                paths.XFTREPORT(self.args.filepath),
-            )
+            if self.calibration.xfit:
+                write_report_to_excel(
+                    self.calibration.xfit,
+                    paths.XFTREPORT(self.args.filepath),
+                )
+            if self.calibration.sfit:
+                write_report_to_excel(
+                    self.calibration.sfit,
+                    paths.SFTREPORT(self.args.filepath),
+                )
 
-    def can_save_xspectra_plots(self):
+
+    def can_svxplots(self):
         if self.calibration.sdd_cal:
             return True
         return False
 
-    def do_save_xspectra_plots(self, arg):
-        """Save X sources fit tables."""
-        if not self.can_save_xspectra_plots():
+    def do_svxplots(self, arg):
+        """Save calibrated X channel spectra."""
+        if not self.can_svxplots():
             self.console.print(self.failure)
             return False
         with self.console.status(self.spinner_message):
@@ -500,14 +519,14 @@ class Mescal(Cmd):
                 self.threads,
             )
 
-    def can_save_xlin_plots(self):
+    def can_svlinplots(self):
         if self.calibration.sdd_cal:
             return True
         return False
 
-    def do_save_xlin_plots(self, args):
+    def do_svlinplots(self, args):
         """Save SDD linearity plots."""
-        if not self.can_save_xlin_plots():
+        if not self.can_svlinplots():
             self.console.print(self.failure)
             return False
         with self.console.status(self.spinner_message):
@@ -519,49 +538,14 @@ class Mescal(Cmd):
                 self.threads,
             )
 
-    def can_save_sdiagns_plots(self):
-        if self.calibration.sfit:
-            return True
-        return False
-
-    def do_save_sdiagns_plots(self, args):
-        """Save S peak detection diagnostics plots."""
-        if not self.can_save_sdiagns_plots():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_diagns(
-                self.calibration.shistograms,
-                self.calibration.sfit,
-                paths.SDNPLOT(self.args.filepath),
-                self.config["margin_diag_plot"],
-                self.threads,
-            )
-
-    def can_save_sfit_table(self):
-        if self.calibration.sfit:
-            return True
-        return False
-
-    def do_save_sfit_table(self, arg):
-        """Save gamma sources fit tables."""
-        if not self.can_save_sfit_table():
-            self.console.print(self.failure)
-            return False
-        with self.console.status(self.spinner_message):
-            write_report_to_excel(
-                self.calibration.sfit,
-                paths.SFTREPORT(self.args.filepath),
-            )
-
-    def can_save_sspectra_plots(self):
+    def can_svsplots(self):
         if self.calibration.optical_coupling:
             return True
         return False
 
-    def do_save_sspectra_plots(self, arg):
-        """Save gamma sources fit tables."""
-        if not self.can_save_sspectra_plots():
+    def do_svsplots(self, arg):
+        """Save calibrated gamma channel spectra."""
+        if not self.can_svsplots():
             self.console.print(self.failure)
             return False
         with self.console.status(self.spinner_message):
@@ -574,14 +558,14 @@ class Mescal(Cmd):
                 self.threads,
             )
 
-    def can_save_event_fits(self):
+    def can_svevents(self):
         if self.eventlist is not None:
             return True
         return False
 
-    def do_save_event_fits(self, arg):
+    def do_svevents(self, arg):
         """Save calibrated events to fits file."""
-        if not self.can_save_event_fits():
+        if not self.can_svevents():
             self.console.print(self.failure)
             return False
         with self.console.status(self.spinner_message):
