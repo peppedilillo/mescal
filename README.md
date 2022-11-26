@@ -13,7 +13,7 @@ It supposes you have an acquisition of some radioactive sources ready in the sta
 
 _Example:_
 
-To launch `calibmake.py` over a calibration acquisition (FM1, radioactive sources 55Fe, 109Cd and 137Cs) located at path  "C:\somepath\acquisition_of_fecdcs_0d5format.fits":
+To launch `calibmake.py` over a calibration acquisition (FM1, radioactive sources 55Fe, 109Cd and 137Cs) located at path  "`C:\somepath\acquisition_of_fecdcs_0d5format.fits`":
 
 1. Move to the mescal directory.
 2. Launch `python calibmake.py fm1 Fe,Cd,Cs "C:\somepath\acquisition_of_fecdcs_0d5format.fits""`
