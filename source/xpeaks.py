@@ -158,7 +158,7 @@ def promscores(peaks_combinations_proms):
     """
     evaluates prominence of a peak combination.
     """
-    scores = [np.sum(peaks_proms) for peaks_proms in peaks_combinations_proms]
+    scores = [np.prod(peaks_proms) for peaks_proms in peaks_combinations_proms]
     return scores
 
 
