@@ -19,7 +19,7 @@ def find_xpeaks(
     energies,
     gain_guess,
     offset_guess,
-    mincounts=200,
+    mincounts=100,
     width=5,
     distance=5,
     smoothing=5,

@@ -3,6 +3,26 @@ import numpy as np
 
 UNBOND = (-1, -1)
 
+
+dm = {
+    'A': ((5, 0), (5, 1), (5, 2), (5, 3), UNBOND, (4, 1), (4, 0), (3, 0),
+          (3, 1), (5, 4), (4, 4), (3, 4), (4, 3), (3, 2), (4, 2), (3, 3),
+          UNBOND, (2, 4), (2, 3), (2, 2), (2, 1), (2, 0), (1, 0), (1, 1),
+          (1, 2), (1, 3), (1, 4), (0, 4), (0, 3), (0, 2), (0, 1), (0, 0)),
+    'B': (UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND,
+          UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND,
+          UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND,
+          UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND),
+    'C': (UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND,
+          UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND,
+          UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND,
+          UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND),
+    'D': (UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND,
+          UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND,
+          UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND,
+          UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND, UNBOND)
+}
+
 fm1 = {
     'D': ((5, 2), (5, 0), (5, 3), (5, 1), (5, 4), (4, 1), (4, 4), (4, 0),
           (4, 3), (4, 2), (3, 0), (3, 2), UNBOND, (3, 1), (3, 3), (3, 4),
@@ -80,9 +100,10 @@ fm3 = {
 }
 
 
-
 def get_quadrant_map(model: str, quad: str, arr_borders):
-    if model == "fm1":
+    if model == "dm":
+        detector_map = dm
+    elif model == "fm1":
         detector_map = fm1
     elif model == "pfm":
         detector_map = pfm
@@ -102,15 +123,18 @@ def get_quadrant_map(model: str, quad: str, arr_borders):
         return tuple(map(lambda x: (x[0] + int(x[0] / 2), x[1]), arr))
     return arr
 
+
 def get_map(model):
     return {quad: get_quadrant_map(model, quad, arr_borders=False)
             for quad in ['A', 'B', 'C', 'D']}
+
 
 def get_quad_couples(model, quad):
     qmaparr = np.array(get_quadrant_map(model, quad, arr_borders=True))
     arr = np.lexsort((qmaparr[:, 0], qmaparr[:, 1])).reshape(16, 2)[1:]
     dic = dict(arr)
     return dic
+
 
 def get_couples(model):
     return {q: get_quad_couples(model, q) for q in "ABCD"}
@@ -124,7 +148,6 @@ class Detector:
         self.couples = get_couples(model)
 
 
-
 # will run some test on detector maps
 if __name__ == '__main__':
     TOT_QUAD = 4
@@ -134,8 +157,8 @@ if __name__ == '__main__':
     COLS = 5
 
     for map, model in zip(
-            [fm1, pfm, fm2, fm3],
-            ['fm1', 'pfm', 'fm2', 'fm3']
+            [dm, fm1, pfm, fm2, fm3],
+            ['dm', 'fm1', 'pfm', 'fm2', 'fm3']
     ):
         # checks for 4 quadrants
         assert len(map.keys()) == TOT_QUAD
@@ -145,18 +168,17 @@ if __name__ == '__main__':
             bonded = [sdd for sdd in map[quadrant] if sdd != UNBOND]
             # checks for 32 channels
             assert len(channels) == TOT_CH
-            # checks for 2 unbounded channels
-            print(set(bonded))
-            assert len(set(bonded)) == TOT_BONDED
             # checks for no duplicates in each quadrant
             assert len(bonded) == len(set(bonded))
-            # check for all places to be assigned
-            for row in range(ROWS):
-                for column in range(COLS):
-                    assert (row, column) in bonded
-
             # check no entry out of grid
             for row, col in bonded:
                 assert row < ROWS
                 assert col < COLS
+            if not ((model=='dm') and quadrant in ['B', 'C', 'D']):
+                # checks for 2 unbounded channels
+                assert len(set(bonded)) == TOT_BONDED
+                # check for all places to be assigned
+                for row in range(ROWS):
+                    for column in range(COLS):
+                        assert (row, column) in bonded
     print("Good news! All tests passed.")

@@ -51,7 +51,7 @@ parser = argparse.ArgumentParser(description=description)
 
 parser.add_argument(
     "model",
-    choices=["fm1", "pfm", "fm2", "fm3"],
+    choices=["dm", "fm1", "pfm", "fm2", "fm3"],
     help="hermes flight model to calibrate. ",
 )
 
@@ -123,6 +123,7 @@ def unpack_configuration(adc):
     general = config["general"]
     adcitems = config[adc]
     out = {
+        "xpeaks_mincounts": general.getint("xpeaks_mincounts"),
         "retrigger_delay": general.getfloat("retrigger_delay"),
         "filter_spurious": general.getboolean("filter_spurious"),
         "bitsize": adcitems.getint("bitsize"),

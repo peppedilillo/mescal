@@ -302,17 +302,14 @@ class Calibrate:
         # X calibration
         if len(self.xradsources()) < 2:
             return None
-        gain_center = self.configuration["gain_center"]
-        gain_sigma = self.configuration["gain_sigma"]
-        offset_center = self.configuration["offset_center"]
-        offset_sigma = self.configuration["offset_sigma"]
-        gain_guess = (gain_center, gain_sigma)  # peak detection prior estimate
-        offset_guess = (
-            offset_center,
-            offset_sigma,
-        )  # peak detection prior estimate
+        # generally self.xpeaks will not be None when
+        # attempting a new sdd calibration.
         if self.xpeaks is None:
-            self.xpeaks = self._detect_xpeaks(gain_guess, offset_guess)
+            self.xpeaks = self._detect_xpeaks()
+        elif self.flagged['xpeak']:
+            for quad, ch in self.flagged['xpeak']:
+                message = err.warn_peak_detection(quad, ch)
+                logging.warning(message)
         self.xfit = self._fit_xradsources()
         self.sdd_cal = self._calibrate_sdds()
         self.en_res = self._compute_energy_resolution()
@@ -321,10 +318,7 @@ class Calibrate:
         # S calibration
         if not self.sradsources():
             return None
-        lightout_center = self.configuration["lightout_center"]
-        lightout_sigma = self.configuration["lightout_sigma"]
-        lightout_guess = (lightout_center, lightout_sigma)
-        self.speaks = self._detect_speaks(lightout_guess)
+        self.speaks = self._detect_speaks()
         self.sfit = self._fit_sradsources()
         electron_evlist = make_electron_list(
             self.data,
@@ -335,7 +329,7 @@ class Calibrate:
         )
         self.ebins = linrange(1000, 25000, 50)
         self.ehistograms = self._make_ehistograms(electron_evlist)
-        self.epeaks = self._detect_epeaks(lightout_guess)
+        self.epeaks = self._detect_epeaks()
         self.efit = self._fit_gamma_electrons()
         self.scint_cal = self._calibrate_scintillators()
         self.optical_coupling = self._compute_effective_light_outputs()
@@ -460,7 +454,17 @@ class Calibrate:
         return histograms
 
     @as_peaks_dataframe
-    def _detect_xpeaks(self, gain_guess, offset_guess):
+    def _detect_xpeaks(self):
+        gain_center = self.configuration["gain_center"]
+        gain_sigma = self.configuration["gain_sigma"]
+        offset_center = self.configuration["offset_center"]
+        offset_sigma = self.configuration["offset_sigma"]
+        gain_guess = (gain_center, gain_sigma)  # peak detection prior estimate
+        offset_guess = (
+            offset_center,
+            offset_sigma,
+        )  # peak detection prior estimate
+
         bins = self.xhistograms.bins
         radiation_sources = self.xradsources()
         energies = [s.energy for s in radiation_sources.values()]
@@ -477,6 +481,7 @@ class Calibrate:
                         energies,
                         gain_guess,
                         offset_guess,
+                        mincounts=self.configuration["xpeaks_mincounts"]
                     )
                 except err.DetectPeakError:
                     message = err.warn_peak_detection(quad, ch)
@@ -528,7 +533,11 @@ class Calibrate:
         return results, radiation_sources
 
     @as_peaks_dataframe
-    def _detect_speaks(self, lightout_guess):
+    def _detect_speaks(self):
+        lightout_center = self.configuration["lightout_center"]
+        lightout_sigma = self.configuration["lightout_sigma"]
+        lightout_guess = (lightout_center, lightout_sigma)
+
         bins = self.shistograms.bins
         radiation_sources = self.sradsources()
         energies = [s.energy for s in radiation_sources.values()]
@@ -606,7 +615,11 @@ class Calibrate:
         return results, radiation_sources
 
     @as_peaks_dataframe
-    def _detect_epeaks(self, lightout_guess):
+    def _detect_epeaks(self):
+        lightout_center = self.configuration["lightout_center"]
+        lightout_sigma = self.configuration["lightout_sigma"]
+        lightout_guess = (lightout_center, lightout_sigma)
+
         bins = self.ehistograms.bins
         radiation_sources = self.sradsources()
         energies = [s.energy for s in radiation_sources.values()]
