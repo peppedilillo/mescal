@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from math import floor, ceil
 from scipy.signal import find_peaks
 
 from source.constants import PHOTOEL_PER_KEV

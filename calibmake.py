@@ -1,12 +1,12 @@
 import argparse
 import atexit
-import logging
 import configparser
-
+import logging
 from os import cpu_count
 from pathlib import Path
-import pandas as pd
+
 import matplotlib
+import pandas as pd
 
 from source.interface import sections_rule
 
@@ -26,6 +26,11 @@ from source.plot import (
     draw_and_save_diagns,
     draw_and_save_lins,
     draw_and_save_uncalibrated,
+    draw_and_save_qlooks,
+    draw_and_save_slo,
+    draw_and_save_calibrated_spectra,
+    mapenres,
+    mapcounts,
 )
 
 from source.cmd import Cmd
@@ -36,12 +41,7 @@ from source.io import (
     get_writer,
     pandas_from_LV0d5,
 )
-from source.plot import (
-    draw_and_save_qlooks,
-    draw_and_save_slo,
-    draw_and_save_calibrated_spectra,
-    mapenres,
-)
+
 
 description = (
     "A script to automatically calibrate HERMES-TP/SP "
@@ -63,8 +63,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "filepath",
-    help="input acquisition file in standard 0.5 fits format.",
+    "filepath", help="input acquisition file in standard 0.5 fits format.",
 )
 
 parser.add_argument(
@@ -214,7 +213,7 @@ class Mescal(Cmd):
         "Type help or ? to list commands.\n"
     )
     prompt = "[mescal] "
-    failure = "[red]Cannnot execute with present calibration."
+    prompt_fail_message = "[red]Cannnot execute with present calibration."
     spinner_message = "Working.."
     xenres_source = "Fe 5.9 keV"
 
@@ -298,13 +297,11 @@ class Mescal(Cmd):
 
         if self.calibration.sdd_cal:
             write_report(
-                self.calibration.sdd_cal,
-                path=paths.CALREPORT(filepath),
+                self.calibration.sdd_cal, path=paths.CALREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote SDD calibration results.")
             write_report(
-                self.calibration.en_res,
-                path=paths.RESREPORT(filepath),
+                self.calibration.en_res, path=paths.RESREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote energy resolution results.")
             draw_and_save_qlooks(
@@ -342,7 +339,7 @@ class Mescal(Cmd):
             )
         return True
 
-    # commands callable from the user
+    # prompt commands
     def do_svall(self, arg):
         """Export all exportable tables and figures.
         Will not export calibrated event list."""
@@ -426,7 +423,7 @@ class Mescal(Cmd):
     def do_mapres(self, arg):
         """Plots X energy resolution map."""
         if not self.can_mapres():
-            self.console.print(self.failure)
+            self.console.print(self.prompt_fail_message)
             return False
         fig, ax = mapenres(
             self.xenres_source,
@@ -435,6 +432,22 @@ class Mescal(Cmd):
             figsize=(8, 8),
         )
         ax.set_title("Energy resolution")
+        plt.show(block=False)
+
+    def can_mapcounts(self):
+        return True
+
+    def do_mapcounts(self, arg):
+        """Plots a map of counts per-channel."""
+        if not self.can_mapcounts():
+            self.console.print(self.prompt_fail_message)
+            return False
+        fig, ax = mapcounts(
+            self.calibration.counts(),
+            self.calibration.detector.map,
+            figsize=(8, 8),
+        )
+        ax.set_title("Per-channel counts (pixel events)")
         plt.show(block=False)
 
     def can_svhistplot(self):
@@ -458,7 +471,7 @@ class Mescal(Cmd):
     def do_svdiags(self, arg):
         """Save X peak detection diagnostics plots."""
         if not self.can_svdiags():
-            self.console.print(self.failure)
+            self.console.print(self.prompt_fail_message)
             return False
         with self.console.status(self.spinner_message):
             if self.calibration.xfit:
@@ -486,20 +499,17 @@ class Mescal(Cmd):
     def do_svtabfit(self, arg):
         """Save X fit tables."""
         if not self.can_svtabfit():
-            self.console.print(self.failure)
+            self.console.print(self.prompt_fail_message)
             return False
         with self.console.status(self.spinner_message):
             if self.calibration.xfit:
                 write_report_to_excel(
-                    self.calibration.xfit,
-                    paths.XFTREPORT(self.args.filepath),
+                    self.calibration.xfit, paths.XFTREPORT(self.args.filepath),
                 )
             if self.calibration.sfit:
                 write_report_to_excel(
-                    self.calibration.sfit,
-                    paths.SFTREPORT(self.args.filepath),
+                    self.calibration.sfit, paths.SFTREPORT(self.args.filepath),
                 )
-
 
     def can_svxplots(self):
         if self.calibration.sdd_cal:
@@ -509,7 +519,7 @@ class Mescal(Cmd):
     def do_svxplots(self, arg):
         """Save calibrated X channel spectra."""
         if not self.can_svxplots():
-            self.console.print(self.failure)
+            self.console.print(self.prompt_fail_message)
             return False
         with self.console.status(self.spinner_message):
             draw_and_save_channels_xspectra(
@@ -528,7 +538,7 @@ class Mescal(Cmd):
     def do_svlinplots(self, args):
         """Save SDD linearity plots."""
         if not self.can_svlinplots():
-            self.console.print(self.failure)
+            self.console.print(self.prompt_fail_message)
             return False
         with self.console.status(self.spinner_message):
             draw_and_save_lins(
@@ -547,7 +557,7 @@ class Mescal(Cmd):
     def do_svsplots(self, arg):
         """Save calibrated gamma channel spectra."""
         if not self.can_svsplots():
-            self.console.print(self.failure)
+            self.console.print(self.prompt_fail_message)
             return False
         with self.console.status(self.spinner_message):
             draw_and_save_channels_sspectra(
@@ -567,12 +577,11 @@ class Mescal(Cmd):
     def do_svevents(self, arg):
         """Save calibrated events to fits file."""
         if not self.can_svevents():
-            self.console.print(self.failure)
+            self.console.print(self.prompt_fail_message)
             return False
         with self.console.status(self.spinner_message):
             write_eventlist_to_fits(
-                self.eventlist,
-                paths.EVLFITS(self.args.filepath),
+                self.eventlist, paths.EVLFITS(self.args.filepath),
             )
 
 

@@ -544,5 +544,26 @@ def mapenres(source, en_res, detmap, **kwargs):
             rows, cols = chns_indeces.T
             mat[rows + ty, cols + tx] = values
 
-    fig, ax = _mapplot(mat, detmap, maskvalue=0)
+    fig, ax = _mapplot(mat, detmap, maskvalue=0, **kwargs)
+    return fig, ax
+
+
+def mapcounts(counts, detmap, **kwargs):
+    mat = np.zeros((12, 10))
+
+    for i, quad, (tx, ty) in zip(
+        [0, 1, 2, 3],
+        ["A", "B", "C", "D"],
+        [(0, 0), (5, 0), (0, 6), (5, 6)],
+    ):
+        if quad in counts.keys():
+            quadmap = np.array(detmap[quad])
+            channels = counts[quad].index
+            chns_indeces = quadmap[channels]
+            values = counts[quad]['counts'].values
+
+            rows, cols = chns_indeces.T
+            mat[rows + ty, cols + tx] = values
+
+    fig, ax = _mapplot(mat, detmap, maskvalue=0, **kwargs)
     return fig, ax

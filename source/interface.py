@@ -2,11 +2,9 @@ from time import sleep
 
 from rich.console import Console
 from rich.text import Text
-from rich.rule import Rule
 
 from source.paths import LOGOPATH
 from source.utils import get_version
-
 
 hdr_text = (
     Text()

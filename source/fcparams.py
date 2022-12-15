@@ -4,11 +4,9 @@ Credits: Francesco Ceraudo, all rights reserved. (Thanks Francesco!)
 """
 
 import itertools
-import matplotlib as mpl
-from matplotlib import colors
+
 import numpy as np
 from cycler import cycler
-import copy
 
 
 def changeLineCycle(rcParams, style=True, color="k", mpl=None):

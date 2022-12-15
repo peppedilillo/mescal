@@ -1,11 +1,10 @@
+import argparse
 from math import ceil
 from pathlib import Path
-import argparse
 
 import matplotlib
 
 matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
 import astropy.io.fits as fitsio
 import numpy as np
 import pandas as pd

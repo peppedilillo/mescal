@@ -2,11 +2,11 @@ import logging
 from collections import namedtuple
 from math import floor, ceil
 
+import matplotlib
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from lmfit.models import GaussianModel, LinearModel
-import matplotlib
 
 matplotlib.use("TkAgg")
 
@@ -19,6 +19,7 @@ from source.eventlist import (
     add_evtype_tag,
     filter_delay,
     filter_spurious,
+    perchannel_counts,
 )
 from source.xpeaks import find_xpeaks
 from source.speaks import find_speaks, find_epeaks
@@ -215,6 +216,7 @@ class Calibrate:
         self.radsources = radsources
         self.detector = detector
         self.configuration = configuration
+        self._counts = None
         self.data = None
         self.channels = None
         self.xbins = None
@@ -306,7 +308,7 @@ class Calibrate:
         # attempting a new sdd calibration.
         if self.xpeaks is None:
             self.xpeaks = self._detect_xpeaks()
-        elif self.flagged['xpeak']:
+        elif 'xpeak' in self.flagged:
             for quad, ch in self.flagged['xpeak']:
                 message = err.warn_peak_detection(quad, ch)
                 logging.warning(message)
@@ -694,25 +696,72 @@ class Calibrate:
         return results, radiation_sources
 
     @staticmethod
-    def _calibrate_chn(centers, radsources: list, weights=None):
-        lmod = LinearModel()
-        pars = lmod.guess(centers, x=radsources)
-        try:
-            resultlin = lmod.fit(
-                centers,
-                pars,
-                x=radsources,
-                weights=weights,
-            )
-        except ValueError:
-            raise err.FailedFitError("linear fitter error")
+    def _calibrate_chn(centers, energies: list, weights=None):
+       lmod = LinearModel()
+       pars = lmod.guess(centers, x=energies)
+       try:
+           resultlin = lmod.fit(
+               centers,
+               pars,
+               x=energies,
+               weights=weights,
+           )
+       except ValueError:
+           raise err.FailedFitError("linear fitter error")
 
-        chi2 = resultlin.redchi
-        gain = resultlin.params["slope"].value
-        offset = resultlin.params["intercept"].value
-        gain_err = resultlin.params["slope"].stderr
-        offset_err = resultlin.params["intercept"].stderr
-        return gain, gain_err, offset, offset_err, chi2
+       chi2 = resultlin.redchi
+       gain = resultlin.params["slope"].value
+       offset = resultlin.params["intercept"].value
+       gain_err = resultlin.params["slope"].stderr
+       offset_err = resultlin.params["intercept"].stderr
+       return gain, gain_err, offset, offset_err, chi2
+
+    # @staticmethod
+    # def _calibrate_chn(centers, energies, centers_errs):
+    #     """
+    #     Performs a linear regression of data with y-uncertainties.
+    #     Based on:
+    #     NUMERICAL RECIPES IN FORTRAN 77: THE ART OF SCIENTIFIC COMPUTING
+    #     (ISBN 0-521-43064-X) by W.H. Press et al., 1993, Chapter 15, pg. 657
+    #     Input data can be in any form that can be converted to a numpy
+    #     array, e.g. lists, tuples, ndarrays.
+    #
+    #     Args:
+    #         centers: the fits' centroids.
+    #         energies: the energy values.
+    #         centers_errs: the error on the fits centroid.
+    #
+    #     Returns:
+    #         gain, gain_err, offset, offset_err, redchi2
+    #     """
+    #     assert len(energies) == len(centers) == len(centers_errs)
+    #     assert len(centers) >= 2
+    #
+    #     x = np.asarray(energies)
+    #     y = np.asarray(centers)
+    #     y_err = np.asarray(centers_errs)
+    #
+    #     S = np.sum(1/y_err**2)
+    #     Sx = np.sum(x/y_err**2)
+    #     Sy = np.sum(y/y_err**2)
+    #     Sxx = np.sum(x**2/y_err**2)
+    #     Sxy = np.sum(x*y/y_err**2)
+    #     D = S*Sxx - Sx**2
+    #
+    #     a = (Sxx * Sy - Sx * Sxy)/D
+    #     a_stdev = np.sqrt(Sxx/D)
+    #     b = (S*Sxy - Sx*Sy)/D
+    #     b_stdev = np.sqrt(S/D)
+    #     if len(x) == 2:
+    #         redchi2 = np.nan
+    #     else:
+    #         redchi2 = np.sum((y - (a + b*x))**2/y_err**2)/(len(x) - 2)
+    #
+    #     offset = a
+    #     offset_err = a_stdev
+    #     gain = b
+    #     gain_err = b_stdev
+    #     return gain, gain_err, offset, offset_err, redchi2
 
     @as_cal_dataframe
     def _calibrate_sdds(self):
@@ -729,8 +778,13 @@ class Calibrate:
                     cal_results = self._calibrate_chn(
                         centers,
                         energies,
-                        center_errs,
+                        weights=1/center_errs**2,
                     )
+                    # cal_results = self._calibrate_chn(
+                    #     centers,
+                    #     energies,
+                    #     center_errs,
+                    # )
                 except err.FailedFitError:
                     message = err.warn_failed_linearity_fit(quad, ch)
                     logging.warning(message)
@@ -898,7 +952,6 @@ class Calibrate:
                     results.setdefault(quad, {})[ch] = np.array((eff, eff_err))
         return results
 
-
     @staticmethod
     def _peak_fitter(x, y, limits):
         start, stop = limits
@@ -917,7 +970,12 @@ class Calibrate:
         mod.set_param_hint("sigma", max=stop - start)
         pars = mod.guess(y_fit, x=x_fit)
         try:
-            result = mod.fit(y_fit, pars, x=x_fit, weights=1 / errors)
+            result = mod.fit(
+                y_fit,
+                pars,
+                x=x_fit,
+                weights=1/errors**2,
+            )
         except TypeError:
             raise err.FailedFitError("peak fit error.")
         x_fine = np.linspace(x[0], x[-1], len(x) * 100)
@@ -959,3 +1017,8 @@ class Calibrate:
         intervals = [*zip(centers + sigmas * lower, centers + sigmas * upper)]
         fit_results = self._fit_peaks(x, y, intervals)
         return intervals, fit_results
+
+    def counts(self):
+        if self._counts is None:
+            self._counts = perchannel_counts(self.data, self.channels)
+        return self._counts

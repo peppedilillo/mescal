@@ -223,6 +223,25 @@ def add_evtype_tag(data, couples):
     return data
 
 
+def perchannel_counts(data, channels):
+    dict_ = {}
+    for quad in channels.keys():
+        quaddata = data[data['QUADID'] == quad]
+        for ch in channels[quad]:
+            counts = len(quaddata[(quaddata['CHN'] == ch)])
+            dict_.setdefault(quad, {})[ch] = counts
+
+    out = {
+        k: pd.DataFrame(
+            dict_[k],
+            index=['counts'],
+        ).T.rename_axis("channel")
+        for k in dict_
+    }
+    return out
+
+
+
 def filter_spurious(data):
     return data[
         (data["NMULT"] < 2) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))
@@ -244,5 +263,5 @@ def infer_onchannels(data):
     for quad in "ABCD":
         onchs = np.unique(data[data["QUADID"] == quad]["CHN"])
         if onchs.any():
-            out[quad] = onchs
+            out[quad] = onchs.tolist()
     return out

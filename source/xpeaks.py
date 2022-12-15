@@ -1,11 +1,12 @@
-from math import ceil, floor
 from itertools import combinations
-import scipy.signal
-import scipy.stats
+from math import ceil, floor
+
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy.signal
+import scipy.stats
 from sklearn.linear_model import LinearRegression
 
 import source.errors as err

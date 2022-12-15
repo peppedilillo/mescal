@@ -1,4 +1,6 @@
-import string, sys
+import string
+import sys
+
 from rich.rule import Rule
 
 
