@@ -5,6 +5,7 @@ from joblib import Parallel, delayed
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
 
+
 s2i = lambda quad: "ABCD".find(str.upper(quad))
 i2s = lambda n: chr(65 + n)
 
@@ -50,7 +51,7 @@ def _convert_gamma_events(data, scint_calibrations, couples):
     ucid_calibs = _as_ucid_dataframe(scint_calibrations)
     if scint_ucid.isin(ucid_calibs.index).all():
         energies = (
-            out["ELECTRONS"] / ucid_calibs.loc[scint_ucid]["light_out"].values
+                out["ELECTRONS"] / ucid_calibs.loc[scint_ucid]["light_out"].values
         )
     else:
         raise err.CalibratedEventlistError("failed event calibration.")
@@ -71,11 +72,11 @@ def electrons_to_energy(data, scint_calibrations, couples):
 
 
 def make_electron_list(
-    data,
-    calibrated_sdds,
-    sfit_results,
-    scintillator_couples,
-    nthreads=1,
+        data,
+        calibrated_sdds,
+        sfit_results,
+        scintillator_couples,
+        nthreads=1,
 ):
     columns = ["TIME", "ELECTRONS", "EVTYPE", "CHN", "QUADID"]
     types = ["float64", "float32", "U1", "int8", "U1"]
@@ -115,7 +116,7 @@ def make_electron_list(
 
 
 def _get_calibrated_events(
-    data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=1
+        data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=1
 ):
     def helper(quadrant):
         couples = scintillator_couples[quadrant]
@@ -124,7 +125,7 @@ def _get_calibrated_events(
 
         quadrant_data = data[
             (data["QUADID"] == quadrant) & (data["CHN"].isin(coupled_channels))
-        ]
+            ]
         quadrant_data = _insert_electron_column(
             quadrant_data, calibrated_sdds[quadrant]
         )
@@ -241,18 +242,17 @@ def perchannel_counts(data, channels):
     return out
 
 
-
 def filter_spurious(data):
     return data[
         (data["NMULT"] < 2) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))
-    ]
+        ]
 
 
 def filter_delay(data, hold_time):
     unique_times = data.TIME.unique()
     bad_events = unique_times[
         np.where(np.diff(unique_times) < hold_time)[0] + 1
-    ]
+        ]
     return data.drop(data.index[data["TIME"].isin(bad_events)]).reset_index(
         drop=True
     )

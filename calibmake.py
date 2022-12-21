@@ -63,7 +63,8 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "filepath", help="input acquisition file in standard 0.5 fits format.",
+    "filepath",
+    help="input acquisition file in standard 0.5 fits format.",
 )
 
 parser.add_argument(
@@ -79,6 +80,16 @@ parser.add_argument(
     action="store_true",
     help="enables loading and saving from cache.",
 )
+
+# parser.add_argument(
+#     "--nofilter",
+#     default=False,
+#     action="store_true",
+#     help="disable filtering of spurious data. "
+#     "will overcome config.ini settings.",
+# )
+
+
 parser.add_argument(
     "--fmt",
     default="xslx",

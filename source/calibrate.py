@@ -310,7 +310,7 @@ class Calibrate:
             self.xpeaks = self._detect_xpeaks()
         elif 'xpeak' in self.flagged:
             for quad, ch in self.flagged['xpeak']:
-                message = err.warn_peak_detection(quad, ch)
+                message = err.warn_failed_peak_detection(quad, ch)
                 logging.warning(message)
         self.xfit = self._fit_xradsources()
         self.sdd_cal = self._calibrate_sdds()
@@ -486,7 +486,7 @@ class Calibrate:
                         mincounts=self.configuration["xpeaks_mincounts"]
                     )
                 except err.DetectPeakError:
-                    message = err.warn_peak_detection(quad, ch)
+                    message = err.warn_failed_peak_detection(quad, ch)
                     logging.warning(message)
                     self._flag(quad, ch, "xpeak")
                     continue
@@ -523,7 +523,7 @@ class Calibrate:
                         constraints,
                     )
                 except err.FailedFitError:
-                    message = err.warn_peak_fit(quad, ch)
+                    message = err.warn_failed_peak_fit(quad, ch)
                     logging.warning(message)
                     self._flag(quad, ch, "xfit")
                     continue
@@ -563,10 +563,10 @@ class Calibrate:
                 except err.DetectPeakError:
                     companion = self._companion(quad, ch)
                     if companion in self.sdd_cal[quad].index:
-                        message = err.warn_peak_detection(quad, ch)
+                        message = err.warn_failed_peak_detection(quad, ch)
                     else:
                         # companion is off and counts is empty
-                        message = err.warn_peak_detection_offcomp(
+                        message = err.warn_widow(
                             quad, ch, companion
                         )
                     logging.warning(message)
@@ -605,7 +605,7 @@ class Calibrate:
                         constraints,
                     )
                 except err.FailedFitError:
-                    message = err.warn_peak_fit(quad, ch)
+                    message = err.warn_failed_peak_fit(quad, ch)
                     logging.warning(message)
                     self._flag(quad, ch, "sfit")
                     continue
@@ -643,7 +643,7 @@ class Calibrate:
                         lightout_guess,
                     )
                 except err.DetectPeakError:
-                    message = err.warn_peak_detection(quad, scint)
+                    message = err.warn_failed_peak_detection(quad, scint)
                     logging.warning(message)
                     self._flag(quad, scint, "epeaks")
                     continue
@@ -684,7 +684,7 @@ class Calibrate:
                         constraints,
                     )
                 except err.FailedFitError:
-                    message = err.warn_peak_fit(quad, scint)
+                    message = err.warn_failed_peak_fit(quad, scint)
                     logging.warning(message)
                     self._flag(quad, scint, "efit")
                     continue

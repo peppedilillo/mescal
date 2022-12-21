@@ -1,3 +1,4 @@
+import logging
 from math import pi, sqrt
 
 import matplotlib
@@ -9,6 +10,7 @@ import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
 
 from source.constants import PHOTOEL_PER_KEV
+from source.errors import warn_nan_in_sdd_calib
 import source.fcparams as fcm
 
 matplotlib.rcParams = fcm.changeRCParams(
@@ -215,7 +217,12 @@ def draw_and_save_lins(res_cal, res_fit, radsources: dict, path, nthreads=1):
 
 def draw_and_save_qlooks(res_cal, path, nthreads=1):
     def helper(quad):
-        fig, axs = _quicklook(res_cal[quad])
+        quad_res_cal = res_cal[quad]
+        if quad_res_cal.isnull().values.any():
+            message = warn_nan_in_sdd_calib(quad)
+            logging.warning(message)
+            quad_res_cal = quad_res_cal.fillna(0)
+        fig, axs = _quicklook(quad_res_cal)
         axs[0].set_title("Calibration quicklook - Quadrant {}".format(quad))
         fig.savefig(path(quad))
         plt.close(fig)
@@ -366,7 +373,9 @@ def _quicklook(calres, **kwargs):
 
     fig, axs = plt.subplots(2, 1, sharex=True, **kwargs)
     axs[0].errorbar(
-        calres.index, calres["gain"], yerr=calres["gain_err"], fmt="o"
+        calres.index, calres["gain"],
+        yerr=calres["gain_err"],
+        fmt="o",
     )
     axs[0].axhspan(
         *gainpercs,
@@ -492,7 +501,7 @@ def _grid(n, margin, spacing):
     return axis
 
 
-def _mapplot(mat, detmap, maskvalue=None, **kwargs):
+def _mapplot(mat, detmap, colorlabel, maskvalue=None, **kwargs):
     xs = _grid(5, margin=0.1, spacing=0.5)
     ys = _grid(6, margin=0.1, spacing=0.3)
     chtext = _chtext(detmap)
@@ -512,13 +521,15 @@ def _mapplot(mat, detmap, maskvalue=None, **kwargs):
                 (xs[2 * i] + xs[2 * i + 1]) / 2 - wx,
                 ys[2 * j] + wy,
                 "{}{:02d}".format(
-                    ["A", "B", "C", "D"][quad], chtext[::-1][j, i]
+                    ["A", "B", "C", "D"][quad],
+                    chtext[::-1][j, i],
                 ),
+                color="gainsboro",
             )
     ax.set_axis_off()
     fig.colorbar(
         pos,
-        label="Energy resolution [keV]",
+        label=colorlabel,
         ax=ax,
         aspect=30,
         pad=wy / 10,
@@ -544,7 +555,7 @@ def mapenres(source, en_res, detmap, **kwargs):
             rows, cols = chns_indeces.T
             mat[rows + ty, cols + tx] = values
 
-    fig, ax = _mapplot(mat, detmap, maskvalue=0, **kwargs)
+    fig, ax = _mapplot(mat, detmap, colorlabel="Energy resolution [keV]", maskvalue=0, **kwargs)
     return fig, ax
 
 
@@ -565,5 +576,5 @@ def mapcounts(counts, detmap, **kwargs):
             rows, cols = chns_indeces.T
             mat[rows + ty, cols + tx] = values
 
-    fig, ax = _mapplot(mat, detmap, maskvalue=0, **kwargs)
+    fig, ax = _mapplot(mat, detmap, colorlabel="Counts", maskvalue=0, **kwargs)
     return fig, ax
