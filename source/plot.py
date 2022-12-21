@@ -6,12 +6,11 @@ import numpy as np
 
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
-
 from joblib import Parallel, delayed
 
-from source.constants import PHOTOEL_PER_KEV
-from source.errors import warn_nan_in_sdd_calib
 import source.fcparams as fcm
+from source.constants import PHOTOEL_PER_KEV
+from source.errors import warn_nan_in_sdd_calib, warn_nan_in_slo_table
 
 matplotlib.rcParams = fcm.changeRCParams(
     matplotlib.rcParams,
@@ -34,16 +33,31 @@ def _compute_lims_for_s(radsources: dict):
     return 20.0, 1000.0
 
 
+def draw_and_save_qlooks(res_cal, path, nthreads=1):
+    for quad in res_cal.keys():
+        quad_res_cal = res_cal[quad]
+        if quad_res_cal.isnull().values.any():
+            message = warn_nan_in_sdd_calib(quad)
+            logging.warning(message)
+            quad_res_cal = quad_res_cal.fillna(0)
+        fig, axs = _quicklook(quad_res_cal)
+        axs[0].set_title("Calibration quicklook - Quadrant {}".format(quad))
+        fig.savefig(path(quad))
+        plt.close(fig)
+    return
+
+
 def draw_and_save_slo(res_slo, path, nthreads=1):
-    def helper(quad):
-        fig, ax = _sloplot(res_slo[quad])
+    for quad in res_slo.keys():
+        quad_res_slo = res_slo[quad]
+        if quad_res_slo.isnull().values.any():
+            message = warn_nan_in_slo_table(quad)
+            logging.warning(message)
+            quad_res_slo = quad_res_slo.fillna(0)
+        fig, ax = _sloplot(quad_res_slo)
         ax.set_title("Light output - Quadrant {}".format(quad))
         fig.savefig(path(quad))
         plt.close(fig)
-
-    return Parallel(n_jobs=nthreads)(
-        delayed(helper)(quad) for quad in res_slo.keys()
-    )
 
 
 def draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads=1):
@@ -209,23 +223,6 @@ def draw_and_save_lins(res_cal, res_fit, radsources: dict, path, nthreads=1):
             ax[0].set_title("Linearity plot - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch))
             plt.close(fig)
-
-    return Parallel(n_jobs=nthreads)(
-        delayed(helper)(quad) for quad in res_cal.keys()
-    )
-
-
-def draw_and_save_qlooks(res_cal, path, nthreads=1):
-    def helper(quad):
-        quad_res_cal = res_cal[quad]
-        if quad_res_cal.isnull().values.any():
-            message = warn_nan_in_sdd_calib(quad)
-            logging.warning(message)
-            quad_res_cal = quad_res_cal.fillna(0)
-        fig, axs = _quicklook(quad_res_cal)
-        axs[0].set_title("Calibration quicklook - Quadrant {}".format(quad))
-        fig.savefig(path(quad))
-        plt.close(fig)
 
     return Parallel(n_jobs=nthreads)(
         delayed(helper)(quad) for quad in res_cal.keys()

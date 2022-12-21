@@ -14,34 +14,18 @@ matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 
 from source import interface, paths
-from source.calibrate import PEAKS_PARAMS
-from source.io import (
-    write_eventlist_to_fits,
-    write_report_to_excel,
-)
-from source.plot import (
-    uncalibrated,
-    draw_and_save_channels_sspectra,
-    draw_and_save_channels_xspectra,
-    draw_and_save_diagns,
-    draw_and_save_lins,
-    draw_and_save_uncalibrated,
-    draw_and_save_qlooks,
-    draw_and_save_slo,
-    draw_and_save_calibrated_spectra,
-    mapenres,
-    mapcounts,
-)
-
+from source.calibrate import PEAKS_PARAMS, Calibrate
 from source.cmd import Cmd
-from source.calibrate import Calibrate
 from source.detectors import Detector
+from source.io import (get_writer, pandas_from_LV0d5, write_eventlist_to_fits,
+                       write_report_to_excel)
+from source.plot import (draw_and_save_calibrated_spectra,
+                         draw_and_save_channels_sspectra,
+                         draw_and_save_channels_xspectra, draw_and_save_diagns,
+                         draw_and_save_lins, draw_and_save_qlooks,
+                         draw_and_save_slo, draw_and_save_uncalibrated,
+                         mapcounts, mapenres, uncalibrated)
 from source.radsources import radsources_dicts
-from source.io import (
-    get_writer,
-    pandas_from_LV0d5,
-)
-
 
 description = (
     "A script to automatically calibrate HERMES-TP/SP "

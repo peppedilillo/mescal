@@ -58,3 +58,10 @@ def warn_nan_in_sdd_calib(quad):
         "NaN in {} quadrant SDD calibration results. "
         "Filling with 0s.".format(quad)
     )
+
+
+def warn_nan_in_slo_table(quad):
+    return (
+        "NaN in {} quadrant light output table. "
+        "Filling with 0s.".format(quad)
+    )

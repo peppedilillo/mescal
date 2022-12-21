@@ -1,6 +1,6 @@
 import logging
 from collections import namedtuple
-from math import floor, ceil
+from math import ceil, floor
 
 import matplotlib
 import numpy as np
@@ -12,17 +12,11 @@ matplotlib.use("TkAgg")
 
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
-from source.eventlist import (
-    electrons_to_energy,
-    make_electron_list,
-    infer_onchannels,
-    add_evtype_tag,
-    filter_delay,
-    filter_spurious,
-    perchannel_counts,
-)
+from source.eventlist import (add_evtype_tag, electrons_to_energy,
+                              filter_delay, filter_spurious, infer_onchannels,
+                              make_electron_list, perchannel_counts)
+from source.speaks import find_epeaks, find_speaks
 from source.xpeaks import find_xpeaks
-from source.speaks import find_speaks, find_epeaks
 
 PEAKS_PARAMS = (
     "lim_low",

@@ -5,7 +5,6 @@ from joblib import Parallel, delayed
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
 
-
 s2i = lambda quad: "ABCD".find(str.upper(quad))
 i2s = lambda n: chr(65 + n)
 
