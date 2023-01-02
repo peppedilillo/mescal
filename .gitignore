@@ -1,9 +1,11 @@
 timeit.py
 *.fits
+.DS_Store
 output/
 data/
 cache/
 tests/
+scraps/
 todolist.txt
 __pycache__
 

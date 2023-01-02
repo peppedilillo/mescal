@@ -44,8 +44,8 @@ def warn_failed_peak_detection(quad, ch):
 
 def warn_widow(quad, ch, companion):
     return (
-        "failed peak detection of {0}{1:02d}, companion cell {0}{2:02d}"
-        " appears to be off.".format(quad, ch, companion)
+        "failed peak detection of {0}{1:02d}, companion cell {0}{2:02d} off."
+        .format(quad, ch, companion)
     )
 
 

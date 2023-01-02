@@ -23,7 +23,9 @@ def write_report_to_excel(result_df, path):
     with pd.ExcelWriter(path) as output:
         for quad in result_df.keys():
             result_df[quad].to_excel(
-                output, sheet_name=quad, engine="xlsxwriter", encoding="utf8"
+                output,
+                sheet_name=quad,
+                engine="xlsxwriter",
             )
     return True
 

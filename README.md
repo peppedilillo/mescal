@@ -2,14 +2,24 @@
 
 Hello and welcome to mescal, your favourite software to analyze HERMES-TP/SP data :).
 
-The packages `lmfit`, `joblib` and `rich` are required to use mescal.
-Mescal CLI is best rendered on modern terminal applications. If you are on windows, try it with the [new Windows terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701)!
+The packages `lmfit`, `joblib` and `rich`, between others, are required to use mescal.
+We provide an `environment.yml` file to easily set up a conda environment in which you can run mescal.
+To create the environment from the `environment.yml` file, move to mescal's folder from your terminal and execute:
+
+`conda env create -f environment.yml`
+
+Don't forget to activate the environment afterwards:
+
+`conda activate mescal`
+
+Mescal CLI is best rendered on modern terminal applications. 
+If you are working on windows, we suggest using mescal with the [new Windows terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701)!
 
 
 ## calibmake.py
 
 This script goal is to calibrate the SDDs and scintillators of a HERMES detector. 
-It supposes you have an acquisition of some radioactive sources ready in the standard HERMES 0.5 fits format.
+We supposes you have an acquisition of supported radioactive sources ready in the standard HERMES 0.5 fits format.
 
 _Example:_
 

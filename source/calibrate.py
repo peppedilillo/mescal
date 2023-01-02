@@ -1,14 +1,12 @@
 import logging
+from bisect import bisect_right
 from collections import namedtuple
 from math import ceil, floor
 
-import matplotlib
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from lmfit.models import GaussianModel, LinearModel
-
-matplotlib.use("TkAgg")
 
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
@@ -293,7 +291,8 @@ class Calibrate:
         return data
 
     def _calibrate(self):
-        logging.info("Attempting new calibration.")
+        message = "attempting new calibration."
+        logging.info(message)
 
         # X calibration
         if len(self.xradsources()) < 2:
@@ -477,7 +476,8 @@ class Calibrate:
                         energies,
                         gain_guess,
                         offset_guess,
-                        mincounts=self.configuration["xpeaks_mincounts"]
+                        mincounts=self.configuration["xpeaks_mincounts"],
+                        channel_id=(quad, ch),
                     )
                 except err.DetectPeakError:
                     message = err.warn_failed_peak_detection(quad, ch)
@@ -710,53 +710,6 @@ class Calibrate:
        offset_err = resultlin.params["intercept"].stderr
        return gain, gain_err, offset, offset_err, chi2
 
-    # @staticmethod
-    # def _calibrate_chn(centers, energies, centers_errs):
-    #     """
-    #     Performs a linear regression of data with y-uncertainties.
-    #     Based on:
-    #     NUMERICAL RECIPES IN FORTRAN 77: THE ART OF SCIENTIFIC COMPUTING
-    #     (ISBN 0-521-43064-X) by W.H. Press et al., 1993, Chapter 15, pg. 657
-    #     Input data can be in any form that can be converted to a numpy
-    #     array, e.g. lists, tuples, ndarrays.
-    #
-    #     Args:
-    #         centers: the fits' centroids.
-    #         energies: the energy values.
-    #         centers_errs: the error on the fits centroid.
-    #
-    #     Returns:
-    #         gain, gain_err, offset, offset_err, redchi2
-    #     """
-    #     assert len(energies) == len(centers) == len(centers_errs)
-    #     assert len(centers) >= 2
-    #
-    #     x = np.asarray(energies)
-    #     y = np.asarray(centers)
-    #     y_err = np.asarray(centers_errs)
-    #
-    #     S = np.sum(1/y_err**2)
-    #     Sx = np.sum(x/y_err**2)
-    #     Sy = np.sum(y/y_err**2)
-    #     Sxx = np.sum(x**2/y_err**2)
-    #     Sxy = np.sum(x*y/y_err**2)
-    #     D = S*Sxx - Sx**2
-    #
-    #     a = (Sxx * Sy - Sx * Sxy)/D
-    #     a_stdev = np.sqrt(Sxx/D)
-    #     b = (S*Sxy - Sx*Sy)/D
-    #     b_stdev = np.sqrt(S/D)
-    #     if len(x) == 2:
-    #         redchi2 = np.nan
-    #     else:
-    #         redchi2 = np.sum((y - (a + b*x))**2/y_err**2)/(len(x) - 2)
-    #
-    #     offset = a
-    #     offset_err = a_stdev
-    #     gain = b
-    #     gain_err = b_stdev
-    #     return gain, gain_err, offset, offset_err, redchi2
-
     @as_cal_dataframe
     def _calibrate_sdds(self):
         fits = self.xfit
@@ -797,8 +750,8 @@ class Calibrate:
             fit = self.xfit[quad]
             cal = self.sdd_cal[quad]
 
-            assert (fit.index == cal.index).all()
-            for ch in fit.index:
+            assert np.isin(cal.index, fit.index).all()
+            for ch in cal.index:
                 helper = []
                 for source, decay in radiation_sources.items():
                     fwhms = fit[source]["fwhm"].loc[ch]
@@ -808,7 +761,8 @@ class Calibrate:
 
                     energyres = fwhms / gains
                     energyres_err = energyres * np.sqrt(
-                        (fwhms_err / fwhms) ** 2 + (gains_err / gains) ** 2
+                        (fwhms_err / fwhms) ** 2
+                        + (gains_err / gains) ** 2
                     )
                     helper.append((energyres, energyres_err))
 
@@ -949,11 +903,11 @@ class Calibrate:
     @staticmethod
     def _peak_fitter(x, y, limits):
         start, stop = limits
-        try:
-            x_start = np.where(x >= start)[0][0]
-            x_stop = np.where(x < stop)[0][-1]
-        except IndexError:
-            raise err.FailedFitError("peak constraints error.")
+        # select index of the smallest subset of x larger than [start, stop]
+        x_start = max(bisect_right(x, start) - 1, 0)
+        x_stop = bisect_right(x, stop)
+        if x_stop - x_start < 5:
+            raise err.FailedFitError("too few bins to fit.")
         x_fit = (x[x_start: x_stop + 1][1:] + x[x_start: x_stop + 1][:-1]) / 2
         y_fit = y[x_start:x_stop]
         errors = np.clip(np.sqrt(y_fit), 1, None)
@@ -963,15 +917,13 @@ class Calibrate:
         mod.set_param_hint("height", value=max(y_fit))
         mod.set_param_hint("sigma", max=stop - start)
         pars = mod.guess(y_fit, x=x_fit)
-        try:
-            result = mod.fit(
-                y_fit,
-                pars,
-                x=x_fit,
-                weights=1/errors**2,
-            )
-        except TypeError:
-            raise err.FailedFitError("peak fit error.")
+        result = mod.fit(
+            y_fit,
+            pars,
+            x=x_fit,
+            weights=1/errors**2,
+        )
+
         x_fine = np.linspace(x[0], x[-1], len(x) * 100)
         fitting_curve = mod.eval(
             x=x_fine,

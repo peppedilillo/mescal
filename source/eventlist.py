@@ -174,7 +174,7 @@ def _extract_gamma_events(quadrant_data, scintillator_couples):
         [*simultaneous_scintillator_events.groups.keys()]
     ).T
 
-    electrons_sum = simultaneous_scintillator_events.sum()["ELECTRONS"].values
+    electrons_sum = simultaneous_scintillator_events.sum(numeric_only=True)["ELECTRONS"].values
     calibrated_gamma_events = np.column_stack((times, electrons_sum, channels))
     return calibrated_gamma_events
 

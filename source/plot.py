@@ -4,7 +4,6 @@ from math import pi, sqrt
 import matplotlib
 import numpy as np
 
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
 
@@ -58,6 +57,7 @@ def draw_and_save_slo(res_slo, path, nthreads=1):
         ax.set_title("Light output - Quadrant {}".format(quad))
         fig.savefig(path(quad))
         plt.close(fig)
+    return
 
 
 def draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads=1):
@@ -68,7 +68,7 @@ def draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads=1):
                 xhistograms.counts[quad][ch],
                 shistograms.bins,
                 shistograms.counts[quad][ch],
-                figsize=(9, 4.5),
+                figsize=(8, 4.5),
             )
             ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch))
@@ -94,8 +94,7 @@ def draw_and_save_diagns(histograms, res_fit, path, margin=500, nthreads=1):
                 .values.reshape(2, -1)
                 .T,
                 margin=margin,
-                figsize=(9, 4.5),
-                dpi=150,
+                figsize=(8, 4.5),
             )
             ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch))
@@ -119,7 +118,7 @@ def draw_and_save_channels_xspectra(
                 histograms.counts[quad][ch],
                 radsources,
                 elims=_compute_lims_for_x(radsources),
-                figsize=(9, 4.5),
+                figsize=(8, 4.5),
             )
             ax.set_title("Spectra plot X - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch))
@@ -147,7 +146,7 @@ def draw_and_save_channels_sspectra(
                 histograms.counts[quad][ch],
                 radsources,
                 elims=_compute_lims_for_s(radsources),
-                figsize=(9, 4.5),
+                figsize=(8, 4.5),
             )
             ax.set_title("Spectra plot S - CH{:02d}Q{}".format(ch, quad))
             fig.savefig(path(quad, ch))
@@ -178,8 +177,7 @@ def draw_and_save_xspectrum(calibrated_events, radsources: dict, path):
             xcounts,
             radsources,
             elims=_compute_lims_for_x(radsources),
-            figsize=(9, 4.5),
-            dpi=150,
+            figsize=(8, 4.5),
         )
         ax.set_title("Spectrum X")
         fig.savefig(path)
@@ -199,8 +197,7 @@ def draw_and_save_sspectrum(calibrated_events, radsources: dict, path):
             scounts,
             radsources,
             elims=_compute_lims_for_s(radsources),
-            figsize=(9, 4.5),
-            dpi=150,
+            figsize=(8, 4.5),
         )
         ax.set_title("Spectrum S")
         fig.savefig(path)
@@ -535,7 +532,7 @@ def _mapplot(mat, detmap, colorlabel, maskvalue=None, **kwargs):
     return fig, ax
 
 
-def mapenres(source, en_res, detmap, **kwargs):
+def mapenres(source, en_res, detmap):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
@@ -552,11 +549,17 @@ def mapenres(source, en_res, detmap, **kwargs):
             rows, cols = chns_indeces.T
             mat[rows + ty, cols + tx] = values
 
-    fig, ax = _mapplot(mat, detmap, colorlabel="Energy resolution [keV]", maskvalue=0, **kwargs)
+    fig, ax = _mapplot(
+        mat,
+        detmap,
+        colorlabel="Energy resolution [keV]",
+        maskvalue=0,
+        figsize=(8,8),
+    )
     return fig, ax
 
 
-def mapcounts(counts, detmap, **kwargs):
+def mapcounts(counts, detmap):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
@@ -573,5 +576,11 @@ def mapcounts(counts, detmap, **kwargs):
             rows, cols = chns_indeces.T
             mat[rows + ty, cols + tx] = values
 
-    fig, ax = _mapplot(mat, detmap, colorlabel="Counts", maskvalue=0, **kwargs)
+    fig, ax = _mapplot(
+        mat,
+        detmap,
+        colorlabel="Counts",
+        maskvalue=0,
+        figsize=(8,8),
+    )
     return fig, ax

@@ -1,17 +1,14 @@
 from itertools import combinations
 from math import ceil, floor
 
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.signal
 import scipy.stats
-from sklearn.linear_model import LinearRegression
+from lmfit.models import LinearModel
 
 import source.errors as err
-
-matplotlib.use("TkAgg")
 
 
 def find_xpeaks(
@@ -24,6 +21,7 @@ def find_xpeaks(
     width=5,
     distance=5,
     smoothing=5,
+    channel_id=None,
 ):
     """
     given a histogram of channel counts, a list of energies
@@ -39,6 +37,7 @@ def find_xpeaks(
         distance: int, min bins between peaks
         width: int, min peak bins width
         mincounts: int, min counts under peak
+        channel_id: (str, int) tuple, for debugging purpose
 
     Returns: array of 2-tuples, peaks guess limits indeces.
 
@@ -54,12 +53,26 @@ def find_xpeaks(
     # look over the smoothed channel histogram counts for
     # peaks larger than a minimum.
     peaks, peaks_props = peaks_with_enough_stat(
-        counts, mincounts, initial_search_pars, smoothing=smoothing
+        counts,
+        mincounts,
+        initial_search_pars,
+        smoothing=smoothing,
     )
+    # crash and burn if we found no suitable peaks
+    if len(peaks) == 0:
+        raise err.DetectPeakError("no peaks!")
 
+    peaks, peaks_props = remove_baseline(
+        bins,
+        counts,
+        gain_guess,
+        peaks,
+        peaks_props,
+    )
     # crash and burn if not enough peaks.
     if len(peaks) < len(energies):
         raise err.DetectPeakError("not enough peaks!")
+
     # avoid calculations if peak number is right already.
     elif len(peaks) == len(energies):
         best_peaks, best_peaks_props = peaks, peaks_props
@@ -86,7 +99,7 @@ def find_xpeaks(
 
     # for each combination we compute some metrics
     # posterior of peaks position
-    pdfscores_ = pdfscores(
+    posteriorscore_ = posteriorscore(
         bins, peaks_combo, energies, gain_guess, offset_guess
     )
     # peaks linearity
@@ -99,15 +112,15 @@ def find_xpeaks(
     widthscores_ = widthscores(peaks_combo, pcombo_widths)
 
     # we rank the combinations by each metric score
-    pdfranking = np.argsort(np.argsort(pdfscores_))
+    posteriorranking = np.argsort(np.argsort(posteriorscore_))
     linranking = np.argsort(np.argsort(linscores_))
     promranking = np.argsort(np.argsort(promscores_))
     baseranking = np.argsort(np.argsort(blscores_))
     widthranking = np.argsort(np.argsort(widthscores_))
 
     # best combination is the one with best ranking across metrics
-    combined_score = pdfranking + promranking + widthranking + baseranking
-    solve_ties_by = pdfscores_
+    combined_score = promranking + baseranking + widthranking + posteriorranking
+    solve_ties_by = baseranking
     if len(energies) > 2:
         # when we have just two peaks scoring linearity makes no sense
         combined_score += linranking
@@ -170,23 +183,30 @@ def linscores(bins, energies, peaks_combinations):
     assert np.all(np.diff(energies) > 0)  # is sorted
     assert np.all(np.diff(peaks_combinations) > 0)  # is sorted
 
-    model = LinearRegression(fit_intercept=True)
     scores = []
     params = []
+
     for peaks in peaks_combinations:
-        model.fit(np.array(energies).reshape(-1, 1), bins[peaks])
-        model_predictions = model.coef_ * np.array(energies) + model.intercept_
-        squared_errors = np.abs(bins[peaks] - model_predictions)
+        lmod = LinearModel()
+        pars = lmod.guess(peaks, x=energies)
+        resultlin = lmod.fit(
+            bins[peaks],
+            pars,
+            x=energies,
+        )
+        gain = resultlin.params["slope"].value
+        offset = resultlin.params["intercept"].value
+        model_predictions = gain * np.array(energies) + offset
+        squared_errors = np.square(bins[peaks] - model_predictions)
         u = np.sum(squared_errors)
         v = np.sum((model_predictions - model_predictions.mean()) ** 2)
         scores.append(1 - u / v)
-        offset, gain = model.intercept_, model.coef_[0]
         params.append((offset, gain))
     scores = np.array(scores)
     return scores, params
 
 
-def pdfscores(bins, peaks_combinations, energies, gain_guess, offset_guess):
+def posteriorscore(bins, peaks_combinations, energies, gain_guess, offset_guess):
     """
     evaluates peaks combinations given a prior on guess and offset.
     """
@@ -195,17 +215,9 @@ def pdfscores(bins, peaks_combinations, energies, gain_guess, offset_guess):
 
     gain_center, gain_sigma = gain_guess
     offset_center, offset_sigma = offset_guess
-    mus = [gain_center * energy + offset_center for energy in energies]
-    covmat = [
-        [
-            gain_sigma**2 * energyi * energyj + offset_sigma**2
-            for energyj in energies
-        ]
-        for energyi in energies
-    ]
-    scores = scipy.stats.multivariate_normal(
-        mean=mus, cov=covmat, allow_singular=True
-    ).logpdf(bins[peaks_combinations])
+    mus = gain_center * np.array(energies) + offset_center
+    standard_distances = np.abs((bins[peaks_combinations] - mus)/gain_sigma)
+    scores = - np.sum(standard_distances, axis=1)
     return scores
 
 
@@ -299,6 +311,56 @@ def remove_small_peaks(mincounts, counts, peaks, peaks_properties):
     return peaks, peaks_properties
 
 
+def remove_baseline(bins, counts, gain_guess, peaks, peaks_properties, closer_than=1.):
+    """
+    Remove peaks close to the baseline.
+    Closeness is computed in units of energy,
+    relative to a guess on the detector's gain.
+
+    Args:
+        bins: array of int, histograms bins
+        counts: array of int, histograms counts
+        gain_guess: float, a guess on the gain
+        peaks: array of int (peaks indeces rel. to counts)
+        peaks_properties: dictionary of arrays
+        closer_than: float, energy threshold value in keV
+
+    Returns: updated peaks and peaks properties
+
+    """
+    gain_center, gain_sigma = gain_guess
+    baseline = find_baseline(counts)
+    threshold = (gain_center - gain_sigma) * closer_than
+
+    to_be_removed = []
+    for parg, _ in enumerate(peaks):
+        if bins[peaks[parg]] - bins[baseline] < threshold:
+            to_be_removed.append(parg)
+    peaks, peaks_properties = _remove(to_be_removed, peaks, peaks_properties)
+    return peaks, peaks_properties
+
+
+def _remove(parg, peaks, peaks_properties):
+    """
+    remove elements from peaks and peaks_properties
+    see scipy.signal.find_peaks() for more
+    info on peaks and peaks_properties.
+
+    Args:
+        parg: int or array (peaks indeces rel. to peaks)
+        peaks: array of int (peaks indeces rel. to counts)
+        peaks_properties: dictionary of arrays
+
+    Returns: updated peaks and peaks properties
+
+    """
+    mask = np.ones(len(peaks), dtype=bool)
+    mask[parg] = False
+    peaks = peaks[mask]
+    properties = {key: value[mask] for key, value in peaks_properties.items()}
+    return peaks, properties
+
+
 def enough_statistics(mincounts, counts, peaks, peaks_properties):
     """
     return False if at least one peak in peaks
@@ -338,32 +400,10 @@ def spans_counts(counts, parg, peaks, peaks_properties):
     Returns: int
 
     """
-    peak = peaks[parg]
     lo = floor(peaks_properties["left_ips"][parg])
     hi = ceil(peaks_properties["right_ips"][parg])
     sumcounts = sum(counts[lo:hi]) - (hi - lo) * min(counts[lo:hi])
     return sumcounts
-
-
-def _remove(parg, peaks, peaks_properties):
-    """
-    remove elements from peaks and peaks_properties
-    see scipy.signal.find_peaks() for more
-    info on peaks and peaks_properties.
-
-    Args:
-        parg: int or array (peaks indeces rel. to peaks)
-        peaks: array of int (peaks indeces rel. to counts)
-        peaks_properties: dictionary of arrays
-
-    Returns: updated peaks and peaks properties
-
-    """
-    mask = np.ones(len(peaks), dtype=bool)
-    mask[parg] = False
-    peaks = peaks[mask]
-    properties = {key: value[mask] for key, value in peaks_properties.items()}
-    return peaks, properties
 
 
 def debug_helper(
@@ -378,6 +418,7 @@ def debug_helper(
     winpeaks_props,
     peaks,
     peaks_props,
+    channel_id,
 ):
     """
     for debugging purpose
@@ -387,15 +428,19 @@ def debug_helper(
         bins,
         counts,
         peaks_combo,
-        ['pdf', 'linearity', 'prominence', 'baseline', 'width'],
-        [pdfscores_, linscores_, promscores_, blscores_, widthscores_],
-        [pdfranking, linranking, promranking, baseranking, widthranking],
+        ['posterior', 'linearity', 'prominence', 'baseline', 'width'],
+        [posteriorscore_, linscores_, promscores_, blscores_, widthscores_],
+        [posteriorranking, linranking, promranking, baseranking, widthranking],
         winner,
         best_peaks,
         best_peaks_props,
         peaks,
-        peaks_props)
+        peaks_props,
+        channel_id,
+    )
     """
+    quad, ch = channel_id
+    print("\n---{}{}---".format(quad, ch))
     print("winner index: ", winner)
     for label, score, ranking in zip(labels, scores, rankings):
         print("{}:".format(label))
@@ -403,7 +448,7 @@ def debug_helper(
         # print(ranking)
         print(
             ">> winner ranking: {}/{}".format(
-                ranking[winner], len(peaks_combo)
+                ranking[winner] + 1, len(peaks_combo)
             )
         )
 
@@ -413,9 +458,10 @@ def debug_helper(
     for peak, lo, hi in zip(
         peaks, peaks_props["left_ips"], peaks_props["right_ips"]
     ):
-        plt.axvspan(bins[int(lo)], bins[int(hi)], alpha=0.2, color="grey")
+        plt.axvspan(bins[int(lo)], bins[int(hi)], alpha=0.1, color="grey",)
     for peak, lo, hi in zip(
         winpeaks, winpeaks_props["left_ips"], winpeaks_props["right_ips"]
     ):
-        plt.axvspan(bins[int(lo)], bins[int(hi)], alpha=0.2, color="red")
+        plt.axvspan(bins[int(lo)], bins[int(hi)], alpha=0.2, color="red",)
     plt.show()
+    plt.close()
