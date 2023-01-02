@@ -85,7 +85,7 @@ def start_log(args):
         format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
         "%(levelname)s: %(message)s",
     )
-    message = 'parser arguments = ' + str(args)[10:-2]
+    message = 'parser arguments = ' + str(args)[10:-1]
     logging.info(message)
     return True
 
@@ -116,7 +116,7 @@ def unpack_configuration(adc):
         "xpeaks_mincounts": general.getint("xpeaks_mincounts"),
         "retrigger_delay": general.getfloat("retrigger_delay"),
         "filter_spurious": general.getboolean("filter_spurious"),
-        "bitsize": adcitems.getint("bitsize"),
+        "binning": adcitems.getint("binning"),
         "gain_center": adcitems.getfloat("gain_center"),
         "gain_sigma": adcitems.getfloat("gain_sigma"),
         "offset_center": adcitems.getfloat("offset_center"),

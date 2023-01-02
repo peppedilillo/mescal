@@ -158,7 +158,7 @@ def linrange(start, stop, step):
 
 
 def find_adc_bins(
-    data, adcbitsize, maxmargin=10, roundto=500, clipquant=0.996
+    data, binning, maxmargin=10, roundto=500, clipquant=0.996
 ):
     """
     find good binning for adc data, euristic.
@@ -166,7 +166,7 @@ def find_adc_bins(
 
     Args:
         data: array of int, adc readings
-        adcbitsize: int, adc conversiong word size in bit
+        binning: int, binning step
         maxmargin: int, ignores data larger than max - maxmargin
         roundto: int, round to nearest
         clipquant: float, ignore data above quantile
@@ -184,15 +184,8 @@ def find_adc_bins(
     clipped_data = data[data < max - maxmargin]
     hi = clipped_data.quantile(clipquant)
     hi = ceil(hi / roundto) * roundto
-    # guess ADC bit resolution to set step
-    if adcbitsize == 12:
-        step = 1
-    elif adcbitsize == 16:
-        step = 10
-    else:
-        raise ValueError("Can't find good binning. ADC values too high.")
 
-    bins = linrange(lo, hi, step)
+    bins = linrange(lo, hi, binning)
     return bins
 
 
@@ -239,9 +232,9 @@ class Calibrate:
         return eventlist
 
     def _bin(self):
-        bitsize = self.configuration["bitsize"]
+        binning = self.configuration["binning"]
 
-        bins = find_adc_bins(self.data["ADC"], bitsize)
+        bins = find_adc_bins(self.data["ADC"], binning)
         self.xbins = bins
         self.sbins = bins
         self.xhistograms = self._make_xhistograms(self.data)
@@ -558,12 +551,13 @@ class Calibrate:
                     companion = self._companion(quad, ch)
                     if companion in self.sdd_cal[quad].index:
                         message = err.warn_failed_peak_detection(quad, ch)
+                        logging.warning(message)
                     else:
                         # companion is off and counts is empty
                         message = err.warn_widow(
                             quad, ch, companion
                         )
-                    logging.warning(message)
+                        logging.info(message)
                     self._flag(quad, ch, "speak")
                     continue
 

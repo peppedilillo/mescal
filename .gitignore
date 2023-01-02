@@ -4,7 +4,6 @@ timeit.py
 output/
 data/
 cache/
-tests/
 scraps/
 todolist.txt
 __pycache__
