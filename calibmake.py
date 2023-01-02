@@ -5,12 +5,10 @@ import logging
 from os import cpu_count
 from pathlib import Path
 
-import matplotlib
 import pandas as pd
 
-from source.interface import sections_rule
+from source.interface import sections_rule, logo
 
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 
 from source import interface, paths
@@ -65,14 +63,6 @@ parser.add_argument(
     help="enables loading and saving from cache.",
 )
 
-# parser.add_argument(
-#     "--nofilter",
-#     default=False,
-#     action="store_true",
-#     help="disable filtering of spurious data. "
-#     "will overcome config.ini settings.",
-# )
-
 
 parser.add_argument(
     "--fmt",
@@ -83,14 +73,20 @@ parser.add_argument(
 )
 
 
-def start_log(filepath):
+
+def start_log(args):
+    logfile = paths.LOGFILE(args.filepath)
+    with open(logfile, 'w') as f:
+        f.write(logo() + '\n')
+
     logging.basicConfig(
-        filename=filepath,
-        filemode="w",
+        filename=logfile,
         level=logging.INFO,
         format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
         "%(levelname)s: %(message)s",
     )
+    message = 'parser arguments = ' + str(args)[10:-2]
+    logging.info(message)
     return True
 
 
@@ -127,7 +123,6 @@ def unpack_configuration(adc):
         "offset_sigma": adcitems.getfloat("offset_sigma"),
         "lightout_center": adcitems.getfloat("lightout_center"),
         "lightout_sigma": adcitems.getfloat("lightout_sigma"),
-        "margin_diag_plot": adcitems.getint("margin_diag_plot"),
     }
     return out
 
@@ -353,7 +348,10 @@ class Mescal(Cmd):
                 do("")
 
     def do_quit(self, arg):
-        """Quit mescal."""
+        """
+        Quits mescal.
+        It's the only do-command to return True.
+        """
         self.console.print("Ciao! :wave:\n")
         return True
 
@@ -366,6 +364,7 @@ class Mescal(Cmd):
             self.calibration._calibrate()
             self._process_results(self.args.fmt, self.args.filepath)
             sections_rule(self.console, "[bold italic]Shell", style="green")
+        return False
 
     def do_setxlim(self, arg):
         """Reset channel X peaks position."""
@@ -391,6 +390,10 @@ class Mescal(Cmd):
                     ch, (source, label_hi)
                 ] = int(lim_hi)
 
+        message = "reset xfit limits for channel {}{}".format(quad, ch)
+        logging.info(message)
+        return False
+
     def do_plothist(self, arg):
         """Plots uncalibrated data from a channel."""
         parsed_arg = parse_chns(arg)
@@ -403,10 +406,10 @@ class Mescal(Cmd):
             self.calibration.xhistograms.counts[quad][ch],
             self.calibration.shistograms.bins,
             self.calibration.shistograms.counts[quad][ch],
-            figsize=(9, 4.5),
         )
         ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
         plt.show(block=False)
+        return False
 
     def can_mapres(self):
         if (
@@ -424,10 +427,10 @@ class Mescal(Cmd):
             self.xenres_source,
             self.calibration.en_res,
             self.calibration.detector.map,
-            figsize=(8, 8),
         )
         ax.set_title("Energy resolution")
         plt.show(block=False)
+        return False
 
     def can_mapcounts(self):
         return True
@@ -440,10 +443,10 @@ class Mescal(Cmd):
         fig, ax = mapcounts(
             self.calibration.counts(),
             self.calibration.detector.map,
-            figsize=(8, 8),
         )
         ax.set_title("Per-channel counts (pixel events)")
         plt.show(block=False)
+        return False
 
     def can_svhistplot(self):
         return True
@@ -457,6 +460,7 @@ class Mescal(Cmd):
                 paths.UNCPLOT(self.args.filepath),
                 self.threads,
             )
+        return False
 
     def can_svdiags(self):
         if self.calibration.xfit or self.calibration.sfit:
@@ -474,17 +478,16 @@ class Mescal(Cmd):
                     self.calibration.xhistograms,
                     self.calibration.xfit,
                     paths.XDNPLOT(self.args.filepath),
-                    self.config["margin_diag_plot"],
-                    self.threads,
+                    nthreads=self.threads,
                 )
             if self.calibration.sfit:
                 draw_and_save_diagns(
                     self.calibration.shistograms,
                     self.calibration.sfit,
                     paths.SDNPLOT(self.args.filepath),
-                    self.config["margin_diag_plot"],
-                    self.threads,
+                    nthreads=self.threads,
                 )
+        return False
 
     def can_svtabfit(self):
         if self.calibration.xfit or self.calibration.sfit:
@@ -505,6 +508,7 @@ class Mescal(Cmd):
                 write_report_to_excel(
                     self.calibration.sfit, paths.SFTREPORT(self.args.filepath),
                 )
+        return False
 
     def can_svxplots(self):
         if self.calibration.sdd_cal:
@@ -524,6 +528,7 @@ class Mescal(Cmd):
                 paths.XCSPLOT(self.args.filepath),
                 self.threads,
             )
+        return False
 
     def can_svlinplots(self):
         if self.calibration.sdd_cal:
@@ -543,6 +548,7 @@ class Mescal(Cmd):
                 paths.LINPLOT(self.args.filepath),
                 self.threads,
             )
+        return False
 
     def can_svsplots(self):
         if self.calibration.optical_coupling:
@@ -563,6 +569,7 @@ class Mescal(Cmd):
                 paths.SCSPLOT(self.args.filepath),
                 self.threads,
             )
+        return False
 
     def can_svevents(self):
         if self.eventlist is not None:
@@ -578,10 +585,11 @@ class Mescal(Cmd):
             write_eventlist_to_fits(
                 self.eventlist, paths.EVLFITS(self.args.filepath),
             )
+        return False
 
 
 if __name__ == "__main__":
     args = parse_args()
-    systhreads = min(8, cpu_count())
-    start_log(paths.LOGFILE(args.filepath))
+    start_log(args)
+    systhreads = min(4, cpu_count())
     Mescal(args, systhreads)
