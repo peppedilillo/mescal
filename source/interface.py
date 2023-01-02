@@ -6,10 +6,17 @@ from rich.text import Text
 from source.paths import LOGOPATH
 from source.utils import get_version
 
-hdr_text = (
+mescal_text = "[bold purple]mescal[/]"
+
+header_text = (
     Text()
-    .append("\nWelcome to ", style="italic")
-    .append("mescal", style="bold purple")
+    .append(
+        "\nWelcome to ",
+        style="italic",
+    )
+    .append(
+        Text().from_markup(mescal_text),
+    )
     .append(
         ", a software to analyze data from the HERMES payloads.\n",
         style="italic",
@@ -18,7 +25,10 @@ hdr_text = (
         "Made with <3 by the HERMES-TP/SP calibration team. Since 2021.\n",
         style="italic",
     )
-    .append("Software version: {}".format(get_version()), style="italic")
+    .append(
+        "Software version: {}".format(get_version()),
+        style="italic",
+    )
 )
 
 
@@ -37,7 +47,7 @@ def hello():
             justify="center",
         )
         sleep(0.1)
-    console.print(hdr_text, justify="center")
+    console.print(header_text, justify="center")
     return console
 
 

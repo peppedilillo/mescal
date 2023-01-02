@@ -35,8 +35,8 @@ class Cmd:
     doc_header = "Documented commands (type help <topic>):"
     misc_header = "Miscellaneous help topics:"
     undoc_header = "Undocumented commands:"
+    unknown_command_message = "Unknown command."
     nohelp = "*** No help on %s"
-    use_rawinput = 1
 
     def __init__(self, console, completekey="tab", stdin=None):
         """Instantiate a line-oriented interpreter framework.
@@ -56,15 +56,21 @@ class Cmd:
         self.cmdqueue = []
         self.completekey = completekey
 
+    def ansi_prompt(self):
+        """turns a markup prompt to ansi string"""
+        with self.console.capture() as capture:
+            self.console.print(self.prompt, end='')
+        str_output = capture.get()
+        return str_output
+
     def cmdloop(self, intro=None):
         """Repeatedly issue a prompt, accept input, parse an initial prefix
         off the received input, and dispatch to action methods, passing them
-        the remainder of the line as argument.
-
-        """
+        the remainder of the line as argument."""
 
         self.preloop()
-        if self.use_rawinput and self.completekey:
+
+        if self.completekey:
             try:
                 import readline
 
@@ -83,24 +89,17 @@ class Cmd:
                 if self.cmdqueue:
                     line = self.cmdqueue.pop(0)
                 else:
-                    if self.use_rawinput:
-                        try:
-                            line = input(self.prompt)
-                        except EOFError:
-                            line = "EOF"
-                    else:
-                        self.console.print(self.prompt)
-                        line = self.stdin.readline()
-                        if not len(line):
-                            line = "EOF"
-                        else:
-                            line = line.rstrip("\r\n")
+                    try:
+                        line = input(self.ansi_prompt())
+                    except EOFError:
+                        line = "EOF"
+
                 line = self.precmd(line)
                 stop = self.onecmd(line)
                 stop = self.postcmd(stop, line)
             self.postloop()
         finally:
-            if self.use_rawinput and self.completekey:
+            if self.completekey:
                 try:
                     import readline
 
@@ -195,7 +194,7 @@ class Cmd:
         returns.
 
         """
-        self.console.print("[bold red]Unknown syntax[/]: %s" % line)
+        self.console.print(self.unknown_command_message)
 
     def completedefault(self, *ignored):
         """Method called to complete an input line when no command-specific

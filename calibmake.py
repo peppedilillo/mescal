@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from source.interface import sections_rule, logo
+from source.interface import sections_rule, logo, mescal_text
 
 import matplotlib.pyplot as plt
 
@@ -165,11 +165,6 @@ def parse_chns(arg):
         ch = int(arg[1:3])
         return quad, ch
     else:
-        print(
-            "Invalid entry.\n"
-            "Channel ID not in standard form.\n"
-            "(e.g., d04, A31, B02)"
-        )
         return INVALID_ENTRY
 
 
@@ -188,24 +183,19 @@ def parse_limits(arg):
         toplim = int(arglist[1])
         return botlim, toplim
     else:
-        print(
-            "Invalid entry.\n"
-            "Entry must be two, different positive integers.\n"
-            "Largest integers must follow the smallest.\n"
-            "Example: '19800 20100'."
-        )
         return INVALID_ENTRY
 
 
 class Mescal(Cmd):
     intro = (
-        "This is [bold purple]mescal[/] shell. "
-        "Type help or ? to list commands.\n"
+        "Type help or ? for a list of commands.\n"
     )
-    prompt = "[mescal] "
-    prompt_fail_message = "[red]Cannnot execute with present calibration."
+    prompt = '[dim cyan]\[mescal] '
     spinner_message = "Working.."
-    xenres_source = "Fe 5.9 keV"
+    unknown_command_message = "[red]Unknown command.[/]"
+    invalid_command_message = "[red]Command unavailable.[/]\nCannnot execute with present calibration."
+    invalid_channel_message = "[red]Invalid channel.[/]\nChannel ID not in standard form (e.g., d04, _A30_, _B02_)."
+    invalid_limits_message = "[red]Invalid limits.[/]\nEntry must be two different sorted integers (e.g., 19800 20100)."
 
     def __init__(self, args, threads):
         console = interface.hello()
@@ -370,6 +360,7 @@ class Mescal(Cmd):
         """Reset channel X peaks position."""
         parsed_arg = parse_chns(arg)
         if parsed_arg is INVALID_ENTRY:
+            self.console.print(self.invalid_channel_message)
             return False
 
         quad, ch = parsed_arg
@@ -377,6 +368,7 @@ class Mescal(Cmd):
             arg = self.console.input(source + ": ")
             parsed_arg = parse_limits(arg)
             if parsed_arg is INVALID_ENTRY:
+                self.console.print(self.invalid_limits_message)
                 return False
             elif parsed_arg is None:
                 continue
@@ -398,6 +390,7 @@ class Mescal(Cmd):
         """Plots uncalibrated data from a channel."""
         parsed_arg = parse_chns(arg)
         if parsed_arg is INVALID_ENTRY:
+            self.console.print(self.invalid_channel_message)
             return False
 
         quad, ch = parsed_arg
@@ -413,22 +406,26 @@ class Mescal(Cmd):
 
     def can_mapres(self):
         if (
-            self.xenres_source in self.calibration.xradsources().keys()
-            and self.calibration.en_res is not None
+            self.calibration.xradsources().keys()
+            and self.calibration.en_res
         ):
             return True
 
     def do_mapres(self, arg):
         """Plots X energy resolution map."""
         if not self.can_mapres():
-            self.console.print(self.prompt_fail_message)
+            self.console.print(self.invalid_command_message)
             return False
+
+        decays = self.calibration.xradsources()
+        reference_source = sorted(decays, key=lambda source: decays[source].energy)[0]
+        energy = decays[reference_source].energy
         fig, ax = mapenres(
-            self.xenres_source,
+            reference_source,
             self.calibration.en_res,
             self.calibration.detector.map,
         )
-        ax.set_title("Energy resolution")
+        ax.set_title("Energy resolution at {} keV".format(energy))
         plt.show(block=False)
         return False
 
@@ -438,7 +435,7 @@ class Mescal(Cmd):
     def do_mapcounts(self, arg):
         """Plots a map of counts per-channel."""
         if not self.can_mapcounts():
-            self.console.print(self.prompt_fail_message)
+            self.console.print(self.invalid_command_message)
             return False
         fig, ax = mapcounts(
             self.calibration.counts(),
@@ -470,7 +467,7 @@ class Mescal(Cmd):
     def do_svdiags(self, arg):
         """Save X peak detection diagnostics plots."""
         if not self.can_svdiags():
-            self.console.print(self.prompt_fail_message)
+            self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
             if self.calibration.xfit:
@@ -497,7 +494,7 @@ class Mescal(Cmd):
     def do_svtabfit(self, arg):
         """Save X fit tables."""
         if not self.can_svtabfit():
-            self.console.print(self.prompt_fail_message)
+            self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
             if self.calibration.xfit:
@@ -518,7 +515,7 @@ class Mescal(Cmd):
     def do_svxplots(self, arg):
         """Save calibrated X channel spectra."""
         if not self.can_svxplots():
-            self.console.print(self.prompt_fail_message)
+            self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
             draw_and_save_channels_xspectra(
@@ -538,7 +535,7 @@ class Mescal(Cmd):
     def do_svlinplots(self, args):
         """Save SDD linearity plots."""
         if not self.can_svlinplots():
-            self.console.print(self.prompt_fail_message)
+            self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
             draw_and_save_lins(
@@ -558,7 +555,7 @@ class Mescal(Cmd):
     def do_svsplots(self, arg):
         """Save calibrated gamma channel spectra."""
         if not self.can_svsplots():
-            self.console.print(self.prompt_fail_message)
+            self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
             draw_and_save_channels_sspectra(
@@ -579,7 +576,7 @@ class Mescal(Cmd):
     def do_svevents(self, arg):
         """Save calibrated events to fits file."""
         if not self.can_svevents():
-            self.console.print(self.prompt_fail_message)
+            self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
             write_eventlist_to_fits(
