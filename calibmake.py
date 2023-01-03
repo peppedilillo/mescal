@@ -120,7 +120,7 @@ def unpack_configuration(adc):
     adcitems = config[adc]
     out = {
         "xpeaks_mincounts": general.getint("xpeaks_mincounts"),
-        "retrigger_delay": general.getfloat("retrigger_delay"),
+        "filter_retrigger": general.getfloat("filter_retrigger"),
         "filter_spurious": general.getboolean("filter_spurious"),
         "binning": adcitems.getint("binning"),
         "gain_center": adcitems.getfloat("gain_center"),
@@ -130,6 +130,9 @@ def unpack_configuration(adc):
         "lightout_center": adcitems.getfloat("lightout_center"),
         "lightout_sigma": adcitems.getfloat("lightout_sigma"),
     }
+
+    message = 'config.ini parameters = ' + str(out)[1:-1]
+    logging.info(message)
     return out
 
 

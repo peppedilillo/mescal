@@ -252,7 +252,7 @@ class Calibrate:
         data,
     ):
         spurious_bool = self.configuration["filter_spurious"]
-        retrigger_delay = self.configuration["retrigger_delay"]
+        retrigger_delay = self.configuration["filter_retrigger"]
 
         data = add_evtype_tag(data, self.detector.couples)
         events_pre_filter = len(data)
@@ -721,11 +721,6 @@ class Calibrate:
                         energies,
                         weights=1/center_errs**2,
                     )
-                    # cal_results = self._calibrate_chn(
-                    #     centers,
-                    #     energies,
-                    #     center_errs,
-                    # )
                 except err.FailedFitError:
                     message = err.warn_failed_linearity_fit(quad, ch)
                     logging.warning(message)
