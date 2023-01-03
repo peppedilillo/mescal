@@ -2,9 +2,8 @@ import logging
 from math import pi, sqrt
 
 import matplotlib
-import numpy as np
-
 import matplotlib.pyplot as plt
+import numpy as np
 from joblib import Parallel, delayed
 
 import source.fcparams as fcm
@@ -110,9 +109,9 @@ def draw_and_save_channels_xspectra(
 ):
     def helper(quad):
         for ch in res_cal[quad].index:
-            enbins = (
-                histograms.bins - res_cal[quad].loc[ch]["offset"]
-            ) / res_cal[quad].loc[ch]["gain"]
+            enbins = (histograms.bins - res_cal[quad].loc[ch]["offset"]) / res_cal[
+                quad
+            ].loc[ch]["gain"]
             fig, ax = _spectrum(
                 enbins,
                 histograms.counts[quad][ch],
@@ -124,9 +123,7 @@ def draw_and_save_channels_xspectra(
             fig.savefig(path(quad, ch))
             plt.close(fig)
 
-    return Parallel(n_jobs=nthreads)(
-        delayed(helper)(quad) for quad in res_cal.keys()
-    )
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
 
 
 def draw_and_save_channels_sspectra(
@@ -134,12 +131,10 @@ def draw_and_save_channels_sspectra(
 ):
     def helper(quad):
         for ch in res_slo[quad].index:
-            xenbins = (
-                histograms.bins - res_cal[quad].loc[ch]["offset"]
-            ) / res_cal[quad].loc[ch]["gain"]
-            enbins = (
-                xenbins / res_slo[quad]["light_out"].loc[ch] / PHOTOEL_PER_KEV
-            )
+            xenbins = (histograms.bins - res_cal[quad].loc[ch]["offset"]) / res_cal[
+                quad
+            ].loc[ch]["gain"]
+            enbins = xenbins / res_slo[quad]["light_out"].loc[ch] / PHOTOEL_PER_KEV
 
             fig, ax = _spectrum(
                 enbins,
@@ -152,9 +147,7 @@ def draw_and_save_channels_sspectra(
             fig.savefig(path(quad, ch))
             plt.close(fig)
 
-    return Parallel(n_jobs=nthreads)(
-        delayed(helper)(quad) for quad in res_slo.keys()
-    )
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_slo.keys())
 
 
 def draw_and_save_calibrated_spectra(
@@ -168,9 +161,7 @@ def draw_and_save_calibrated_spectra(
 def draw_and_save_xspectrum(calibrated_events, radsources: dict, path):
     if not calibrated_events.empty:
         xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
-        xcounts, xbins = np.histogram(
-            xevs["ENERGY"], bins=np.arange(2, 40, 0.05)
-        )
+        xcounts, xbins = np.histogram(xevs["ENERGY"], bins=np.arange(2, 40, 0.05))
 
         fig, ax = _spectrum(
             xbins,
@@ -188,9 +179,7 @@ def draw_and_save_xspectrum(calibrated_events, radsources: dict, path):
 def draw_and_save_sspectrum(calibrated_events, radsources: dict, path):
     if not calibrated_events.empty:
         sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
-        scounts, sbins = np.histogram(
-            sevs["ENERGY"], bins=np.arange(30, 1000, 2)
-        )
+        scounts, sbins = np.histogram(sevs["ENERGY"], bins=np.arange(30, 1000, 2))
 
         fig, ax = _spectrum(
             sbins,
@@ -209,9 +198,7 @@ def draw_and_save_lins(res_cal, res_fit, radsources: dict, path, nthreads=1):
     def helper(quad):
         for ch in res_cal[quad].index:
             fig, ax = _linearity(
-                *res_cal[quad].loc[ch][
-                    ["gain", "gain_err", "offset", "offset_err"]
-                ],
+                *res_cal[quad].loc[ch][["gain", "gain_err", "offset", "offset_err"]],
                 res_fit[quad].loc[ch].loc[:, "center"],
                 res_fit[quad].loc[ch].loc[:, "center_err"],
                 radsources,
@@ -221,9 +208,7 @@ def draw_and_save_lins(res_cal, res_fit, radsources: dict, path, nthreads=1):
             fig.savefig(path(quad, ch))
             plt.close(fig)
 
-    return Parallel(n_jobs=nthreads)(
-        delayed(helper)(quad) for quad in res_cal.keys()
-    )
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
 
 
 def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
@@ -246,9 +231,7 @@ normal = (
 )
 
 
-def _diagnostics(
-    bins, counts, centers, amps, fwhms, limits, margin=500, **kwargs
-):
+def _diagnostics(bins, counts, centers, amps, fwhms, limits, margin=500, **kwargs):
     low_lims, high_lims = [*zip(*limits)]
     min_xlim, max_xlim = min(low_lims) - margin, max(high_lims) + margin
     start = np.where(bins >= min_xlim)[0][0]
@@ -297,14 +280,7 @@ def _spectrum(enbins, counts, radsources: dict, elims=None, **kwargs):
 
 
 def _linearity(
-    gain,
-    gain_err,
-    offset,
-    offset_err,
-    adcs,
-    adcs_err,
-    radsources: dict,
-    **kwargs
+    gain, gain_err, offset, offset_err, adcs, adcs_err, radsources: dict, **kwargs
 ):
     radsources_energies = np.array([l.energy for l in radsources.values()])
     measured_energies_err = np.sqrt(
@@ -314,20 +290,14 @@ def _linearity(
     )
     residual = gain * radsources_energies + offset - adcs
     res_err = np.sqrt(
-        (gain_err**2) * (radsources_energies**2)
-        + offset_err**2
-        + adcs_err**2
+        (gain_err**2) * (radsources_energies**2) + offset_err**2 + adcs_err**2
     )
     perc_residual = 100 * residual / adcs
     perc_residual_err = 100 * res_err / adcs
 
     prediction_discrepancy = (adcs - offset) / gain - radsources_energies
-    perc_prediction_discrepancy = (
-        100 * prediction_discrepancy / radsources_energies
-    )
-    perc_measured_energies_err = (
-        100 * measured_energies_err / radsources_energies
-    )
+    perc_prediction_discrepancy = 100 * prediction_discrepancy / radsources_energies
+    perc_measured_energies_err = 100 * measured_energies_err / radsources_energies
 
     margin = (radsources_energies[-1] - radsources_energies[0]) / 10
     xs = np.linspace(
@@ -367,7 +337,8 @@ def _quicklook(calres, **kwargs):
 
     fig, axs = plt.subplots(2, 1, sharex=True, **kwargs)
     axs[0].errorbar(
-        calres.index, calres["gain"],
+        calres.index,
+        calres["gain"],
         yerr=calres["gain_err"],
         fmt="o",
     )
@@ -433,18 +404,20 @@ def _sloplot(res_slo, **kwargs):
 # mapplot utilities
 
 quadtext = np.array(
-    [[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-     [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-     [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-     [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-     [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-     [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-     [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
-     [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
-     [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
-     [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
-     [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
-     [2, 2, 2, 2, 2, 3, 3, 3, 3, 3]]
+    [
+        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+        [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+        [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+        [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+        [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+        [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+        [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+    ]
 ).astype(int)
 
 
@@ -454,8 +427,8 @@ def _transf(mat, val=-1):
     empty slots with some value (by default, -1).
     used in map plots.
     """
-    m1 = np.dstack((mat, val*np.ones((12, 10)))).reshape((12, 20))
-    m2 = np.hstack((m1, val*np.ones((12, 20)))).reshape((24, 20))
+    m1 = np.dstack((mat, val * np.ones((12, 10)))).reshape((12, 20))
+    m2 = np.hstack((m1, val * np.ones((12, 20)))).reshape((24, 20))
     m2 = m2[:-1, :-1]
     return m2
 
@@ -468,12 +441,10 @@ def _chtext(detmap):
         [0, 1, 2, 3], ["A", "B", "C", "D"], [(0, 0), (5, 0), (0, 6), (5, 6)]
     ):
         quadmap = np.array(detmap[quad])
-        rows, cols = quadmap[
-            (quadmap != UNBOND)[:, 0] & (quadmap != UNBOND)[:, 1]
-            ].T
+        rows, cols = quadmap[(quadmap != UNBOND)[:, 0] & (quadmap != UNBOND)[:, 1]].T
         chtext[rows + ty, cols + tx] = np.arange(len(quadmap))[
             (quadmap != UNBOND)[:, 0] & (quadmap != UNBOND)[:, 1]
-            ]
+        ]
     return chtext
 
 
@@ -554,7 +525,7 @@ def mapenres(source, en_res, detmap):
         detmap,
         colorlabel="Energy resolution [keV]",
         maskvalue=0,
-        figsize=(8,8),
+        figsize=(8, 8),
     )
     return fig, ax
 
@@ -571,7 +542,7 @@ def mapcounts(counts, detmap):
             quadmap = np.array(detmap[quad])
             channels = counts[quad].index
             chns_indeces = quadmap[channels]
-            values = counts[quad]['counts'].values
+            values = counts[quad]["counts"].values
 
             rows, cols = chns_indeces.T
             mat[rows + ty, cols + tx] = values
@@ -581,6 +552,6 @@ def mapcounts(counts, detmap):
         detmap,
         colorlabel="Counts",
         maskvalue=0,
-        figsize=(8,8),
+        figsize=(8, 8),
     )
     return fig, ax

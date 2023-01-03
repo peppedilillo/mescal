@@ -10,9 +10,15 @@ from lmfit.models import GaussianModel, LinearModel
 
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
-from source.eventlist import (add_evtype_tag, electrons_to_energy,
-                              filter_delay, filter_spurious, infer_onchannels,
-                              make_electron_list, perchannel_counts)
+from source.eventlist import (
+    add_evtype_tag,
+    electrons_to_energy,
+    filter_delay,
+    filter_spurious,
+    infer_onchannels,
+    make_electron_list,
+    perchannel_counts,
+)
 from source.speaks import find_epeaks, find_speaks
 from source.xpeaks import find_xpeaks
 
@@ -157,9 +163,7 @@ def linrange(start, stop, step):
     return bins
 
 
-def find_adc_bins(
-    data, binning, maxmargin=10, roundto=500, clipquant=0.996
-):
+def find_adc_bins(data, binning, maxmargin=10, roundto=500, clipquant=0.996):
     """
     find good binning for adc data, euristic.
     not intended to use for binning scintillator electrons data.
@@ -256,30 +260,21 @@ class Calibrate:
 
         data = add_evtype_tag(data, self.detector.couples)
         events_pre_filter = len(data)
-        self.console.log(
-            ":white_check_mark: Tagged X and S events."
-        )
+        self.console.log(":white_check_mark: Tagged X and S events.")
 
         if retrigger_delay:
             data = filter_delay(data, retrigger_delay)
         else:
-            self.console.log(
-                ":exclamation_mark: Retrigger filter is off."
-            )
+            self.console.log(":exclamation_mark: Retrigger filter is off.")
         if spurious_bool:
             data = filter_spurious(data)
         else:
-            self.console.log(
-                ":exclamation_mark: Spurious filter is off."
-            )
+            self.console.log(":exclamation_mark: Spurious filter is off.")
 
-        filtered_percentual = (
-            100 * (events_pre_filter - len(data)) / events_pre_filter
-        )
-        if filtered_percentual:
+        filtered = 100 * (events_pre_filter - len(data)) / events_pre_filter
+        if filtered:
             self.console.log(
-                ":white_check_mark: Filtered out {:.1f}% of the events."
-                .format(filtered_percentual)
+                ":white_check_mark: Filtered {:.1f}% of the events.".format(filtered)
             )
         return data
 
@@ -294,8 +289,8 @@ class Calibrate:
         # attempting a new sdd calibration.
         if self.xpeaks is None:
             self.xpeaks = self._detect_xpeaks()
-        elif 'xpeak' in self.flagged:
-            for quad, ch in self.flagged['xpeak']:
+        elif "xpeak" in self.flagged:
+            for quad, ch in self.flagged["xpeak"]:
                 message = err.warn_failed_peak_detection(quad, ch)
                 logging.warning(message)
         self.xfit = self._fit_xradsources()
@@ -399,9 +394,7 @@ class Calibrate:
                 hist_quads[ch] = ys
             return quad, hist_quads
 
-        results = Parallel(n_jobs=nthreads)(
-            delayed(helper)(quad) for quad in "ABCD"
-        )
+        results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in "ABCD")
         counts = {key: value for key, value in results}
         return histogram(bins, counts)
 
@@ -479,18 +472,14 @@ class Calibrate:
                     continue
 
                 inf, sup = zip(*limits)
-                results.setdefault(quad, {})[ch] = np.column_stack(
-                    (inf, sup)
-                ).flatten()
+                results.setdefault(quad, {})[ch] = np.column_stack((inf, sup)).flatten()
         return results, radiation_sources
 
     @as_fit_dataframe
     def _fit_xradsources(self):
         bins = self.xhistograms.bins
         radiation_sources = self.xradsources()
-        constraints = [
-            (s.low_lim, s.hi_lim) for s in radiation_sources.values()
-        ]
+        constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
 
         results = {}
         for quad in self.xpeaks.keys():
@@ -554,26 +543,20 @@ class Calibrate:
                         logging.warning(message)
                     else:
                         # companion is off and counts is empty
-                        message = err.warn_widow(
-                            quad, ch, companion
-                        )
+                        message = err.warn_widow(quad, ch, companion)
                         logging.info(message)
                     self._flag(quad, ch, "speak")
                     continue
 
                 inf, sup = zip(*limits)
-                results.setdefault(quad, {})[ch] = np.column_stack(
-                    (inf, sup)
-                ).flatten()
+                results.setdefault(quad, {})[ch] = np.column_stack((inf, sup)).flatten()
         return results, radiation_sources
 
     @as_fit_dataframe
     def _fit_sradsources(self):
         bins = self.shistograms.bins
         radiation_sources = self.sradsources()
-        constraints = [
-            (s.low_lim, s.hi_lim) for s in radiation_sources.values()
-        ]
+        constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
 
         results = {}
         for quad in self.speaks.keys():
@@ -646,9 +629,7 @@ class Calibrate:
     def _fit_gamma_electrons(self):
         bins = self.ehistograms.bins
         radiation_sources = self.sradsources()
-        constraints = [
-            (s.low_lim, s.hi_lim) for s in radiation_sources.values()
-        ]
+        constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
 
         results = {}
         for quad in self.epeaks.keys():
@@ -685,24 +666,24 @@ class Calibrate:
 
     @staticmethod
     def _calibrate_chn(centers, energies: list, weights=None):
-       lmod = LinearModel()
-       pars = lmod.guess(centers, x=energies)
-       try:
-           resultlin = lmod.fit(
-               centers,
-               pars,
-               x=energies,
-               weights=weights,
-           )
-       except ValueError:
-           raise err.FailedFitError("linear fitter error")
+        lmod = LinearModel()
+        pars = lmod.guess(centers, x=energies)
+        try:
+            resultlin = lmod.fit(
+                centers,
+                pars,
+                x=energies,
+                weights=weights,
+            )
+        except ValueError:
+            raise err.FailedFitError("linear fitter error")
 
-       chi2 = resultlin.redchi
-       gain = resultlin.params["slope"].value
-       offset = resultlin.params["intercept"].value
-       gain_err = resultlin.params["slope"].stderr
-       offset_err = resultlin.params["intercept"].stderr
-       return gain, gain_err, offset, offset_err, chi2
+        chi2 = resultlin.redchi
+        gain = resultlin.params["slope"].value
+        offset = resultlin.params["intercept"].value
+        gain_err = resultlin.params["slope"].stderr
+        offset_err = resultlin.params["intercept"].stderr
+        return gain, gain_err, offset, offset_err, chi2
 
     @as_cal_dataframe
     def _calibrate_sdds(self):
@@ -719,7 +700,7 @@ class Calibrate:
                     cal_results = self._calibrate_chn(
                         centers,
                         energies,
-                        weights=1/center_errs**2,
+                        weights=1 / center_errs**2,
                     )
                 except err.FailedFitError:
                     message = err.warn_failed_linearity_fit(quad, ch)
@@ -750,8 +731,7 @@ class Calibrate:
 
                     energyres = fwhms / gains
                     energyres_err = energyres * np.sqrt(
-                        (fwhms_err / fwhms) ** 2
-                        + (gains_err / gains) ** 2
+                        (fwhms_err / fwhms) ** 2 + (gains_err / gains) ** 2
                     )
                     helper.append((energyres, energyres_err))
 
@@ -769,26 +749,24 @@ class Calibrate:
                 los = self.efit[quad].loc[scint][:, "center"].values / energies
                 lo_errs = self._scintillator_lout_error(quad, scint, energies)
 
-                lo, lo_err = self._deal_with_multiple_gamma_decays(
-                    los, lo_errs
-                )
+                lo, lo_err = self._deal_with_multiple_gamma_decays(los, lo_errs)
                 results.setdefault(quad, {})[scint] = np.array((lo, lo_err))
         return results
 
     @staticmethod
     def _electron_error(
-            adc,
-            gain,
-            gain_err,
-            offset,
-            offset_err,
+        adc,
+        gain,
+        gain_err,
+        offset,
+        offset_err,
     ):
         error = (
-                np.sqrt(
-                    +((offset_err / gain) ** 2)
-                    + ((adc - offset) / gain ** 2) * (gain_err ** 2)
-                )
-                / PHOTOEL_PER_KEV
+            np.sqrt(
+                +((offset_err / gain) ** 2)
+                + ((adc - offset) / gain**2) * (gain_err**2)
+            )
+            / PHOTOEL_PER_KEV
         )
         return error
 
@@ -808,9 +786,7 @@ class Calibrate:
         centers_comp = self.sfit[quad].loc[companion][:, "center"].values
         electron_err_cell = self._electron_error(centers_cell, *cell_cal)
         electron_err_companion = self._electron_error(centers_comp, *comp_cal)
-        electron_err_sum = np.sqrt(
-            electron_err_cell**2 + electron_err_companion**2
-        )
+        electron_err_sum = np.sqrt(electron_err_cell**2 + electron_err_companion**2)
         fit_error = self.efit[quad].loc[cell][:, "center_err"].values
         error = (electron_err_sum + fit_error) / energies
         return error
@@ -818,9 +794,7 @@ class Calibrate:
     @staticmethod
     def _deal_with_multiple_gamma_decays(light_outs, light_outs_errs):
         mean_lout = light_outs.mean()
-        mean_lout_err = np.sqrt(np.sum(light_outs_errs**2)) / len(
-            light_outs_errs
-        )
+        mean_lout_err = np.sqrt(np.sum(light_outs_errs**2)) / len(light_outs_errs)
         return mean_lout, mean_lout_err
 
     @as_slo_dataframe
@@ -851,25 +825,17 @@ class Calibrate:
 
                 else:
                     centers = self.sfit[quad].loc[ch][:, "center"].values
-                    gain, offset = (
-                        self.sdd_cal[quad].loc[ch][["gain", "offset"]].values
-                    )
-                    centers_electrons = (
-                        (centers - offset) / gain / PHOTOEL_PER_KEV
-                    )
+                    gain, offset = self.sdd_cal[quad].loc[ch][["gain", "offset"]].values
+                    centers_electrons = (centers - offset) / gain / PHOTOEL_PER_KEV
 
                     centers_companion = (
                         self.sfit[quad].loc[companion][:, "center"].values
                     )
                     gain_comp, offset_comp = (
-                        self.sdd_cal[quad]
-                        .loc[companion][["gain", "offset"]]
-                        .values
+                        self.sdd_cal[quad].loc[companion][["gain", "offset"]].values
                     )
                     centers_electrons_comp = (
-                        (centers_companion - offset_comp)
-                        / gain_comp
-                        / PHOTOEL_PER_KEV
+                        (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
                     )
 
                     effs = (
@@ -883,9 +849,7 @@ class Calibrate:
                         / (centers_electrons + centers_electrons_comp)
                     )
 
-                    eff, eff_err = self._deal_with_multiple_gamma_decays(
-                        effs, eff_errs
-                    )
+                    eff, eff_err = self._deal_with_multiple_gamma_decays(effs, eff_errs)
                     results.setdefault(quad, {})[ch] = np.array((eff, eff_err))
         return results
 
@@ -897,7 +861,7 @@ class Calibrate:
         x_stop = bisect_right(x, stop)
         if x_stop - x_start < 5:
             raise err.FailedFitError("too few bins to fit.")
-        x_fit = (x[x_start: x_stop + 1][1:] + x[x_start: x_stop + 1][:-1]) / 2
+        x_fit = (x[x_start : x_stop + 1][1:] + x[x_start : x_stop + 1][:-1]) / 2
         y_fit = y[x_start:x_stop]
         errors = np.clip(np.sqrt(y_fit), 1, None)
 
@@ -910,7 +874,7 @@ class Calibrate:
             y_fit,
             pars,
             x=x_fit,
-            weights=1/errors**2,
+            weights=1 / errors**2,
         )
 
         x_fine = np.linspace(x[0], x[-1], len(x) * 100)

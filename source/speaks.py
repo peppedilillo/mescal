@@ -38,9 +38,7 @@ def find_epeaks(
     peaks, peaks_props = find_peaks(mm, **search_pars)
     guesses = guess_epeaks_position(energies, lightout_guess)
     if len(peaks) >= len(guesses):
-        best_peaks, best_peaks_props = _closest_peaks(
-            guesses, bins, peaks, peaks_props
-        )
+        best_peaks, best_peaks_props = _closest_peaks(guesses, bins, peaks, peaks_props)
     else:
         raise DetectPeakError("candidate peaks are less than sources to fit.")
     limits = [
@@ -76,9 +74,7 @@ def find_speaks(
     peaks, peaks_props = find_peaks(mm, **search_pars)
     guesses = guess_speaks_position(energies, lightout_guess, gain, offset)
     if len(peaks) >= len(guesses):
-        best_peaks, best_peaks_props = _closest_peaks(
-            guesses, bins, peaks, peaks_props
-        )
+        best_peaks, best_peaks_props = _closest_peaks(guesses, bins, peaks, peaks_props)
     else:
         raise DetectPeakError("candidate peaks are less than sources to fit.")
     limits = [

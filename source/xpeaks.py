@@ -139,9 +139,7 @@ def find_xpeaks(
 
     limits = [
         (bins[floor(lo)], bins[ceil(hi)])
-        for lo, hi in zip(
-            best_peaks_props["left_ips"], best_peaks_props["right_ips"]
-        )
+        for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])
     ]
     return limits
 
@@ -216,8 +214,8 @@ def posteriorscore(bins, peaks_combinations, energies, gain_guess, offset_guess)
     gain_center, gain_sigma = gain_guess
     offset_center, offset_sigma = offset_guess
     mus = gain_center * np.array(energies) + offset_center
-    standard_distances = np.abs((bins[peaks_combinations] - mus)/gain_sigma)
-    scores = - np.sum(standard_distances, axis=1)
+    standard_distances = np.abs((bins[peaks_combinations] - mus) / gain_sigma)
+    scores = -np.sum(standard_distances, axis=1)
     return scores
 
 
@@ -266,9 +264,7 @@ def peaks_with_enough_stat(counts, mincounts, pars, smoothing=1, maxdepth=20):
         )
     if peaks.any():
         # print("candidate peaks: {} peaks".format(len(peaks)))
-        peaks, peaks_props = remove_small_peaks(
-            mincounts, counts, peaks, peaks_props
-        )
+        peaks, peaks_props = remove_small_peaks(mincounts, counts, peaks, peaks_props)
         # print("after small peaks filter: {} peaks".format(len(peaks)))
     return peaks, peaks_props
 
@@ -311,7 +307,7 @@ def remove_small_peaks(mincounts, counts, peaks, peaks_properties):
     return peaks, peaks_properties
 
 
-def remove_baseline(bins, counts, gain_guess, peaks, peaks_properties, closer_than=1.):
+def remove_baseline(bins, counts, gain_guess, peaks, peaks_properties, closer_than=1.0):
     """
     Remove peaks close to the baseline.
     Closeness is computed in units of energy,
@@ -446,22 +442,26 @@ def debug_helper(
         print("{}:".format(label))
         # print(score)
         # print(ranking)
-        print(
-            ">> winner ranking: {}/{}".format(
-                ranking[winner] + 1, len(peaks_combo)
-            )
-        )
+        print(">> winner ranking: {}/{}".format(ranking[winner] + 1, len(peaks_combo)))
 
     plt.plot(bins[:-1], counts)
     baseline = np.argwhere((counts[1:] != 0) & (counts[:-1] != 0))[0][0]
     plt.axvline(bins[baseline])
-    for peak, lo, hi in zip(
-        peaks, peaks_props["left_ips"], peaks_props["right_ips"]
-    ):
-        plt.axvspan(bins[int(lo)], bins[int(hi)], alpha=0.1, color="grey",)
+    for peak, lo, hi in zip(peaks, peaks_props["left_ips"], peaks_props["right_ips"]):
+        plt.axvspan(
+            bins[int(lo)],
+            bins[int(hi)],
+            alpha=0.1,
+            color="grey",
+        )
     for peak, lo, hi in zip(
         winpeaks, winpeaks_props["left_ips"], winpeaks_props["right_ips"]
     ):
-        plt.axvspan(bins[int(lo)], bins[int(hi)], alpha=0.2, color="red",)
+        plt.axvspan(
+            bins[int(lo)],
+            bins[int(hi)],
+            alpha=0.2,
+            color="red",
+        )
     plt.show()
     plt.close()

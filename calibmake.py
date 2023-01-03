@@ -6,25 +6,34 @@ import sys
 from os import cpu_count
 from pathlib import Path
 
-import pandas as pd
-
-from source.interface import sections_rule, logo
-
 import matplotlib
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from source import interface, paths
 from source.calibrate import PEAKS_PARAMS, Calibrate
 from source.cmd import Cmd
 from source.detectors import Detector
-from source.io import (get_writer, pandas_from_LV0d5, write_eventlist_to_fits,
-                       write_report_to_excel)
-from source.plot import (draw_and_save_calibrated_spectra,
-                         draw_and_save_channels_sspectra,
-                         draw_and_save_channels_xspectra, draw_and_save_diagns,
-                         draw_and_save_lins, draw_and_save_qlooks,
-                         draw_and_save_slo, draw_and_save_uncalibrated,
-                         mapcounts, mapenres, uncalibrated)
+from source.interface import logo, sections_rule
+from source.io import (
+    get_writer,
+    pandas_from_LV0d5,
+    write_eventlist_to_fits,
+    write_report_to_excel,
+)
+from source.plot import (
+    draw_and_save_calibrated_spectra,
+    draw_and_save_channels_sspectra,
+    draw_and_save_channels_xspectra,
+    draw_and_save_diagns,
+    draw_and_save_lins,
+    draw_and_save_qlooks,
+    draw_and_save_slo,
+    draw_and_save_uncalibrated,
+    mapcounts,
+    mapenres,
+    uncalibrated,
+)
 from source.radsources import radsources_dicts
 from source.utils import get_version
 
@@ -81,12 +90,14 @@ def start_logger(args):
     Starts logger in default output folder and logs user command line arguments.
     """
     logfile = paths.LOGFILE(args.filepath)
-    with open(logfile, 'w') as f:
+    with open(logfile, "w") as f:
         f.write(logo())
         len_logo = len(logo().split("\n")[0])
         version_message = "version " + get_version()
         if len_logo > len(version_message) + 1:
-            f.write(" "*(len_logo - len(version_message) + 1) + version_message + "\n\n")
+            f.write(
+                " " * (len_logo - len(version_message) + 1) + version_message + "\n\n"
+            )
         else:
             f.write(version_message + "\n\n")
 
@@ -96,7 +107,7 @@ def start_logger(args):
         format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
         "%(levelname)s: %(message)s",
     )
-    message = 'parser arguments = ' + str(args)[10:-1]
+    message = "parser arguments = " + str(args)[10:-1]
     logging.info(message)
     return True
 
@@ -114,10 +125,10 @@ def check_system():
     Perfoms system inspection to choose matplotlib backend
     and threads number (max 4).
     """
-    if sys.platform.startswith('win') or sys.platform.startswith('linux'):
+    if sys.platform.startswith("win") or sys.platform.startswith("linux"):
         if "TkAgg" in matplotlib.rcsetup.all_backends:
             matplotlib.use("TkAgg")
-    elif sys.platform.startswith('mac'):
+    elif sys.platform.startswith("mac"):
         if "macosx" in matplotlib.rcsetup.all_backends:
             matplotlib.use("macosx")
 
@@ -163,9 +174,10 @@ def unpack_configuration(adc):
         "lightout_sigma": adcitems.getfloat("lightout_sigma"),
     }
 
-    message = 'config.ini parameters = ' + str(out)[1:-1]
+    message = "config.ini parameters = " + str(out)[1:-1]
     logging.info(message)
     return out
+
 
 # TODO: refactoring. caching should have its own function.
 def get_from(fitspath: Path, console, use_cache=True):
@@ -176,9 +188,7 @@ def get_from(fitspath: Path, console, use_cache=True):
     cached = paths.CACHEDIR().joinpath(fitspath.name).with_suffix(".pkl.gz")
     if cached.is_file() and use_cache:
         out = pd.read_pickle(cached)
-        console.log(
-            "[bold yellow]:yellow_circle: Data were loaded from cache."
-        )
+        console.log("[bold yellow]:yellow_circle: Data were loaded from cache.")
     elif fitspath.is_file():
         out = pandas_from_LV0d5(fitspath)
         console.log(":open_book: Data loaded.")
@@ -198,15 +208,24 @@ class Mescal(Cmd):
     """
     Main program class dealing with calibration workflow and shell loop.
     """
-    intro = (
-        "Type help or ? for a list of commands.\n"
-    )
-    prompt = '[dim cyan]\[mescalSH] '
+
+    intro = "Type help or ? for a list of commands.\n"
+    prompt = "[dim cyan]\[mescalSH] "
     spinner_message = "Working.."
-    unknown_command_message = "[red]Unknown command.[/]\nType help or ? for a list of commands."
-    invalid_command_message = "[red]Command unavailable.[/]\nCannnot execute with present calibration."
-    invalid_channel_message = "[red]Invalid channel.[/]\nChannel ID not in standard form (e.g., d04, A30, B02)."
-    invalid_limits_message = "[red]Invalid limits.[/]\nEntry must be two different sorted integers (e.g., 19800 20100)."
+    unknown_command_message = (
+        "[red]Unknown command.[/]\nType help or ? for a list of commands."
+    )
+    invalid_command_message = (
+        "[red]Command unavailable.[/]\nCannnot execute with present calibration."
+    )
+    invalid_channel_message = (
+        "[red]Invalid channel.[/]\n"
+        "Channel ID not in standard form (e.g., d04, A30, B02).",
+    )
+    invalid_limits_message = (
+        "[red]Invalid limits.[/]\n"
+        "Entry must be two different sorted integers (e.g., 19800 20100)."
+    )
 
     def __init__(self, args, threads):
         console = interface.hello()
@@ -242,27 +261,12 @@ class Mescal(Cmd):
         self.cmdloop()
 
     def _warn_about_flagged(self):
-        num_flagged = len(
-            set(
-                [
-                    item
-                    for sublist in self.calibration.flagged.values()
-                    for item in sublist
-                ]
-            )
-        )
-        num_channels = len(
-            [
-                item
-                for sublist in self.calibration.channels.values()
-                for item in sublist
-            ]
-        )
+        sublists = self.calibration.flagged.values()
+        num_flagged = len(set([item for sublist in sublists for item in sublist]))
+        num_channels = len([item for sublist in sublists for item in sublist])
         message = (
             "In total, {} channels out of {} were flagged.\n"
-            "For more details, see the log file.".format(
-                num_flagged, num_channels
-            )
+            "For more details, see the log file.".format(num_flagged, num_channels)
         )
 
         self.console.print(message)
@@ -271,28 +275,24 @@ class Mescal(Cmd):
     def _process_results(self, output_format, filepath):
         write_report = get_writer(output_format)
 
-        if (
-            not self.calibration.sdd_cal
-            and not self.calibration.optical_coupling
-        ):
+        if not self.calibration.sdd_cal and not self.calibration.optical_coupling:
             self.console.log("[bold red]:red_circle: Calibration failed.")
-        elif (
-            not self.calibration.sdd_cal
-            or not self.calibration.optical_coupling
-        ):
+        elif not self.calibration.sdd_cal or not self.calibration.optical_coupling:
             self.console.log(
-                "[bold yellow]:yellow_circle: Calibration partially completed. "
+                "[bold yellow]:yellow_circle: Calibration partially complete. "
             )
         else:
             self.console.log(":green_circle: Calibration complete.")
 
         if self.calibration.sdd_cal:
             write_report(
-                self.calibration.sdd_cal, path=paths.CALREPORT(filepath),
+                self.calibration.sdd_cal,
+                path=paths.CALREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote SDD calibration results.")
             write_report(
-                self.calibration.en_res, path=paths.RESREPORT(filepath),
+                self.calibration.en_res,
+                path=paths.RESREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote energy resolution results.")
             draw_and_save_qlooks(
@@ -307,9 +307,7 @@ class Mescal(Cmd):
                 self.calibration.optical_coupling,
                 path=paths.SLOREPORT(filepath),
             )
-            self.console.log(
-                ":blue_book: Wrote scintillators calibration results."
-            )
+            self.console.log(":blue_book: Wrote scintillators calibration results.")
             draw_and_save_slo(
                 self.calibration.optical_coupling,
                 path=paths.SLOPLOT(filepath),
@@ -325,9 +323,7 @@ class Mescal(Cmd):
                 paths.XSPPLOT(filepath),
                 paths.SSPPLOT(filepath),
             )
-            self.console.log(
-                ":chart_increasing: Saved calibrated spectra plots."
-            )
+            self.console.log(":chart_increasing: Saved calibrated spectra plots.")
         return True
 
     # prompt commands
@@ -359,9 +355,7 @@ class Mescal(Cmd):
     def do_retry(self, arg):
         """Launches calibration again."""
         with self.console.status(self.spinner_message):
-            sections_rule(
-                self.console, "[bold italic]Calibration log", style="green"
-            )
+            sections_rule(self.console, "[bold italic]Calibration log", style="green")
             self.calibration._calibrate()
             self._process_results(self.args.fmt, self.args.filepath)
             sections_rule(self.console, "[bold italic]Shell", style="green")
@@ -386,12 +380,8 @@ class Mescal(Cmd):
             else:
                 lim_lo, lim_hi = parsed_arg
                 label_lo, label_hi = PEAKS_PARAMS
-                self.calibration.xpeaks[quad].loc[
-                    ch, (source, label_lo)
-                ] = int(lim_lo)
-                self.calibration.xpeaks[quad].loc[
-                    ch, (source, label_hi)
-                ] = int(lim_hi)
+                self.calibration.xpeaks[quad].loc[ch, (source, label_lo)] = int(lim_lo)
+                self.calibration.xpeaks[quad].loc[ch, (source, label_hi)] = int(lim_hi)
 
         message = "reset xfit limits for channel {}{}".format(quad, ch)
         logging.info(message)
@@ -416,10 +406,7 @@ class Mescal(Cmd):
         return False
 
     def can_mapres(self):
-        if (
-            self.calibration.xradsources().keys()
-            and self.calibration.en_res
-        ):
+        if self.calibration.xradsources().keys() and self.calibration.en_res:
             return True
 
     def do_mapres(self, arg):
@@ -510,11 +497,13 @@ class Mescal(Cmd):
         with self.console.status(self.spinner_message):
             if self.calibration.xfit:
                 write_report_to_excel(
-                    self.calibration.xfit, paths.XFTREPORT(self.args.filepath),
+                    self.calibration.xfit,
+                    paths.XFTREPORT(self.args.filepath),
                 )
             if self.calibration.sfit:
                 write_report_to_excel(
-                    self.calibration.sfit, paths.SFTREPORT(self.args.filepath),
+                    self.calibration.sfit,
+                    paths.SFTREPORT(self.args.filepath),
                 )
         return False
 
@@ -591,7 +580,8 @@ class Mescal(Cmd):
             return False
         with self.console.status(self.spinner_message):
             write_eventlist_to_fits(
-                self.eventlist, paths.EVLFITS(self.args.filepath),
+                self.eventlist,
+                paths.EVLFITS(self.args.filepath),
             )
         return False
 
@@ -635,7 +625,6 @@ def parse_limits(arg):
         return botlim, toplim
     else:
         return INVALID_ENTRY
-
 
 
 if __name__ == "__main__":

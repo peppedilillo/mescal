@@ -59,7 +59,7 @@ class Cmd:
     def ansi_prompt(self):
         """turns a markup prompt to ansi string"""
         with self.console.capture() as capture:
-            self.console.print(self.prompt, end='')
+            self.console.print(self.prompt, end="")
         str_output = capture.get()
         return str_output
 
@@ -249,9 +249,7 @@ class Cmd:
 
     def complete_help(self, *args):
         commands = set(self.completenames(*args))
-        topics = set(
-            a[5:] for a in self.get_names() if a.startswith("help_" + args[0])
-        )
+        topics = set(a[5:] for a in self.get_names() if a.startswith("help_" + args[0]))
         return list(commands | topics)
 
     def do_help(self, arg):
@@ -321,13 +319,10 @@ class Cmd:
             self.console.print("<empty>\n")
             return
 
-        nonstrings = [
-            i for i in range(len(list)) if not isinstance(list[i], str)
-        ]
+        nonstrings = [i for i in range(len(list)) if not isinstance(list[i], str)]
         if nonstrings:
             raise TypeError(
-                "list[i] not a string for i in %s"
-                % ", ".join(map(str, nonstrings))
+                "list[i] not a string for i in %s" % ", ".join(map(str, nonstrings))
             )
         size = len(list)
         if size == 1:

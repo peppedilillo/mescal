@@ -172,9 +172,7 @@ def transform_table(big_table):
     # untriggered channels (np.nan) go to the right of the matrix
     # big_table_idCHNs_sortedADCs = [[3, 1, 0],
     #                                [0, 3, 1]]
-    big_table_idCHNs_sortedADCs = np.argsort(big_table, axis=1)[
-        :, :6
-    ]  # [:, :3]
+    big_table_idCHNs_sortedADCs = np.argsort(big_table, axis=1)[:, :6]  # [:, :3]
     # replace channels IDs of untriggered channels with 32
     # big_table_idCHNs_sortedADCs = [[3, 1, 32],
     #                                [0, 3, 32]]
@@ -282,9 +280,7 @@ if __name__ == "__main__":
     last_time = 0
     for filepath in args.infiles:
         times, wftable = table_from_wfs(Path(filepath))
-        tables.append(
-            table0d5_from_wftable(args.quadrant, times + last_time, wftable)
-        )
+        tables.append(table0d5_from_wftable(args.quadrant, times + last_time, wftable))
         last_time += times[-1]
     dataframe = dataframe_from_table0d5(np.vstack(tables))
     save_to_fits(dataframe, args.outfile)
