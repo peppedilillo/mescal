@@ -100,13 +100,13 @@ def start_logger(args):
             )
         else:
             f.write(version_message + "\n\n")
-
     logging.basicConfig(
         filename=logfile,
         level=logging.INFO,
         format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
         "%(levelname)s: %(message)s",
     )
+
     message = "parser arguments = " + str(args)[10:-1]
     logging.info(message)
     return True
@@ -206,7 +206,7 @@ INVALID_ENTRY = 0
 
 class Mescal(Cmd):
     """
-    Main program class dealing with calibration workflow and shell loop.
+    Main program class implementing calibration workflow and shell loop.
     """
 
     intro = "Type help or ? for a list of commands.\n"
@@ -261,6 +261,9 @@ class Mescal(Cmd):
         self.cmdloop()
 
     def _warn_about_flagged(self):
+        """Tells user about channels for which calibration
+        could not be completed.
+        """
         sublists = self.calibration.flagged.values()
         num_flagged = len(set([item for sublist in sublists for item in sublist]))
         num_channels = len([item for sublist in sublists for item in sublist])
@@ -273,6 +276,7 @@ class Mescal(Cmd):
         return True
 
     def _process_results(self, output_format, filepath):
+        """Prepares and exports calibration results."""
         write_report = get_writer(output_format)
 
         if not self.calibration.sdd_cal and not self.calibration.optical_coupling:
@@ -326,10 +330,15 @@ class Mescal(Cmd):
             self.console.log(":chart_increasing: Saved calibrated spectra plots.")
         return True
 
-    # prompt commands
-    def do_svall(self, arg):
+    # shell prompt commands
+    # commands with "do_" prefix methods are callable by the user.
+    # some of these commands requires a particular point during calibrations
+    # to have been reached. these commands have a secondary "can_" method
+    # checking for the command actually being executable.
+    def do_svall(self):
         """Export all exportable tables and figures.
-        Will not export calibrated event list."""
+        Will not export calibrated event list.
+        """
         cmds = [
             "svhistplot",
             "svdiags",
@@ -344,15 +353,14 @@ class Mescal(Cmd):
                 do = getattr(self, "do_" + cmd)
                 do("")
 
-    def do_quit(self, arg):
-        """
-        Quits mescal.
+    def do_quit(self):
+        """Quits mescal.
         It's the only do-command to return True.
         """
         self.console.print("Ciao! :wave:\n")
         return True
 
-    def do_retry(self, arg):
+    def do_retry(self):
         """Launches calibration again."""
         with self.console.status(self.spinner_message):
             sections_rule(self.console, "[bold italic]Calibration log", style="green")
@@ -362,7 +370,7 @@ class Mescal(Cmd):
         return False
 
     def do_setxlim(self, arg):
-        """Reset channel X peaks position."""
+        """Reset channel X peaks position for user selected channels."""
         parsed_arg = parse_chns(arg)
         if parsed_arg is INVALID_ENTRY:
             self.console.print(self.invalid_channel_message)
@@ -409,7 +417,7 @@ class Mescal(Cmd):
         if self.calibration.xradsources().keys() and self.calibration.en_res:
             return True
 
-    def do_mapres(self, arg):
+    def do_mapres(self):
         """Plots X energy resolution map."""
         if not self.can_mapres():
             self.console.print(self.invalid_command_message)
@@ -430,7 +438,7 @@ class Mescal(Cmd):
     def can_mapcounts(self):
         return True
 
-    def do_mapcounts(self, arg):
+    def do_mapcounts(self):
         """Plots a map of counts per-channel."""
         if not self.can_mapcounts():
             self.console.print(self.invalid_command_message)
@@ -446,7 +454,7 @@ class Mescal(Cmd):
     def can_svhistplot(self):
         return True
 
-    def do_svhistplot(self, arg):
+    def do_svhistplot(self):
         """Save raw acquisition histogram plots."""
         with self.console.status(self.spinner_message):
             draw_and_save_uncalibrated(
@@ -462,7 +470,7 @@ class Mescal(Cmd):
             return True
         return False
 
-    def do_svdiags(self, arg):
+    def do_svdiags(self):
         """Save X peak detection diagnostics plots."""
         if not self.can_svdiags():
             self.console.print(self.invalid_command_message)
@@ -489,7 +497,7 @@ class Mescal(Cmd):
             return True
         return False
 
-    def do_svtabfit(self, arg):
+    def do_svtabfit(self):
         """Save X fit tables."""
         if not self.can_svtabfit():
             self.console.print(self.invalid_command_message)
@@ -512,7 +520,7 @@ class Mescal(Cmd):
             return True
         return False
 
-    def do_svxplots(self, arg):
+    def do_svxplots(self):
         """Save calibrated X channel spectra."""
         if not self.can_svxplots():
             self.console.print(self.invalid_command_message)
@@ -532,7 +540,7 @@ class Mescal(Cmd):
             return True
         return False
 
-    def do_svlinplots(self, args):
+    def do_svlinplots(self):
         """Save SDD linearity plots."""
         if not self.can_svlinplots():
             self.console.print(self.invalid_command_message)
@@ -552,7 +560,7 @@ class Mescal(Cmd):
             return True
         return False
 
-    def do_svsplots(self, arg):
+    def do_svsplots(self):
         """Save calibrated gamma channel spectra."""
         if not self.can_svsplots():
             self.console.print(self.invalid_command_message)
@@ -573,7 +581,7 @@ class Mescal(Cmd):
             return True
         return False
 
-    def do_svevents(self, arg):
+    def do_svevents(self):
         """Save calibrated events to fits file."""
         if not self.can_svevents():
             self.console.print(self.invalid_command_message)
