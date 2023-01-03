@@ -2,6 +2,7 @@ import argparse
 import atexit
 import configparser
 import logging
+import sys
 from os import cpu_count
 from pathlib import Path
 
@@ -9,6 +10,7 @@ import pandas as pd
 
 from source.interface import sections_rule, logo
 
+import matplotlib
 import matplotlib.pyplot as plt
 
 from source import interface, paths
@@ -75,6 +77,9 @@ parser.add_argument(
 
 
 def start_logger(args):
+    """
+    Starts logger in default output folder and logs user command line arguments.
+    """
     logfile = paths.LOGFILE(args.filepath)
     with open(logfile, 'w') as f:
         f.write(logo())
@@ -98,10 +103,34 @@ def start_logger(args):
 
 @atexit.register
 def end_log():
+    """
+    Kills loggers on shutdown.
+    """
     logging.shutdown()
 
 
+def check_system():
+    """
+    Perfoms system inspection to choose matplotlib backend
+    and threads number (max 4).
+    """
+    if sys.platform.startswith('win') or sys.platform.startswith('linux'):
+        if "TkAgg" in matplotlib.rcsetup.all_backends:
+            matplotlib.use("TkAgg")
+    elif sys.platform.startswith('mac'):
+        if "macosx" in matplotlib.rcsetup.all_backends:
+            matplotlib.use("macosx")
+
+    systhreads = min(4, cpu_count())
+    logging.info("using matplotlib backend {}".format(matplotlib.get_backend()))
+    logging.info("running over {} threads".format(systhreads))
+    return systhreads
+
+
 def parse_args():
+    """
+    user arguments parsing.
+    """
     args = parser.parse_args()
     args.filepath = Path(args.filepath)
     args.radsources = args.radsources.upper().split(",")
@@ -114,6 +143,9 @@ def parse_args():
 
 
 def unpack_configuration(adc):
+    """
+    unpacks ini configuration file into a dict.
+    """
     config = configparser.ConfigParser()
     config.read("./source/config.ini")
     general = config["general"]
@@ -135,8 +167,11 @@ def unpack_configuration(adc):
     logging.info(message)
     return out
 
-
+# TODO: refactoring. caching should have its own function.
 def get_from(fitspath: Path, console, use_cache=True):
+    """
+    deals with data load and caching.
+    """
     console.log(":question_mark: Looking for data..")
     cached = paths.CACHEDIR().joinpath(fitspath.name).with_suffix(".pkl.gz")
     if cached.is_file() and use_cache:
@@ -149,7 +184,6 @@ def get_from(fitspath: Path, console, use_cache=True):
         console.log(":open_book: Data loaded.")
         if use_cache:
             # save data to cache
-            # TODO: saving to cache needs a dedicated function
             out.to_pickle(cached)
             console.log(":blue_book: Data saved to cache.")
     else:
@@ -160,50 +194,18 @@ def get_from(fitspath: Path, console, use_cache=True):
 INVALID_ENTRY = 0
 
 
-def parse_chns(arg):
-    quadrants = ["A", "B", "C", "D"]
-    chn_strings = ["{0:02d}".format(i) for i in range(32)]
-    stripped_arg = arg.strip()
-    if (
-        arg
-        and (arg[0].upper() in quadrants)
-        and (arg[1:3] in chn_strings)
-        and len(stripped_arg) == 3
-    ):
-        quad = arg[0]
-        ch = int(arg[1:3])
-        return quad, ch
-    else:
-        return INVALID_ENTRY
-
-
-def parse_limits(arg):
-    if arg == "":
-        return None
-
-    arglist = arg.strip().split(" ")
-    if (
-        len(arglist) == 2
-        and arglist[0].isdigit()
-        and arglist[1].isdigit()
-        and int(arglist[0]) < int(arglist[1])
-    ):
-        botlim = int(arglist[0])
-        toplim = int(arglist[1])
-        return botlim, toplim
-    else:
-        return INVALID_ENTRY
-
-
 class Mescal(Cmd):
+    """
+    Main program class dealing with calibration workflow and shell loop.
+    """
     intro = (
         "Type help or ? for a list of commands.\n"
     )
-    prompt = '[dim cyan]\[mescal] '
+    prompt = '[dim cyan]\[mescalSH] '
     spinner_message = "Working.."
-    unknown_command_message = "[red]Unknown command.[/]"
+    unknown_command_message = "[red]Unknown command.[/]\nType help or ? for a list of commands."
     invalid_command_message = "[red]Command unavailable.[/]\nCannnot execute with present calibration."
-    invalid_channel_message = "[red]Invalid channel.[/]\nChannel ID not in standard form (e.g., d04, _A30_, _B02_)."
+    invalid_channel_message = "[red]Invalid channel.[/]\nChannel ID not in standard form (e.g., d04, A30, B02)."
     invalid_limits_message = "[red]Invalid limits.[/]\nEntry must be two different sorted integers (e.g., 19800 20100)."
 
     def __init__(self, args, threads):
@@ -211,7 +213,7 @@ class Mescal(Cmd):
         super().__init__(console)
         self.args = args
         self.config = unpack_configuration(args.adc)
-        self.threads = systhreads
+        self.threads = threads
 
         sections_rule(console, "[bold italic]Calibration log", style="green")
         with console.status("Initializing.."):
@@ -296,7 +298,7 @@ class Mescal(Cmd):
             draw_and_save_qlooks(
                 self.calibration.sdd_cal,
                 path=paths.QLKPLOT(filepath),
-                nthreads=systhreads,
+                nthreads=self.threads,
             )
             self.console.log(":chart_increasing: Saved X fit quicklook plots.")
 
@@ -311,7 +313,7 @@ class Mescal(Cmd):
             draw_and_save_slo(
                 self.calibration.optical_coupling,
                 path=paths.SLOPLOT(filepath),
-                nthreads=systhreads,
+                nthreads=self.threads,
             )
             self.console.log(":chart_increasing: Saved light-output plots.")
 
@@ -594,8 +596,50 @@ class Mescal(Cmd):
         return False
 
 
+def parse_chns(arg):
+    """
+    Shell helper.
+    """
+    quadrants = ["A", "B", "C", "D"]
+    chn_strings = ["{0:02d}".format(i) for i in range(32)]
+    stripped_arg = arg.strip()
+    if (
+        arg
+        and (arg[0].upper() in quadrants)
+        and (arg[1:3] in chn_strings)
+        and len(stripped_arg) == 3
+    ):
+        quad = arg[0]
+        ch = int(arg[1:3])
+        return quad, ch
+    else:
+        return INVALID_ENTRY
+
+
+def parse_limits(arg):
+    """
+    Shell helper.
+    """
+    if arg == "":
+        return None
+
+    arglist = arg.strip().split(" ")
+    if (
+        len(arglist) == 2
+        and arglist[0].isdigit()
+        and arglist[1].isdigit()
+        and int(arglist[0]) < int(arglist[1])
+    ):
+        botlim = int(arglist[0])
+        toplim = int(arglist[1])
+        return botlim, toplim
+    else:
+        return INVALID_ENTRY
+
+
+
 if __name__ == "__main__":
     args = parse_args()
     start_logger(args)
-    systhreads = min(4, cpu_count())
+    systhreads = check_system()
     Mescal(args, systhreads)
