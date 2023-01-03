@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from source.interface import sections_rule, logo, mescal_text
+from source.interface import sections_rule, logo
 
 import matplotlib.pyplot as plt
 
@@ -24,6 +24,7 @@ from source.plot import (draw_and_save_calibrated_spectra,
                          draw_and_save_slo, draw_and_save_uncalibrated,
                          mapcounts, mapenres, uncalibrated)
 from source.radsources import radsources_dicts
+from source.utils import get_version
 
 description = (
     "A script to automatically calibrate HERMES-TP/SP "
@@ -73,11 +74,16 @@ parser.add_argument(
 )
 
 
-
-def start_log(args):
+def start_logger(args):
     logfile = paths.LOGFILE(args.filepath)
     with open(logfile, 'w') as f:
-        f.write(logo() + '\n')
+        f.write(logo())
+        len_logo = len(logo().split("\n")[0])
+        version_message = "version " + get_version()
+        if len_logo > len(version_message) + 1:
+            f.write(" "*(len_logo - len(version_message) + 1) + version_message + "\n\n")
+        else:
+            f.write(version_message + "\n\n")
 
     logging.basicConfig(
         filename=logfile,
@@ -587,6 +593,6 @@ class Mescal(Cmd):
 
 if __name__ == "__main__":
     args = parse_args()
-    start_log(args)
+    start_logger(args)
     systhreads = min(4, cpu_count())
     Mescal(args, systhreads)
