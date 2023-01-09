@@ -38,7 +38,7 @@ def draw_and_save_qlooks(res_cal, path, nthreads=1):
             message = warn_nan_in_sdd_calib(quad)
             logging.warning(message)
             quad_res_cal = quad_res_cal.fillna(0)
-        fig, axs = _quicklook(quad_res_cal)
+        fig, axs = quicklook(quad_res_cal)
         axs[0].set_title("Calibration quicklook - Quadrant {}".format(quad))
         fig.savefig(path(quad))
         plt.close(fig)
@@ -52,7 +52,7 @@ def draw_and_save_slo(res_slo, path, nthreads=1):
             message = warn_nan_in_slo_table(quad)
             logging.warning(message)
             quad_res_slo = quad_res_slo.fillna(0)
-        fig, ax = _sloplot(quad_res_slo)
+        fig, ax = lightout(quad_res_slo)
         ax.set_title("Light output - Quadrant {}".format(quad))
         fig.savefig(path(quad))
         plt.close(fig)
@@ -81,7 +81,7 @@ def draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads=1):
 def draw_and_save_diagns(histograms, res_fit, path, margin=500, nthreads=1):
     def helper(quad):
         for ch in res_fit[quad].index:
-            fig, ax = _diagnostics(
+            fig, ax = diagnostics(
                 histograms.bins,
                 histograms.counts[quad][ch],
                 res_fit[quad].loc[ch].loc[:, "center"],
@@ -112,7 +112,7 @@ def draw_and_save_channels_xspectra(
             enbins = (histograms.bins - res_cal[quad].loc[ch]["offset"]) / res_cal[
                 quad
             ].loc[ch]["gain"]
-            fig, ax = _spectrum(
+            fig, ax = spectrum(
                 enbins,
                 histograms.counts[quad][ch],
                 radsources,
@@ -136,7 +136,7 @@ def draw_and_save_channels_sspectra(
             ].loc[ch]["gain"]
             enbins = xenbins / res_slo[quad]["light_out"].loc[ch] / PHOTOEL_PER_KEV
 
-            fig, ax = _spectrum(
+            fig, ax = spectrum(
                 enbins,
                 histograms.counts[quad][ch],
                 radsources,
@@ -159,45 +159,43 @@ def draw_and_save_calibrated_spectra(
 
 
 def draw_and_save_xspectrum(calibrated_events, radsources: dict, path):
-    if not calibrated_events.empty:
-        xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
-        xcounts, xbins = np.histogram(xevs["ENERGY"], bins=np.arange(2, 40, 0.05))
+    xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
+    xcounts, xbins = np.histogram(xevs["ENERGY"], bins=np.arange(2, 40, 0.05))
 
-        fig, ax = _spectrum(
-            xbins,
-            xcounts,
-            radsources,
-            elims=_compute_lims_for_x(radsources),
-            figsize=(8, 4.5),
-        )
-        ax.set_title("Spectrum X")
-        fig.savefig(path)
-        plt.close(fig)
-        return True
+    fig, ax = spectrum(
+        xbins,
+        xcounts,
+        radsources,
+        elims=_compute_lims_for_x(radsources),
+        figsize=(8, 4.5),
+    )
+    ax.set_title("Spectrum X")
+    fig.savefig(path)
+    plt.close(fig)
+    return True
 
 
 def draw_and_save_sspectrum(calibrated_events, radsources: dict, path):
-    if not calibrated_events.empty:
-        sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
-        scounts, sbins = np.histogram(sevs["ENERGY"], bins=np.arange(30, 1000, 2))
+    sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
+    scounts, sbins = np.histogram(sevs["ENERGY"], bins=np.arange(30, 1000, 2))
 
-        fig, ax = _spectrum(
-            sbins,
-            scounts,
-            radsources,
-            elims=_compute_lims_for_s(radsources),
-            figsize=(8, 4.5),
-        )
-        ax.set_title("Spectrum S")
-        fig.savefig(path)
-        plt.close(fig)
-        return True
+    fig, ax = spectrum(
+        sbins,
+        scounts,
+        radsources,
+        elims=_compute_lims_for_s(radsources),
+        figsize=(8, 4.5),
+    )
+    ax.set_title("Spectrum S")
+    fig.savefig(path)
+    plt.close(fig)
+    return True
 
 
 def draw_and_save_lins(res_cal, res_fit, radsources: dict, path, nthreads=1):
     def helper(quad):
         for ch in res_cal[quad].index:
-            fig, ax = _linearity(
+            fig, ax = linearity(
                 *res_cal[quad].loc[ch][["gain", "gain_err", "offset", "offset_err"]],
                 res_fit[quad].loc[ch].loc[:, "center"],
                 res_fit[quad].loc[ch].loc[:, "center_err"],
@@ -209,6 +207,20 @@ def draw_and_save_lins(res_cal, res_fit, radsources: dict, path, nthreads=1):
             plt.close(fig)
 
     return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
+
+
+def draw_and_save_mapres(source, en_res, detmap, path):
+    fig, ax = mapenres(source, en_res, detmap)
+    fig.savefig(path)
+    plt.close(fig)
+    return True
+
+
+def draw_and_save_mapcounts(counts, detmap, path):
+    fig, ax = mapcounts(counts, detmap)
+    fig.savefig(path)
+    plt.close(fig)
+    return True
 
 
 def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
@@ -231,7 +243,7 @@ normal = (
 )
 
 
-def _diagnostics(bins, counts, centers, amps, fwhms, limits, margin=500, **kwargs):
+def diagnostics(bins, counts, centers, amps, fwhms, limits, margin=500, **kwargs):
     low_lims, high_lims = [*zip(*limits)]
     min_xlim, max_xlim = min(low_lims) - margin, max(high_lims) + margin
     start = np.where(bins >= min_xlim)[0][0]
@@ -254,7 +266,7 @@ def _diagnostics(bins, counts, centers, amps, fwhms, limits, margin=500, **kwarg
     return fig, ax
 
 
-def _spectrum(enbins, counts, radsources: dict, elims=None, **kwargs):
+def spectrum(enbins, counts, radsources: dict, elims=None, **kwargs):
     radsources_keys = radsources.keys()
     radsources_energies = [l.energy for l in radsources.values()]
     colors = [plt.cm.tab10(i) for i in range(len(radsources))]
@@ -279,7 +291,7 @@ def _spectrum(enbins, counts, radsources: dict, elims=None, **kwargs):
     return fig, ax
 
 
-def _linearity(
+def linearity(
     gain, gain_err, offset, offset_err, adcs, adcs_err, radsources: dict, **kwargs
 ):
     radsources_energies = np.array([l.energy for l in radsources.values()])
@@ -330,7 +342,7 @@ def _linearity(
     return fig, axs
 
 
-def _quicklook(calres, **kwargs):
+def quicklook(calres, **kwargs):
     percentiles = (25, 75)
     gainpercs = np.percentile(calres["gain"], percentiles)
     offsetpercs = np.percentile(calres["offset"], percentiles)
@@ -372,7 +384,7 @@ def _quicklook(calres, **kwargs):
     return fig, axs
 
 
-def _sloplot(res_slo, **kwargs):
+def lightout(res_slo, **kwargs):
     percentiles = (25, 75)
     ypercs = np.percentile(res_slo["light_out"], percentiles)
 
@@ -503,7 +515,7 @@ def _mapplot(mat, detmap, colorlabel, maskvalue=None, **kwargs):
     return fig, ax
 
 
-def mapenres(source, en_res, detmap):
+def mapenres(source: str, en_res, detmap):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
@@ -527,6 +539,7 @@ def mapenres(source, en_res, detmap):
         maskvalue=0,
         figsize=(8, 8),
     )
+    ax.set_title("{} energy resolution".format(source))
     return fig, ax
 
 
@@ -554,4 +567,5 @@ def mapcounts(counts, detmap):
         maskvalue=0,
         figsize=(8, 8),
     )
+    ax.set_title("Per-channel counts (pixel events)")
     return fig, ax

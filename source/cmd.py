@@ -305,7 +305,7 @@ class Cmd:
             message = space + "%s" % str(header)
             self.console.print("\n%s" % str(message))
             if self.ruler:
-                doc_rule = Rule()
+                doc_rule = Rule(style="green")
                 self.console.print(doc_rule, width=columns)
             self.columnize(cmds, columns - 1)
 

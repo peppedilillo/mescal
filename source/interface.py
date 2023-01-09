@@ -2,11 +2,12 @@ from time import sleep
 
 from rich.console import Console
 from rich.text import Text
+from rich.theme import Theme
 
 from source.paths import LOGOPATH
 from source.utils import get_version
 
-mescal_text = "[bold purple]mescal[/]"
+mescal_text = "[magenta]mescal[/]"
 
 header_text = (
     Text()
@@ -39,7 +40,7 @@ def logo():
 
 
 def hello():
-    console = Console()
+    console = Console(theme=Theme({"log.time": "cyan"}))
     for i, line in enumerate(logo().split("\n")):
         console.print(
             line,
