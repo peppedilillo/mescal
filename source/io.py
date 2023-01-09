@@ -23,7 +23,7 @@ def write_report_to_excel(result_df, path):
     with pd.ExcelWriter(path) as output:
         for quad in result_df.keys():
             result_df[quad].to_excel(
-                output, sheet_name=quad, engine="xlsxwriter", encoding="utf8"
+                output, sheet_name=quad, engine="xlsxwriter",
             )
     return True
 
@@ -32,13 +32,9 @@ def read_report_from_excel(from_path, kind):
     if kind == "calib":
         return pd.read_excel(from_path, index_col=0, sheet_name=None)
     elif kind == "peaks":
-        return pd.read_excel(
-            from_path, header=[0, 1], index_col=0, sheet_name=None
-        )
+        return pd.read_excel(from_path, header=[0, 1], index_col=0, sheet_name=None)
     elif kind == "fits":
-        return pd.read_excel(
-            from_path, header=[0, 1], index_col=0, sheet_name=None
-        )
+        return pd.read_excel(from_path, header=[0, 1], index_col=0, sheet_name=None)
     else:
         raise ValueError("kind must be either 'calib', 'peaks', or 'fits'.")
 
@@ -62,9 +58,7 @@ def read_report_from_fits(path):
 def write_report_to_csv(result_df, path):
     for quad, df in result_df.items():
         df.to_csv(
-            path.with_name(path.stem + "_quad{}".format(quad)).with_suffix(
-                ".csv"
-            )
+            path.with_name(path.stem + "_quad{}".format(quad)).with_suffix(".csv")
         )
     return True
 
@@ -78,8 +72,7 @@ def write_eventlist_to_fits(eventlist, path):
     output = fitsio.HDUList([header])
     table_quad = fitsio.BinTableHDU.from_columns(
         eventlist.to_records(
-            index=False,
-            column_dtypes={"EVTYPE": "U1", "CHN": "i8", "QUADID": "U1"},
+            index=False, column_dtypes={"EVTYPE": "U1", "CHN": "i8", "QUADID": "U1"},
         ),
         name="Event list",
     )
@@ -111,7 +104,7 @@ def pandas_from_LV0d5(fits: Path):
     temp = temp[temp[:, 0] > 0]
     temp = temp[temp[:, -1].argsort()]
     df = pd.DataFrame(temp, columns=columns)
-    df = df.assign(
-        QUADID=df["QUADID"].map({0: "A", 1: "B", 2: "C", 3: "D"})
-    ).astype(dtypes)
+    df = df.assign(QUADID=df["QUADID"].map({0: "A", 1: "B", 2: "C", 3: "D"})).astype(
+        dtypes
+    )
     return df

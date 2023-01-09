@@ -1,0 +1,12 @@
+name: mescal
+dependencies:
+  - numpy
+  - pandas
+  - matplotlib
+  - astropy
+  - openpyxl
+  - joblib
+  - rich
+  - pip
+  - pip:
+      - lmfit

@@ -1,47 +1,46 @@
 import argparse
 import atexit
-import logging
 import configparser
-
+import logging
+import sys
+from collections import namedtuple
 from os import cpu_count
 from pathlib import Path
-import pandas as pd
+
 import matplotlib
-
-from source.interface import sections_rule
-
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
+import pandas as pd
 
-from source import interface, paths
-from source.calibrate import PEAKS_PARAMS
+from source import paths
+from source.calibrate import PEAKS_PARAMS, Calibrate
+from source.cli import interface
+from source.cli.beaupy.beaupy import select_multiple
+from source.cli.interface import logo, sections_rule
+from source.cmd import Cmd
+from source.detectors import Detector
 from source.io import (
+    get_writer,
+    pandas_from_LV0d5,
     write_eventlist_to_fits,
     write_report_to_excel,
 )
 from source.plot import (
-    uncalibrated,
+    draw_and_save_calibrated_spectra,
     draw_and_save_channels_sspectra,
     draw_and_save_channels_xspectra,
     draw_and_save_diagns,
     draw_and_save_lins,
-    draw_and_save_uncalibrated,
-)
-
-from source.cmd import Cmd
-from source.calibrate import Calibrate
-from source.detectors import Detector
-from source.radsources import radsources_dicts
-from source.io import (
-    get_writer,
-    pandas_from_LV0d5,
-)
-from source.plot import (
+    draw_and_save_mapcounts,
+    draw_and_save_mapres,
     draw_and_save_qlooks,
     draw_and_save_slo,
-    draw_and_save_calibrated_spectra,
+    draw_and_save_uncalibrated,
+    mapcounts,
     mapenres,
+    uncalibrated,
 )
+from source.radsources import radsources_dicts
+from source.utils import get_version
 
 description = (
     "A script to automatically calibrate HERMES-TP/SP "
@@ -51,7 +50,7 @@ parser = argparse.ArgumentParser(description=description)
 
 parser.add_argument(
     "model",
-    choices=["fm1", "pfm", "fm2", "fm3"],
+    choices=["dm", "fm1", "pfm", "fm2", "fm3"],
     help="hermes flight model to calibrate. ",
 )
 
@@ -63,8 +62,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "filepath",
-    help="input acquisition file in standard 0.5 fits format.",
+    "filepath", help="input acquisition file in standard 0.5 fits format.",
 )
 
 parser.add_argument(
@@ -80,6 +78,8 @@ parser.add_argument(
     action="store_true",
     help="enables loading and saving from cache.",
 )
+
+
 parser.add_argument(
     "--fmt",
     default="xslx",
@@ -89,23 +89,64 @@ parser.add_argument(
 )
 
 
-def start_log(filepath):
+def start_logger(args):
+    """
+    Starts logger in default output folder and logs user command line arguments.
+    """
+    logfile = paths.LOGFILE(args.filepath)
+    with open(logfile, "w") as f:
+        f.write(logo())
+        len_logo = len(logo().split("\n")[0])
+        version_message = "version " + get_version()
+        if len_logo > len(version_message) + 1:
+            f.write(
+                " " * (len_logo - len(version_message) + 1) + version_message + "\n\n"
+            )
+        else:
+            f.write(version_message + "\n\n")
     logging.basicConfig(
-        filename=filepath,
-        filemode="w",
+        filename=logfile,
         level=logging.INFO,
         format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
         "%(levelname)s: %(message)s",
     )
+
+    message = "parser arguments = " + str(args)[10:-1]
+    logging.info(message)
     return True
 
 
 @atexit.register
 def end_log():
+    """
+    Kills loggers on shutdown.
+    """
     logging.shutdown()
 
 
+def check_system():
+    """
+    Perfoms system inspection to choose matplotlib backend
+    and threads number (max 4).
+    """
+    if sys.platform.startswith("win") or sys.platform.startswith("linux"):
+        if "TkAgg" in matplotlib.rcsetup.all_backends:
+            pass  # matplotlib.use("TkAgg")
+    elif sys.platform.startswith("mac"):
+        if "macosx" in matplotlib.rcsetup.all_backends:
+            matplotlib.use("macosx")
+
+    systhreads = min(4, cpu_count())
+    logging.info("detected {} os".format(sys.platform))
+    logging.info("using matplotlib backend {}".format(matplotlib.get_backend()))
+    logging.info("running over {} threads".format(systhreads))
+    return systhreads
+
+
 def parse_args():
+    """
+    user arguments parsing.
+    """
     args = parser.parse_args()
     args.filepath = Path(args.filepath)
     args.radsources = args.radsources.upper().split(",")
@@ -118,39 +159,46 @@ def parse_args():
 
 
 def unpack_configuration(adc):
+    """
+    unpacks ini configuration file into a dict.
+    """
     config = configparser.ConfigParser()
     config.read("./source/config.ini")
     general = config["general"]
     adcitems = config[adc]
     out = {
-        "retrigger_delay": general.getfloat("retrigger_delay"),
+        "xpeaks_mincounts": general.getint("xpeaks_mincounts"),
+        "filter_retrigger": general.getfloat("filter_retrigger"),
         "filter_spurious": general.getboolean("filter_spurious"),
-        "bitsize": adcitems.getint("bitsize"),
+        "binning": adcitems.getint("binning"),
         "gain_center": adcitems.getfloat("gain_center"),
         "gain_sigma": adcitems.getfloat("gain_sigma"),
         "offset_center": adcitems.getfloat("offset_center"),
         "offset_sigma": adcitems.getfloat("offset_sigma"),
         "lightout_center": adcitems.getfloat("lightout_center"),
         "lightout_sigma": adcitems.getfloat("lightout_sigma"),
-        "margin_diag_plot": adcitems.getint("margin_diag_plot"),
     }
+
+    message = "config.ini parameters = " + str(out)[1:-1]
+    logging.info(message)
     return out
 
 
+# TODO: refactoring. caching should have its own function.
 def get_from(fitspath: Path, console, use_cache=True):
+    """
+    deals with data load and caching.
+    """
     console.log(":question_mark: Looking for data..")
     cached = paths.CACHEDIR().joinpath(fitspath.name).with_suffix(".pkl.gz")
     if cached.is_file() and use_cache:
         out = pd.read_pickle(cached)
-        console.log(
-            "[bold yellow]:yellow_circle: Data were loaded from cache."
-        )
+        console.log("[bold yellow]:yellow_circle: Data were loaded from cache.")
     elif fitspath.is_file():
         out = pandas_from_LV0d5(fitspath)
         console.log(":open_book: Data loaded.")
         if use_cache:
             # save data to cache
-            # TODO: saving to cache needs a dedicated function
             out.to_pickle(cached)
             console.log(":blue_book: Data saved to cache.")
     else:
@@ -161,68 +209,35 @@ def get_from(fitspath: Path, console, use_cache=True):
 INVALID_ENTRY = 0
 
 
-def parse_chns(arg):
-    quadrants = ["A", "B", "C", "D"]
-    chn_strings = ["{0:02d}".format(i) for i in range(32)]
-    stripped_arg = arg.strip()
-    if (
-        arg
-        and (arg[0].upper() in quadrants)
-        and (arg[1:3] in chn_strings)
-        and len(stripped_arg) == 3
-    ):
-        quad = arg[0]
-        ch = int(arg[1:3])
-        return quad, ch
-    else:
-        print(
-            "Invalid entry.\n"
-            "Channel ID not in standard form.\n"
-            "(e.g., d04, A31, B02)"
-        )
-        return INVALID_ENTRY
-
-
-def parse_limits(arg):
-    if arg == "":
-        return None
-
-    arglist = arg.strip().split(" ")
-    if (
-        len(arglist) == 2
-        and arglist[0].isdigit()
-        and arglist[1].isdigit()
-        and int(arglist[0]) < int(arglist[1])
-    ):
-        botlim = int(arglist[0])
-        toplim = int(arglist[1])
-        return botlim, toplim
-    else:
-        print(
-            "Invalid entry.\n"
-            "Entry must be two, different positive integers.\n"
-            "Largest integers must follow the smallest.\n"
-            "Example: '19800 20100'."
-        )
-        return INVALID_ENTRY
-
-
 class Mescal(Cmd):
-    intro = (
-        "This is [bold purple]mescal[/] shell. "
-        "Type help or ? to list commands.\n"
-    )
-    prompt = "[mescal] "
-    failure = "[red]Cannnot execute with present calibration."
+    """
+    Main program class implementing calibration workflow and shell loop.
+    """
+
+    intro = "Type help or ? for a list of commands.\n"
+    prompt = "[cyan]\[mescalSH] "
     spinner_message = "Working.."
-    xenres_source = "Fe 5.9 keV"
+    unknown_command_message = (
+        "[red]Unknown command.[/]\nType help or ? for a list of commands."
+    )
+    invalid_command_message = (
+        "[red]Command unavailable.[/]\nCannnot execute with present calibration."
+    )
+    invalid_channel_message = (
+        "[red]Invalid channel.[/]\n"
+        "Channel ID not in standard form (e.g., d04, A30, B02)."
+    )
+    invalid_limits_message = (
+        "[red]Invalid limits.[/]\n"
+        "Entry must be two different sorted integers (e.g., 19800 20100)."
+    )
 
     def __init__(self, args, threads):
         console = interface.hello()
         super().__init__(console)
         self.args = args
         self.config = unpack_configuration(args.adc)
-        self.threads = systhreads
+        self.threads = threads
 
         sections_rule(console, "[bold italic]Calibration log", style="green")
         with console.status("Initializing.."):
@@ -251,84 +266,62 @@ class Mescal(Cmd):
         self.cmdloop()
 
     def _warn_about_flagged(self):
-        num_flagged = len(
-            set(
-                [
-                    item
-                    for sublist in self.calibration.flagged.values()
-                    for item in sublist
-                ]
-            )
-        )
-        num_channels = len(
-            [
-                item
-                for sublist in self.calibration.channels.values()
-                for item in sublist
-            ]
-        )
+        """Tells user about channels for which calibration
+        could not be completed.
+        """
+        sublists = self.calibration.flagged.values()
+        num_flagged = len(set([item for sublist in sublists for item in sublist]))
+        num_channels = len([item for sublist in sublists for item in sublist])
         message = (
             "In total, {} channels out of {} were flagged.\n"
-            "For more details, see the log file.".format(
-                num_flagged, num_channels
-            )
+            "For more details, see the log file.".format(num_flagged, num_channels)
         )
 
         self.console.print(message)
         return True
 
     def _process_results(self, output_format, filepath):
+        """Prepares and exports calibration results."""
         write_report = get_writer(output_format)
 
-        if (
-            not self.calibration.sdd_cal
-            and not self.calibration.optical_coupling
-        ):
+        if not self.calibration.sdd_cal and not self.calibration.optical_coupling:
             self.console.log("[bold red]:red_circle: Calibration failed.")
-        elif (
-            not self.calibration.sdd_cal
-            or not self.calibration.optical_coupling
-        ):
+        elif not self.calibration.sdd_cal or not self.calibration.optical_coupling:
             self.console.log(
-                "[bold yellow]:yellow_circle: Calibration partially completed. "
+                "[bold yellow]:yellow_circle: Calibration partially complete. "
             )
         else:
             self.console.log(":green_circle: Calibration complete.")
 
         if self.calibration.sdd_cal:
             write_report(
-                self.calibration.sdd_cal,
-                path=paths.CALREPORT(filepath),
+                self.calibration.sdd_cal, path=paths.CALREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote SDD calibration results.")
             write_report(
-                self.calibration.en_res,
-                path=paths.RESREPORT(filepath),
+                self.calibration.en_res, path=paths.RESREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote energy resolution results.")
             draw_and_save_qlooks(
                 self.calibration.sdd_cal,
                 path=paths.QLKPLOT(filepath),
-                nthreads=systhreads,
+                nthreads=self.threads,
             )
             self.console.log(":chart_increasing: Saved X fit quicklook plots.")
 
         if self.calibration.optical_coupling:
             write_report(
-                self.calibration.optical_coupling,
-                path=paths.SLOREPORT(filepath),
+                self.calibration.optical_coupling, path=paths.SLOREPORT(filepath),
             )
-            self.console.log(
-                ":blue_book: Wrote scintillators calibration results."
-            )
+            self.console.log(":blue_book: Wrote scintillators calibration results.")
             draw_and_save_slo(
                 self.calibration.optical_coupling,
                 path=paths.SLOPLOT(filepath),
-                nthreads=systhreads,
+                nthreads=self.threads,
             )
             self.console.log(":chart_increasing: Saved light-output plots.")
 
-        if self.eventlist is not None:
+        if (self.eventlist is not None) and (not self.eventlist.empty):
             draw_and_save_calibrated_spectra(
                 self.eventlist,
                 self.calibration.xradsources(),
@@ -336,15 +329,12 @@ class Mescal(Cmd):
                 paths.XSPPLOT(filepath),
                 paths.SSPPLOT(filepath),
             )
-            self.console.log(
-                ":chart_increasing: Saved calibrated spectra plots."
-            )
+            self.console.log(":chart_increasing: Saved calibrated spectra plots.")
         return True
 
-    # commands callable from the user
-    def do_svall(self, arg):
-        """Export all exportable tables and figures.
-        Will not export calibrated event list."""
+    # shell prompt commands
+    def do_export(self, arg):
+        """prompts user on exports."""
         cmds = [
             "svhistplot",
             "svdiags",
@@ -352,32 +342,63 @@ class Mescal(Cmd):
             "svxplots",
             "svlinplots",
             "svsplots",
-            "svsplots",
+            "svmapres",
+            "svmapcounts",
         ]
-        for cmd in cmds:
-            if self.can(cmd):
-                do = getattr(self, "do_" + cmd)
-                do("")
+
+        Option = namedtuple("Option", ["label", "command", "ticked",])
+        options = [
+            Option("Uncalibrated histogram plots", "svhistplot", True),
+            Option("X diagnostic plots", "svxdiags", True),
+            Option("S diagnostic plots", "svsdiags", False),
+            Option("Linearity plots", "svlinplots", False),
+            Option("Per-channel X spectra plots", "svxplots", False),
+            Option("Per-channel S spectra plots", "svsplots", False),
+            Option("Energy resolution map", "svmapres", True),
+            Option("Channel counts map", "svmapcounts", True),
+            Option("Fit tables", "svtabfit", True),
+            Option("Save calibrated events to fits file", "svevents", False),
+        ]
+
+        available_options = [o for o in options if self.can(o.command)]
+        available_options_labels = [o.label for o in available_options]
+        available_options_commands = [o.command for o in available_options]
+        available_options_ticked = [
+            i for i, v in enumerate(available_options) if v.ticked
+        ]
+
+        selection = select_multiple(
+            available_options_labels,
+            self.console,
+            ticked_indices=available_options_ticked,
+            return_indices=True,
+        )
+
+        for cmd in [available_options_commands[i] for i in selection]:
+            do = getattr(self, cmd)
+            do("")
 
     def do_quit(self, arg):
-        """Quit mescal."""
+        """Quits mescal.
+        It's the only do-command to return True.
+        """
         self.console.print("Ciao! :wave:\n")
         return True
 
     def do_retry(self, arg):
         """Launches calibration again."""
         with self.console.status(self.spinner_message):
-            sections_rule(
-                self.console, "[bold italic]Calibration log", style="green"
-            )
+            sections_rule(self.console, "[bold italic]Calibration log", style="green")
             self.calibration._calibrate()
             self._process_results(self.args.fmt, self.args.filepath)
             sections_rule(self.console, "[bold italic]Shell", style="green")
+        return False
 
     def do_setxlim(self, arg):
-        """Reset channel X peaks position."""
+        """Reset channel X peaks position for user selected channels."""
         parsed_arg = parse_chns(arg)
         if parsed_arg is INVALID_ENTRY:
+            self.console.print(self.invalid_channel_message)
             return False
 
         quad, ch = parsed_arg
@@ -385,23 +406,25 @@ class Mescal(Cmd):
             arg = self.console.input(source + ": ")
             parsed_arg = parse_limits(arg)
             if parsed_arg is INVALID_ENTRY:
+                self.console.print(self.invalid_limits_message)
                 return False
             elif parsed_arg is None:
                 continue
             else:
                 lim_lo, lim_hi = parsed_arg
                 label_lo, label_hi = PEAKS_PARAMS
-                self.calibration.xpeaks[quad].loc[
-                    ch, (source, label_lo)
-                ] = int(lim_lo)
-                self.calibration.xpeaks[quad].loc[
-                    ch, (source, label_hi)
-                ] = int(lim_hi)
+                self.calibration.xpeaks[quad].loc[ch, (source, label_lo)] = int(lim_lo)
+                self.calibration.xpeaks[quad].loc[ch, (source, label_hi)] = int(lim_hi)
+
+        message = "reset xfit limits for channel {}{}".format(quad, ch)
+        logging.info(message)
+        return False
 
     def do_plothist(self, arg):
         """Plots uncalibrated data from a channel."""
         parsed_arg = parse_chns(arg)
         if parsed_arg is INVALID_ENTRY:
+            self.console.print(self.invalid_channel_message)
             return False
 
         quad, ch = parsed_arg
@@ -410,54 +433,93 @@ class Mescal(Cmd):
             self.calibration.xhistograms.counts[quad][ch],
             self.calibration.shistograms.bins,
             self.calibration.shistograms.counts[quad][ch],
-            figsize=(9, 4.5),
         )
         ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
         plt.show(block=False)
+        return False
+
+    def can_mapcounts(self):
+        return True
+
+    def do_mapcounts(self, arg):
+        """Plots a map of counts per-channel."""
+        if not self.can_mapcounts():
+            self.console.print(self.invalid_command_message)
+            return False
+        fig, ax = mapcounts(self.calibration.counts(), self.calibration.detector.map,)
+        plt.show(block=False)
+        return False
+
+    def can_svmapcounts(self):
+        if self.can_mapcounts():
+            return True
+        return False
+
+    def svmapcounts(self, arg):
+        if not self.can_mapcounts():
+            self.console.print(self.invalid_command_message)
+            return False
+
+        with self.console.status(self.spinner_message):
+            draw_and_save_mapcounts(
+                self.calibration.counts(),
+                self.calibration.detector.map,
+                paths.CNTPLOT(self.args.filepath),
+            )
+        return False
 
     def can_mapres(self):
-        if (
-            self.xenres_source in self.calibration.xradsources().keys()
-            and self.calibration.en_res is not None
-        ):
+        if self.calibration.xradsources().keys() and self.calibration.en_res:
             return True
+        return False
 
-    def do_mapres(self, arg):
-        """Plots X energy resolution map."""
+    def can_svmapres(self):
+        if self.can_mapres():
+            return True
+        return False
+
+    def svmapres(self, arg):
         if not self.can_mapres():
-            self.console.print(self.failure)
+            self.console.print(self.invalid_command_message)
             return False
-        fig, ax = mapenres(
-            self.xenres_source,
-            self.calibration.en_res,
-            self.calibration.detector.map,
-            figsize=(8, 8),
-        )
-        ax.set_title("Energy resolution")
-        plt.show(block=False)
+
+        with self.console.status(self.spinner_message):
+            decays = self.calibration.xradsources()
+            reference_source = sorted(decays, key=lambda source: decays[source].energy)[
+                0
+            ]
+            energy = decays[reference_source].energy
+            draw_and_save_mapres(
+                reference_source,
+                self.calibration.en_res,
+                self.calibration.detector.map,
+                paths.RESPLOT(self.args.filepath),
+            )
+        return False
 
     def can_svhistplot(self):
         return True
 
-    def do_svhistplot(self, arg):
+    def svhistplot(self, arg):
         """Save raw acquisition histogram plots."""
         with self.console.status(self.spinner_message):
             draw_and_save_uncalibrated(
                 self.calibration.xhistograms,
                 self.calibration.shistograms,
                 paths.UNCPLOT(self.args.filepath),
-                self.threads,
+                nthreads=self.threads,
             )
+        return False
 
-    def can_svdiags(self):
-        if self.calibration.xfit or self.calibration.sfit:
+    def can_svxdiags(self):
+        if self.calibration.xfit:
             return True
         return False
 
-    def do_svdiags(self, arg):
+    def svxdiags(self, arg):
         """Save X peak detection diagnostics plots."""
-        if not self.can_svdiags():
-            self.console.print(self.failure)
+        if not self.can_svxdiags():
+            self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
             if self.calibration.xfit:
@@ -465,50 +527,60 @@ class Mescal(Cmd):
                     self.calibration.xhistograms,
                     self.calibration.xfit,
                     paths.XDNPLOT(self.args.filepath),
-                    self.config["margin_diag_plot"],
-                    self.threads,
+                    nthreads=self.threads,
                 )
+        return False
+
+    def can_svsdiags(self):
+        if self.calibration.sfit:
+            return True
+        return False
+
+    def svsdiags(self, arg):
+        """Save X peak detection diagnostics plots."""
+        if not self.can_svsdiags():
+            self.console.print(self.invalid_command_message)
+            return False
+        with self.console.status(self.spinner_message):
             if self.calibration.sfit:
                 draw_and_save_diagns(
                     self.calibration.shistograms,
                     self.calibration.sfit,
                     paths.SDNPLOT(self.args.filepath),
-                    self.config["margin_diag_plot"],
-                    self.threads,
+                    nthreads=self.threads,
                 )
+        return False
 
     def can_svtabfit(self):
         if self.calibration.xfit or self.calibration.sfit:
             return True
         return False
 
-    def do_svtabfit(self, arg):
+    def svtabfit(self, arg):
         """Save X fit tables."""
         if not self.can_svtabfit():
-            self.console.print(self.failure)
+            self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
             if self.calibration.xfit:
                 write_report_to_excel(
-                    self.calibration.xfit,
-                    paths.XFTREPORT(self.args.filepath),
+                    self.calibration.xfit, paths.XFTREPORT(self.args.filepath),
                 )
             if self.calibration.sfit:
                 write_report_to_excel(
-                    self.calibration.sfit,
-                    paths.SFTREPORT(self.args.filepath),
+                    self.calibration.sfit, paths.SFTREPORT(self.args.filepath),
                 )
-
+        return False
 
     def can_svxplots(self):
         if self.calibration.sdd_cal:
             return True
         return False
 
-    def do_svxplots(self, arg):
+    def svxplots(self, arg):
         """Save calibrated X channel spectra."""
         if not self.can_svxplots():
-            self.console.print(self.failure)
+            self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
             draw_and_save_channels_xspectra(
@@ -516,18 +588,19 @@ class Mescal(Cmd):
                 self.calibration.sdd_cal,
                 self.calibration.xradsources(),
                 paths.XCSPLOT(self.args.filepath),
-                self.threads,
+                nthreads=self.threads,
             )
+        return False
 
     def can_svlinplots(self):
         if self.calibration.sdd_cal:
             return True
         return False
 
-    def do_svlinplots(self, args):
+    def svlinplots(self, arg):
         """Save SDD linearity plots."""
         if not self.can_svlinplots():
-            self.console.print(self.failure)
+            self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
             draw_and_save_lins(
@@ -535,18 +608,19 @@ class Mescal(Cmd):
                 self.calibration.xfit,
                 self.calibration.xradsources(),
                 paths.LINPLOT(self.args.filepath),
-                self.threads,
+                nthreads=self.threads,
             )
+        return False
 
     def can_svsplots(self):
         if self.calibration.optical_coupling:
             return True
         return False
 
-    def do_svsplots(self, arg):
+    def svsplots(self, arg):
         """Save calibrated gamma channel spectra."""
         if not self.can_svsplots():
-            self.console.print(self.failure)
+            self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
             draw_and_save_channels_sspectra(
@@ -555,28 +629,70 @@ class Mescal(Cmd):
                 self.calibration.optical_coupling,
                 self.calibration.sradsources(),
                 paths.SCSPLOT(self.args.filepath),
-                self.threads,
+                nthreads=self.threads,
             )
+        return False
 
     def can_svevents(self):
         if self.eventlist is not None:
             return True
         return False
 
-    def do_svevents(self, arg):
+    def svevents(self, arg):
         """Save calibrated events to fits file."""
         if not self.can_svevents():
-            self.console.print(self.failure)
+            self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
             write_eventlist_to_fits(
-                self.eventlist,
-                paths.EVLFITS(self.args.filepath),
+                self.eventlist, paths.EVLFITS(self.args.filepath),
             )
+        return False
+
+
+def parse_chns(arg):
+    """
+    Shell helper.
+    """
+    quadrants = ["A", "B", "C", "D"]
+    chn_strings = ["{0:02d}".format(i) for i in range(32)]
+    stripped_arg = arg.strip()
+    if (
+        arg
+        and (arg[0].upper() in quadrants)
+        and (arg[1:3] in chn_strings)
+        and len(stripped_arg) == 3
+    ):
+        quad = arg[0]
+        ch = int(arg[1:3])
+        return quad, ch
+    else:
+        return INVALID_ENTRY
+
+
+def parse_limits(arg):
+    """
+    Shell helper.
+    """
+    if arg == "":
+        return None
+
+    arglist = arg.strip().split(" ")
+    if (
+        len(arglist) == 2
+        and arglist[0].isdigit()
+        and arglist[1].isdigit()
+        and int(arglist[0]) < int(arglist[1])
+    ):
+        botlim = int(arglist[0])
+        toplim = int(arglist[1])
+        return botlim, toplim
+    else:
+        return INVALID_ENTRY
 
 
 if __name__ == "__main__":
     args = parse_args()
-    systhreads = min(8, cpu_count())
-    start_log(paths.LOGFILE(args.filepath))
+    start_logger(args)
+    systhreads = check_system()
     Mescal(args, systhreads)

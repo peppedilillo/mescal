@@ -1,4 +1,7 @@
-import string, sys
+import string
+import sys
+
+from rich.columns import Columns
 from rich.rule import Rule
 
 
@@ -33,8 +36,8 @@ class Cmd:
     doc_header = "Documented commands (type help <topic>):"
     misc_header = "Miscellaneous help topics:"
     undoc_header = "Undocumented commands:"
+    unknown_command_message = "Unknown command."
     nohelp = "*** No help on %s"
-    use_rawinput = 1
 
     def __init__(self, console, completekey="tab", stdin=None):
         """Instantiate a line-oriented interpreter framework.
@@ -54,15 +57,21 @@ class Cmd:
         self.cmdqueue = []
         self.completekey = completekey
 
+    def ansi_prompt(self):
+        """turns a markup prompt to ansi string"""
+        with self.console.capture() as capture:
+            self.console.print(self.prompt, end="")
+        str_output = capture.get()
+        return str_output
+
     def cmdloop(self, intro=None):
         """Repeatedly issue a prompt, accept input, parse an initial prefix
         off the received input, and dispatch to action methods, passing them
-        the remainder of the line as argument.
-
-        """
+        the remainder of the line as argument."""
 
         self.preloop()
-        if self.use_rawinput and self.completekey:
+
+        if self.completekey:
             try:
                 import readline
 
@@ -81,24 +90,17 @@ class Cmd:
                 if self.cmdqueue:
                     line = self.cmdqueue.pop(0)
                 else:
-                    if self.use_rawinput:
-                        try:
-                            line = input(self.prompt)
-                        except EOFError:
-                            line = "EOF"
-                    else:
-                        self.console.print(self.prompt)
-                        line = self.stdin.readline()
-                        if not len(line):
-                            line = "EOF"
-                        else:
-                            line = line.rstrip("\r\n")
+                    try:
+                        line = input(self.ansi_prompt())
+                    except EOFError:
+                        line = "EOF"
+
                 line = self.precmd(line)
                 stop = self.onecmd(line)
                 stop = self.postcmd(stop, line)
             self.postloop()
         finally:
-            if self.use_rawinput and self.completekey:
+            if self.completekey:
                 try:
                     import readline
 
@@ -193,7 +195,7 @@ class Cmd:
         returns.
 
         """
-        self.console.print("[bold red]Unknown syntax[/]: %s" % line)
+        self.console.print(self.unknown_command_message)
 
     def completedefault(self, *ignored):
         """Method called to complete an input line when no command-specific
@@ -248,9 +250,7 @@ class Cmd:
 
     def complete_help(self, *args):
         commands = set(self.completenames(*args))
-        topics = set(
-            a[5:] for a in self.get_names() if a.startswith("help_" + args[0])
-        )
+        topics = set(a[5:] for a in self.get_names() if a.startswith("help_" + args[0]))
         return list(commands | topics)
 
     def do_help(self, arg):
@@ -306,9 +306,9 @@ class Cmd:
             message = space + "%s" % str(header)
             self.console.print("\n%s" % str(message))
             if self.ruler:
-                doc_rule = Rule()
+                doc_rule = Rule(style="green")
                 self.console.print(doc_rule, width=columns)
-            self.columnize(cmds, columns - 1)
+            self.columnize(cmds, columns)
 
     def columnize(self, list, displaywidth=80):
         """Display a list of strings as a compact set of columns.
@@ -320,13 +320,10 @@ class Cmd:
             self.console.print("<empty>\n")
             return
 
-        nonstrings = [
-            i for i in range(len(list)) if not isinstance(list[i], str)
-        ]
+        nonstrings = [i for i in range(len(list)) if not isinstance(list[i], str)]
         if nonstrings:
             raise TypeError(
-                "list[i] not a string for i in %s"
-                % ", ".join(map(str, nonstrings))
+                "list[i] not a string for i in %s" % ", ".join(map(str, nonstrings))
             )
         size = len(list)
         if size == 1:

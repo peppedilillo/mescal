@@ -112,6 +112,8 @@ SLOREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_slo.xlsx"))
 
 XSPPLOT = (lambda filepath: PLTDIR(filepath).joinpath("spectrum_x.png"))
 SSPPLOT = (lambda filepath: PLTDIR(filepath).joinpath("spectrum_s.png"))
+RESPLOT = (lambda filepath: PLTDIR(filepath).joinpath("map_resolution.png"))
+CNTPLOT = (lambda filepath: PLTDIR(filepath).joinpath("map_counts.png"))
 QLKPLOT = (lambda filepath: (lambda quad: PLTDIR(filepath).joinpath("quicklook_quad{}.png".format(quad))))
 SLOPLOT = (lambda filepath: (lambda quad: PLTDIR(filepath).joinpath("slo_quad{}.png".format(quad))))
 LINPLOT = (lambda filepath: (lambda quad, ch: LINDIR(filepath).joinpath("linearity_quad{}_ch{:02d}.png".format(quad, ch))))

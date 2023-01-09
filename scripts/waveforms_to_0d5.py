@@ -1,11 +1,10 @@
+import argparse
 from math import ceil
 from pathlib import Path
-import argparse
 
 import matplotlib
 
 matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
 import astropy.io.fits as fitsio
 import numpy as np
 import pandas as pd
@@ -19,7 +18,7 @@ parser.add_argument("infiles", action="store", type=str, nargs="+")
 # refers to CAEN DT5740
 NCH = 32
 DEFAULT_PARS = {
-    "time_unit_s": 8 * 10**-9,
+    "time_unit_s": 8 * 10 ** -9,
     "sample_dur_us": 0.016,
     "mux_time_us": 10.0,
     "offset_from_start_us": 0.64,
@@ -102,7 +101,7 @@ def get_mux_intervals(
     offset_from_start_us,
     offset_from_stop_us,
 ):
-    sampling_time_us = sample_dur_us * 2**decimation
+    sampling_time_us = sample_dur_us * 2 ** decimation
     mux_intervals = [
         (
             ceil(
@@ -173,9 +172,7 @@ def transform_table(big_table):
     # untriggered channels (np.nan) go to the right of the matrix
     # big_table_idCHNs_sortedADCs = [[3, 1, 0],
     #                                [0, 3, 1]]
-    big_table_idCHNs_sortedADCs = np.argsort(big_table, axis=1)[
-        :, :6
-    ]  # [:, :3]
+    big_table_idCHNs_sortedADCs = np.argsort(big_table, axis=1)[:, :6]  # [:, :3]
     # replace channels IDs of untriggered channels with 32
     # big_table_idCHNs_sortedADCs = [[3, 1, 32],
     #                                [0, 3, 32]]
@@ -193,14 +190,10 @@ def transform_table(big_table):
     sorting_by_idCHNs = np.argsort(big_table_idCHNs_sortedADCs, axis=1)
     big_table_idCHNs_sortedADCs[big_table_idCHNs_sortedADCs == +32] = -1
     big_table_idCHNs_sortedADCs = np.take_along_axis(
-        big_table_idCHNs_sortedADCs,
-        sorting_by_idCHNs,
-        axis=1,
+        big_table_idCHNs_sortedADCs, sorting_by_idCHNs, axis=1,
     )
     big_table_sortedADCs = np.take_along_axis(
-        big_table_sortedADCs,
-        sorting_by_idCHNs,
-        axis=1,
+        big_table_sortedADCs, sorting_by_idCHNs, axis=1,
     )
 
     output = (
@@ -267,10 +260,7 @@ def save_to_fits(dataframe, filepath):
     header_fits = fitsio.PrimaryHDU()
     output_fits = fitsio.HDUList([header_fits])
     table_fits = fitsio.BinTableHDU.from_columns(
-        dataframe.to_records(
-            index=False,
-        ),
-        name="CAEN DT5740 mock-up HERMES L0d5.",
+        dataframe.to_records(index=False,), name="CAEN DT5740 mock-up HERMES L0d5.",
     )
     output_fits.append(table_fits)
     output_fits.writeto(filepath, overwrite=True)
@@ -283,9 +273,7 @@ if __name__ == "__main__":
     last_time = 0
     for filepath in args.infiles:
         times, wftable = table_from_wfs(Path(filepath))
-        tables.append(
-            table0d5_from_wftable(args.quadrant, times + last_time, wftable)
-        )
+        tables.append(table0d5_from_wftable(args.quadrant, times + last_time, wftable))
         last_time += times[-1]
     dataframe = dataframe_from_table0d5(np.vstack(tables))
     save_to_fits(dataframe, args.outfile)

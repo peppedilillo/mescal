@@ -4,19 +4,15 @@ Credits: Francesco Ceraudo, all rights reserved. (Thanks Francesco!)
 """
 
 import itertools
-import matplotlib as mpl
-from matplotlib import colors
+
 import numpy as np
 from cycler import cycler
-import copy
 
 
 def changeLineCycle(rcParams, style=True, color="k", mpl=None):
     if style and color:
         if color == "k":
-            colors = cycler(
-                "color", ["k", "r", "b", (0.2, 0.8, 0.2), "c", "m", "y"]
-            )
+            colors = cycler("color", ["k", "r", "b", (0.2, 0.8, 0.2), "c", "m", "y"])
             if mpl is not None:
                 defineColorMap(mpl)
                 rcParams["image.cmap"] = "hot_ur"
@@ -24,9 +20,7 @@ def changeLineCycle(rcParams, style=True, color="k", mpl=None):
                 rcParams["image.cmap"] = "inferno_r"
                 # rcParams['image.cmap'] = 'plasma_r'
         elif color == "b":
-            colors = cycler(
-                "color", ["b", "r", (0.2, 0.8, 0.2), "c", "m", "y", "k"]
-            )
+            colors = cycler("color", ["b", "r", (0.2, 0.8, 0.2), "c", "m", "y", "k"])
             rcParams["image.cmap"] = "jet"
 
         Ncolors = len(colors)
@@ -59,9 +53,7 @@ def changeLineCycle(rcParams, style=True, color="k", mpl=None):
         )
     elif not style and color:
         if color == "k":
-            colors = cycler(
-                "color", ["k", "r", "b", (0.2, 0.8, 0.2), "c", "m", "y"]
-            )
+            colors = cycler("color", ["k", "r", "b", (0.2, 0.8, 0.2), "c", "m", "y"])
             if mpl is not None:
                 defineColorMap(mpl)
                 rcParams["image.cmap"] = "hot_ur"
@@ -69,9 +61,7 @@ def changeLineCycle(rcParams, style=True, color="k", mpl=None):
                 rcParams["image.cmap"] = "inferno_r"
                 # rcParams['image.cmap'] = 'plasma_r'
         elif color == "b":
-            colors = cycler(
-                "color", ["b", "r", (0.2, 0.8, 0.2), "c", "m", "y", "k"]
-            )
+            colors = cycler("color", ["b", "r", (0.2, 0.8, 0.2), "c", "m", "y", "k"])
         rcParams["axes.prop_cycle"] = colors
         rcParams["image.cmap"] = "jet"
     return rcParams
@@ -1183,9 +1173,7 @@ def defineColorMap(mpl):
         # (0.000000, 0.000000, 0.000000)
     ]
     cmap = mpl.colors.LinearSegmentedColormap.from_list("coldwhot_u", vals)
-    cmapR = mpl.colors.LinearSegmentedColormap.from_list(
-        "coldwhot_ur", vals[::-1]
-    )
+    cmapR = mpl.colors.LinearSegmentedColormap.from_list("coldwhot_ur", vals[::-1])
     mpl.pyplot.register_cmap(cmap=cmap)
     mpl.pyplot.register_cmap(cmap=cmapR)
 
@@ -1705,9 +1693,7 @@ def defineColorMap(mpl):
         # (1.000000, 0.996584, 0.994029),
     ]
     cmap = mpl.colors.LinearSegmentedColormap.from_list("coldkhot_u", vals)
-    cmapR = mpl.colors.LinearSegmentedColormap.from_list(
-        "coldkhot_ur", vals[::-1]
-    )
+    cmapR = mpl.colors.LinearSegmentedColormap.from_list("coldkhot_ur", vals[::-1])
     mpl.pyplot.register_cmap(cmap=cmap)
     mpl.pyplot.register_cmap(cmap=cmapR)
 
@@ -1979,9 +1965,7 @@ def defineColorMap(mpl):
         for v in valsBW
     ]
     cmapBW = mpl.colors.LinearSegmentedColormap.from_list("binary_u", valsBW)
-    cmapBWR = mpl.colors.LinearSegmentedColormap.from_list(
-        "binary_ur", valsBW[::-1]
-    )
+    cmapBWR = mpl.colors.LinearSegmentedColormap.from_list("binary_ur", valsBW[::-1])
     mpl.pyplot.register_cmap(cmap=cmapBW)
     mpl.pyplot.register_cmap(cmap=cmapBWR)
 
@@ -2245,13 +2229,10 @@ def defineColorMap(mpl):
         (0.75243, 0.0084181, 0.021805),
     ]
     valsCW = [
-        (min(float(v[0]), 1), min(float(v[1]), 1), min(float(v[2]), 1))
-        for v in valsCW
+        (min(float(v[0]), 1), min(float(v[1]), 1), min(float(v[2]), 1)) for v in valsCW
     ]
     cmapCW = mpl.colors.LinearSegmentedColormap.from_list("coolwarm_u", valsCW)
-    cmapCWR = mpl.colors.LinearSegmentedColormap.from_list(
-        "coolwarm_ur", valsCW[::-1]
-    )
+    cmapCWR = mpl.colors.LinearSegmentedColormap.from_list("coolwarm_ur", valsCW[::-1])
     mpl.pyplot.register_cmap(cmap=cmapCW)
     mpl.pyplot.register_cmap(cmap=cmapCWR)
 
@@ -2515,12 +2496,9 @@ def defineColorMap(mpl):
         (0.99097, 0.89391, 0.035647),
     ]
     valsBJY = [
-        (min(float(v[0]), 1), min(float(v[1]), 1), min(float(v[2]), 1))
-        for v in valsBJY
+        (min(float(v[0]), 1), min(float(v[1]), 1), min(float(v[2]), 1)) for v in valsBJY
     ]
-    cmapBJY = mpl.colors.LinearSegmentedColormap.from_list(
-        "bluegreyyellow_u", valsBJY
-    )
+    cmapBJY = mpl.colors.LinearSegmentedColormap.from_list("bluegreyyellow_u", valsBJY)
     cmapBJYR = mpl.colors.LinearSegmentedColormap.from_list(
         "bluegreyyellow_ur", valsBJY[::-1]
     )
@@ -2658,9 +2636,7 @@ def plotMap(
         Y = YY.copy()
 
     if cmap is not None:
-        CPfilled = ax.pcolormesh(
-            X, Y, ZZ, norm=norm(vmin=lo, vmax=hi), cmap=cmap
-        )
+        CPfilled = ax.pcolormesh(X, Y, ZZ, norm=norm(vmin=lo, vmax=hi), cmap=cmap)
     else:
         CPfilled = ax.pcolormesh(X, Y, ZZ, norm=norm(vmin=lo, vmax=hi))
 

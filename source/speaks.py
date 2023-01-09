@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from math import floor, ceil
 from scipy.signal import find_peaks
 
 from source.constants import PHOTOEL_PER_KEV
@@ -23,13 +22,7 @@ PROMINENCE_WEIGHTING = False
 
 
 def find_epeaks(
-    bins,
-    counts,
-    energies,
-    lightout_guess,
-    smoothing=20,
-    prominence=30,
-    width=10,
+    bins, counts, energies, lightout_guess, smoothing=20, prominence=30, width=10,
 ):
     search_pars = {
         "prominence": prominence,
@@ -39,9 +32,7 @@ def find_epeaks(
     peaks, peaks_props = find_peaks(mm, **search_pars)
     guesses = guess_epeaks_position(energies, lightout_guess)
     if len(peaks) >= len(guesses):
-        best_peaks, best_peaks_props = _closest_peaks(
-            guesses, bins, peaks, peaks_props
-        )
+        best_peaks, best_peaks_props = _closest_peaks(guesses, bins, peaks, peaks_props)
     else:
         raise DetectPeakError("candidate peaks are less than sources to fit.")
     limits = [
@@ -77,9 +68,7 @@ def find_speaks(
     peaks, peaks_props = find_peaks(mm, **search_pars)
     guesses = guess_speaks_position(energies, lightout_guess, gain, offset)
     if len(peaks) >= len(guesses):
-        best_peaks, best_peaks_props = _closest_peaks(
-            guesses, bins, peaks, peaks_props
-        )
+        best_peaks, best_peaks_props = _closest_peaks(guesses, bins, peaks, peaks_props)
     else:
         raise DetectPeakError("candidate peaks are less than sources to fit.")
     limits = [
@@ -120,7 +109,7 @@ def _closest_peaks(guess, bins, peaks, peaks_infos):
     if PROMINENCE_WEIGHTING:
         assert "prominences" in peaks_infos.keys()
         weights = peaks_infos["prominences"]
-        argmin = np.argmin(peaks_dist_from_guess**2 / weights, axis=1)
+        argmin = np.argmin(peaks_dist_from_guess ** 2 / weights, axis=1)
     else:
         argmin = np.argmin(peaks_dist_from_guess, axis=1)
     best_peaks = peaks[argmin]
@@ -136,7 +125,7 @@ def _compute_louts(
         np.sqrt(
             (center_errs / gain) ** 2
             + (offset_err / gain) ** 2
-            + ((centers - offset) / gain**2) * (gain_err**2)
+            + ((centers - offset) / gain ** 2) * (gain_err ** 2)
         )
         / PHOTOEL_PER_KEV
         / radsources
