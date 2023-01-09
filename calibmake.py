@@ -1,9 +1,9 @@
 import argparse
 import atexit
-from collections import namedtuple
 import configparser
 import logging
 import sys
+from collections import namedtuple
 from os import cpu_count
 from pathlib import Path
 
@@ -12,12 +12,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from source import paths
+from source.calibrate import PEAKS_PARAMS, Calibrate
 from source.cli import interface
 from source.cli.beaupy.beaupy import select_multiple
-from source.calibrate import PEAKS_PARAMS, Calibrate
+from source.cli.interface import logo, sections_rule
 from source.cmd import Cmd
 from source.detectors import Detector
-from source.cli.interface import logo, sections_rule
 from source.io import (
     get_writer,
     pandas_from_LV0d5,
@@ -62,8 +62,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "filepath",
-    help="input acquisition file in standard 0.5 fits format.",
+    "filepath", help="input acquisition file in standard 0.5 fits format.",
 )
 
 parser.add_argument(
@@ -132,7 +131,7 @@ def check_system():
     """
     if sys.platform.startswith("win") or sys.platform.startswith("linux"):
         if "TkAgg" in matplotlib.rcsetup.all_backends:
-            pass # matplotlib.use("TkAgg")
+            pass  # matplotlib.use("TkAgg")
     elif sys.platform.startswith("mac"):
         if "macosx" in matplotlib.rcsetup.all_backends:
             matplotlib.use("macosx")
@@ -296,13 +295,11 @@ class Mescal(Cmd):
 
         if self.calibration.sdd_cal:
             write_report(
-                self.calibration.sdd_cal,
-                path=paths.CALREPORT(filepath),
+                self.calibration.sdd_cal, path=paths.CALREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote SDD calibration results.")
             write_report(
-                self.calibration.en_res,
-                path=paths.RESREPORT(filepath),
+                self.calibration.en_res, path=paths.RESREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote energy resolution results.")
             draw_and_save_qlooks(
@@ -314,8 +311,7 @@ class Mescal(Cmd):
 
         if self.calibration.optical_coupling:
             write_report(
-                self.calibration.optical_coupling,
-                path=paths.SLOREPORT(filepath),
+                self.calibration.optical_coupling, path=paths.SLOREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote scintillators calibration results.")
             draw_and_save_slo(
@@ -350,7 +346,7 @@ class Mescal(Cmd):
             "svmapcounts",
         ]
 
-        Option = namedtuple('Option', ['label','command','ticked',])
+        Option = namedtuple("Option", ["label", "command", "ticked",])
         options = [
             Option("Uncalibrated histogram plots", "svhistplot", True),
             Option("X diagnostic plots", "svxdiags", True),
@@ -367,7 +363,9 @@ class Mescal(Cmd):
         available_options = [o for o in options if self.can(o.command)]
         available_options_labels = [o.label for o in available_options]
         available_options_commands = [o.command for o in available_options]
-        available_options_ticked = [i for i, v in enumerate(available_options) if v.ticked]
+        available_options_ticked = [
+            i for i, v in enumerate(available_options) if v.ticked
+        ]
 
         selection = select_multiple(
             available_options_labels,
@@ -448,10 +446,7 @@ class Mescal(Cmd):
         if not self.can_mapcounts():
             self.console.print(self.invalid_command_message)
             return False
-        fig, ax = mapcounts(
-            self.calibration.counts(),
-            self.calibration.detector.map,
-        )
+        fig, ax = mapcounts(self.calibration.counts(), self.calibration.detector.map,)
         plt.show(block=False)
         return False
 
@@ -490,7 +485,9 @@ class Mescal(Cmd):
 
         with self.console.status(self.spinner_message):
             decays = self.calibration.xradsources()
-            reference_source = sorted(decays, key=lambda source: decays[source].energy)[0]
+            reference_source = sorted(decays, key=lambda source: decays[source].energy)[
+                0
+            ]
             energy = decays[reference_source].energy
             draw_and_save_mapres(
                 reference_source,
@@ -567,13 +564,11 @@ class Mescal(Cmd):
         with self.console.status(self.spinner_message):
             if self.calibration.xfit:
                 write_report_to_excel(
-                    self.calibration.xfit,
-                    paths.XFTREPORT(self.args.filepath),
+                    self.calibration.xfit, paths.XFTREPORT(self.args.filepath),
                 )
             if self.calibration.sfit:
                 write_report_to_excel(
-                    self.calibration.sfit,
-                    paths.SFTREPORT(self.args.filepath),
+                    self.calibration.sfit, paths.SFTREPORT(self.args.filepath),
                 )
         return False
 
@@ -650,8 +645,7 @@ class Mescal(Cmd):
             return False
         with self.console.status(self.spinner_message):
             write_eventlist_to_fits(
-                self.eventlist,
-                paths.EVLFITS(self.args.filepath),
+                self.eventlist, paths.EVLFITS(self.args.filepath),
             )
         return False
 

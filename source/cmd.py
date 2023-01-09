@@ -1,8 +1,9 @@
 import string
 import sys
 
-from rich.rule import Rule
 from rich.columns import Columns
+from rich.rule import Rule
+
 
 class Cmd:
     """

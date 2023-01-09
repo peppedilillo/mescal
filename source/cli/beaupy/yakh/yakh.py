@@ -54,14 +54,15 @@ and [here](./yakh/key/_key.py#L81).
 
 import sys
 from typing import List
+
 from .key._key import Key
 
 try:
-    import termios
-    import tty
     import fcntl
     import os
     import re
+    import termios
+    import tty
 
     __ANSICODE = re.compile(r"\x1B[@-_][0-?]*[ -/]*[@-~]")
 
@@ -119,6 +120,7 @@ try:
 
         ch_ord = tuple(map(ord, ch_str))
         return Key(ch_str, ch_ord, ch_str.isprintable() or ch_ord in [(13,), (27, 13)])
+
 
 except ImportError:
 

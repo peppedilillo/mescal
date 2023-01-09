@@ -63,11 +63,7 @@ def electrons_to_energy(data, scint_calibrations, couples):
 
 
 def make_electron_list(
-    data,
-    calibrated_sdds,
-    sfit_results,
-    scintillator_couples,
-    nthreads=1,
+    data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=1,
 ):
     columns = ["TIME", "ELECTRONS", "EVTYPE", "CHN", "QUADID"]
     types = ["float64", "float32", "U1", "int8", "U1"]
@@ -75,11 +71,7 @@ def make_electron_list(
     container = np.recarray(shape=0, dtype=[*dtypes.items()])
 
     disorganized_events = _get_calibrated_events(
-        data,
-        calibrated_sdds,
-        sfit_results,
-        scintillator_couples,
-        nthreads=nthreads,
+        data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=nthreads,
     )
 
     for quadrant in disorganized_events.keys():
@@ -222,10 +214,7 @@ def perchannel_counts(data, channels):
             dict_.setdefault(quad, {})[ch] = counts
 
     out = {
-        k: pd.DataFrame(
-            dict_[k],
-            index=["counts"],
-        ).T.rename_axis("channel")
+        k: pd.DataFrame(dict_[k], index=["counts"],).T.rename_axis("channel")
         for k in dict_
     }
     return out

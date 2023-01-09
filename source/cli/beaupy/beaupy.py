@@ -10,7 +10,7 @@ You can find the original repo at https://github.com/petereon/beaupy
 A Python library of interactive CLI elements you have been looking for
 """
 
-__license__ = 'MIT'
+__license__ = "MIT"
 
 import warnings
 from ast import literal_eval
@@ -18,8 +18,6 @@ from typing import Any, Callable, List, Optional, Tuple, Type, Union
 
 from rich.console import Console
 from rich.live import Live
-from source.cli.beaupy.yakh.yakh import get_key
-from source.cli.beaupy.yakh.key._key import Keys
 
 from source.cli.beaupy._internals import (
     ConversionError,
@@ -30,6 +28,8 @@ from source.cli.beaupy._internals import (
     _render_prompt,
     _update_rendered,
 )
+from source.cli.beaupy.yakh.key._key import Keys
+from source.cli.beaupy.yakh.yakh import get_key
 
 
 class DefaultKeys:
@@ -50,14 +50,17 @@ class DefaultKeys:
     """
 
     escape: List[Union[Tuple[int, ...], str]] = [Keys.ESC]
-    select: List[Union[Tuple[int, ...], str]] = [' ']
+    select: List[Union[Tuple[int, ...], str]] = [" "]
     confirm: List[Union[Tuple[int, ...], str]] = [Keys.ENTER]
     backspace: List[Union[Tuple[int, ...], str]] = [Keys.BACKSPACE]
     delete: List[Union[Tuple[int, ...], str]] = [Keys.DELETE]
     down: List[Union[Tuple[int, ...], str]] = [Keys.DOWN_ARROW, Keys.NUMPAD_DOWN_ARROW]
     up: List[Union[Tuple[int, ...], str]] = [Keys.UP_ARROW, Keys.NUMPAD_UP_ARROW]
     left: List[Union[Tuple[int, ...], str]] = [Keys.LEFT_ARROW, Keys.NUMPAD_LEFT_ARROW]
-    right: List[Union[Tuple[int, ...], str]] = [Keys.RIGHT_ARROW, Keys.NUMPAD_RIGHT_ARROW]
+    right: List[Union[Tuple[int, ...], str]] = [
+        Keys.RIGHT_ARROW,
+        Keys.NUMPAD_RIGHT_ARROW,
+    ]
     tab: List[Union[Tuple[int, ...], str]] = [Keys.TAB]
     home: List[Union[Tuple[int, ...], str]] = [Keys.HOME]
     end: List[Union[Tuple[int, ...], str]] = [Keys.END]
@@ -110,14 +113,16 @@ def prompt(
     Returns:
         Union[T, str]: Returns a value formatted as provided type or string if no type is provided
     """
-    rendered = ''
-    with _cursor_hidden(console), Live(rendered, console=console, auto_refresh=False, transient=True) as live:
+    rendered = ""
+    with _cursor_hidden(console), Live(
+        rendered, console=console, auto_refresh=False, transient=True
+    ) as live:
         value: List[str] = [*initial_value] if initial_value else []
         cursor_index = len(initial_value) if initial_value else 0
-        error: str = ''
+        error: str = ""
         while True:
             rendered = _render_prompt(secure, value, prompt, cursor_index, error)
-            error = ''
+            error = ""
             _update_rendered(live, rendered)
             keypress = get_key()
             if keypress in DefaultKeys.interrupt:
@@ -125,7 +130,7 @@ def prompt(
                     raise KeyboardInterrupt()
                 return None
             elif keypress in DefaultKeys.confirm:
-                str_value = ''.join(value)
+                str_value = "".join(value)
                 try:
                     if target_type is bool:
                         result: bool = literal_eval(str_value)
@@ -176,8 +181,8 @@ def select(
     options: List[Union[Tuple[int, ...], str]],
     console: Console,
     preprocessor: Callable[[Any], Any] = lambda val: val,
-    cursor: str = '>',
-    cursor_style: str = 'pink1',
+    cursor: str = ">",
+    cursor_style: str = "pink1",
     cursor_index: int = 0,
     return_index: bool = False,
     strict: bool = False,
@@ -205,29 +210,37 @@ def select(
     Returns:
         Union[int, str, None]: Selected value or the index of a selected option or `None`
     """
-    rendered = ''
-    with _cursor_hidden(console), Live(rendered, console=console, auto_refresh=False, transient=True) as live:
+    rendered = ""
+    with _cursor_hidden(console), Live(
+        rendered, console=console, auto_refresh=False, transient=True
+    ) as live:
         if not options:
             if strict:
-                raise ValueError('`options` cannot be empty')
+                raise ValueError("`options` cannot be empty")
             return None
-        if cursor_style in ['', None]:
-            warnings.warn('`cursor_style` should be a valid style, defaulting to `white`')
-            cursor_style = 'white'
+        if cursor_style in ["", None]:
+            warnings.warn(
+                "`cursor_style` should be a valid style, defaulting to `white`"
+            )
+            cursor_style = "white"
 
         index: int = cursor_index
 
         while True:
             rendered = (
-                '\n'.join(
+                "\n".join(
                     [
                         _format_option_select(
-                            i=i, cursor_index=index, option=preprocessor(option), cursor_style=cursor_style, cursor=cursor
+                            i=i,
+                            cursor_index=index,
+                            option=preprocessor(option),
+                            cursor_style=cursor_style,
+                            cursor=cursor,
                         )
                         for i, option in enumerate(options)
                     ]
                 )
-                + '\n\n(Confirm with [bold]enter[/bold])'  # noqa: W503
+                + "\n\n(Confirm with [bold]enter[/bold])"  # noqa: W503
             )
             _update_rendered(live, rendered)
             keypress = get_key()
@@ -256,9 +269,9 @@ def select_multiple(
     options: List[Union[Tuple[int, ...], str]],
     console: Console,
     preprocessor: Callable[[Any], Any] = lambda val: val,
-    tick_character: str = '✓',
-    tick_style: str = 'pink1',
-    cursor_style: str = 'cyan',
+    tick_character: str = "✓",
+    tick_style: str = "pink1",
+    cursor_style: str = "cyan",
     ticked_indices: Optional[List[int]] = None,
     cursor_index: int = 0,
     minimal_count: int = 0,
@@ -293,29 +306,32 @@ def select_multiple(
     Returns:
         Union[List[str], List[int]]: A list of selected values or indices of selected options
     """
-    rendered = ''
-    with _cursor_hidden(console), Live(rendered, console=console, auto_refresh=False, transient=True) as live:
+    rendered = ""
+    with _cursor_hidden(console), Live(
+        rendered, console=console, auto_refresh=False, transient=True
+    ) as live:
         if not options:
             if strict:
-                raise ValueError('`options` cannot be empty')
+                raise ValueError("`options` cannot be empty")
             return []
-        if cursor_style in ['', None]:
-            warnings.warn('`cursor_style` should be a valid style, defaulting to `white`')
-            cursor_style = 'white'
-        if tick_style in ['', None]:
-            warnings.warn('`tick_style` should be a valid style, defaulting to `white`')
-            tick_style = 'white'
+        if cursor_style in ["", None]:
+            warnings.warn(
+                "`cursor_style` should be a valid style, defaulting to `white`"
+            )
+            cursor_style = "white"
+        if tick_style in ["", None]:
+            warnings.warn("`tick_style` should be a valid style, defaulting to `white`")
+            tick_style = "white"
         if ticked_indices is None:
             ticked_indices = []
 
         index = cursor_index
 
-        error_message = ''
+        error_message = ""
         while True:
             rendered = (
-
-                'Select one or more.\n\n' +
-                '\n'.join(
+                "Select one or more.\n\n"
+                + "\n".join(
                     [
                         _render_option_select_multiple(
                             option=preprocessor(option),
@@ -328,11 +344,11 @@ def select_multiple(
                         for i, option in enumerate(options)
                     ]
                 )
-                + '\n\n(Mark with [bold]space[/bold], confirm with [bold]enter[/bold], cancel with [bold]esc[/bold])'  # noqa: W503
+                + "\n\n(Mark with [bold]space[/bold], confirm with [bold]enter[/bold], cancel with [bold]esc[/bold])"  # noqa: W503
             )
             if error_message:
-                rendered = f'{rendered}\n[red]Error:[/red] {error_message}'
-                error_message = ''
+                rendered = f"{rendered}\n[red]Error:[/red] {error_message}"
+                error_message = ""
             _update_rendered(live, rendered)
             keypress = get_key()
             if keypress in DefaultKeys.interrupt:
@@ -352,12 +368,12 @@ def select_multiple(
                     if len(ticked_indices) + 1 <= maximal_count:
                         ticked_indices.append(index)
                     else:
-                        error_message = f'Must select at most {maximal_count} options'
+                        error_message = f"Must select at most {maximal_count} options"
                 else:
                     ticked_indices.append(index)
             elif keypress in DefaultKeys.confirm:
                 if minimal_count > len(ticked_indices):
-                    error_message = f'Must select at least {minimal_count} options'
+                    error_message = f"Must select at least {minimal_count} options"
                 else:
                     break
             elif keypress in DefaultKeys.escape:
@@ -370,13 +386,13 @@ def select_multiple(
 def confirm(
     question: str,
     console: Console,
-    yes_text: str = 'Yes',
-    no_text: str = 'No',
+    yes_text: str = "Yes",
+    no_text: str = "No",
     has_to_match_case: bool = False,
     enter_empty_confirms: bool = True,
     default_is_yes: bool = False,
-    cursor: str = '>',
-    cursor_style: str = 'pink1',
+    cursor: str = ">",
+    cursor_style: str = "pink1",
     char_prompt: bool = True,
 ) -> Optional[bool]:
     """A prompt that asks a question and offers two responses
@@ -399,24 +415,28 @@ def confirm(
     Returns:
         Optional[bool]
     """
-    rendered = ''
-    with _cursor_hidden(console), Live(rendered, console=console, auto_refresh=False, transient=True) as live:
-        if cursor_style in ['', None]:
-            warnings.warn('`cursor_style` should be a valid style, defaulting to `white`')
-            cursor_style = 'white'
+    rendered = ""
+    with _cursor_hidden(console), Live(
+        rendered, console=console, auto_refresh=False, transient=True
+    ) as live:
+        if cursor_style in ["", None]:
+            warnings.warn(
+                "`cursor_style` should be a valid style, defaulting to `white`"
+            )
+            cursor_style = "white"
         is_yes = default_is_yes
         is_selected = enter_empty_confirms
-        current_message = ''
-        yn_prompt = f' ({yes_text[0]}/{no_text[0]}) ' if char_prompt else ': '
-        selected_prefix = f'[{cursor_style}]{cursor}[/{cursor_style}] '
-        deselected_prefix = (' ' * len(cursor)) + ' '
+        current_message = ""
+        yn_prompt = f" ({yes_text[0]}/{no_text[0]}) " if char_prompt else ": "
+        selected_prefix = f"[{cursor_style}]{cursor}[/{cursor_style}] "
+        deselected_prefix = (" " * len(cursor)) + " "
         while True:
             yes = is_yes and is_selected
             no = not is_yes and is_selected
-            question_line = f'{question}{yn_prompt}{current_message}'
+            question_line = f"{question}{yn_prompt}{current_message}"
             yes_prefix = selected_prefix if yes else deselected_prefix
             no_prefix = selected_prefix if no else deselected_prefix
-            rendered = f'{question_line}\n{yes_prefix}{yes_text}\n{no_prefix}{no_text}\n\n(Confirm with [bold]enter[/bold])'
+            rendered = f"{question_line}\n{yes_prefix}{yes_text}\n{no_prefix}{no_text}\n\n(Confirm with [bold]enter[/bold])"
             _update_rendered(live, rendered)
 
             keypress = get_key()
