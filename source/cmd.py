@@ -2,7 +2,7 @@ import string
 import sys
 
 from rich.rule import Rule
-
+from rich.columns import Columns
 
 class Cmd:
     """
@@ -307,7 +307,7 @@ class Cmd:
             if self.ruler:
                 doc_rule = Rule(style="green")
                 self.console.print(doc_rule, width=columns)
-            self.columnize(cmds, columns - 1)
+            self.columnize(cmds, columns)
 
     def columnize(self, list, displaywidth=80):
         """Display a list of strings as a compact set of columns.
