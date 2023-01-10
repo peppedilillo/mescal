@@ -36,7 +36,6 @@ from source.plot import (
     draw_and_save_slo,
     draw_and_save_uncalibrated,
     mapcounts,
-    mapenres,
     uncalibrated,
 )
 from source.radsources import radsources_dicts
@@ -271,7 +270,7 @@ class Mescal(Cmd):
         """
         sublists = self.calibration.flagged.values()
         num_flagged = len(set([item for sublist in sublists for item in sublist]))
-        num_channels = len([item for sublist in sublists for item in sublist])
+        num_channels = len([ch for quad, chs in self.calibration.channels.items() for ch in chs])
         message = (
             "In total, {} channels out of {} were flagged.\n"
             "For more details, see the log file.".format(num_flagged, num_channels)
@@ -281,7 +280,7 @@ class Mescal(Cmd):
         return True
 
     def _process_results(self, output_format, filepath):
-        """Prepares and exports calibration results."""
+        """Prepares and exports base calibration results."""
         write_report = get_writer(output_format)
 
         if not self.calibration.sdd_cal and not self.calibration.optical_coupling:
@@ -334,7 +333,7 @@ class Mescal(Cmd):
 
     # shell prompt commands
     def do_export(self, arg):
-        """prompts user on exports."""
+        """prompts user on optional exports."""
         cmds = [
             "svhistplot",
             "svdiags",
@@ -347,7 +346,7 @@ class Mescal(Cmd):
         ]
 
         Option = namedtuple("Option", ["label", "command", "ticked",])
-        options = [
+        all_options = [
             Option("Uncalibrated histogram plots", "svhistplot", True),
             Option("X diagnostic plots", "svxdiags", True),
             Option("S diagnostic plots", "svsdiags", False),
@@ -360,21 +359,19 @@ class Mescal(Cmd):
             Option("Save calibrated events to fits file", "svevents", False),
         ]
 
-        available_options = [o for o in options if self.can(o.command)]
-        available_options_labels = [o.label for o in available_options]
-        available_options_commands = [o.command for o in available_options]
-        available_options_ticked = [
-            i for i, v in enumerate(available_options) if v.ticked
-        ]
+        options = [o for o in all_options if self.can(o.command)]
+        options_labels = [o.label for o in options]
+        options_commands = [o.command for o in options]
+        options_ticked = [i for i, v in enumerate(options) if v.ticked]
 
         selection = select_multiple(
-            available_options_labels,
+            options_labels,
             self.console,
-            ticked_indices=available_options_ticked,
+            ticked_indices=options_ticked,
             return_indices=True,
         )
 
-        for cmd in [available_options_commands[i] for i in selection]:
+        for cmd in [options_commands[i] for i in selection]:
             do = getattr(self, cmd)
             do("")
 
@@ -438,6 +435,20 @@ class Mescal(Cmd):
         plt.show(block=False)
         return False
 
+    def can_svhistplot(self):
+        return True
+
+    def svhistplot(self, arg):
+        """Save raw acquisition histogram plots."""
+        with self.console.status(self.spinner_message):
+            draw_and_save_uncalibrated(
+                self.calibration.xhistograms,
+                self.calibration.shistograms,
+                paths.UNCPLOT(self.args.filepath),
+                nthreads=self.threads,
+            )
+        return False
+
     def can_mapcounts(self):
         return True
 
@@ -482,32 +493,14 @@ class Mescal(Cmd):
         if not self.can_mapres():
             self.console.print(self.invalid_command_message)
             return False
-
         with self.console.status(self.spinner_message):
             decays = self.calibration.xradsources()
-            reference_source = sorted(decays, key=lambda source: decays[source].energy)[
-                0
-            ]
-            energy = decays[reference_source].energy
+            source = sorted(decays, key=lambda source: decays[source].energy)[0]
             draw_and_save_mapres(
-                reference_source,
+                source,
                 self.calibration.en_res,
                 self.calibration.detector.map,
                 paths.RESPLOT(self.args.filepath),
-            )
-        return False
-
-    def can_svhistplot(self):
-        return True
-
-    def svhistplot(self, arg):
-        """Save raw acquisition histogram plots."""
-        with self.console.status(self.spinner_message):
-            draw_and_save_uncalibrated(
-                self.calibration.xhistograms,
-                self.calibration.shistograms,
-                paths.UNCPLOT(self.args.filepath),
-                nthreads=self.threads,
             )
         return False
 
