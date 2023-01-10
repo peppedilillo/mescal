@@ -332,49 +332,6 @@ class Mescal(Cmd):
         return True
 
     # shell prompt commands
-    def do_export(self, arg):
-        """prompts user on optional exports."""
-        cmds = [
-            "svhistplot",
-            "svdiags",
-            "svtabfit",
-            "svxplots",
-            "svlinplots",
-            "svsplots",
-            "svmapres",
-            "svmapcounts",
-        ]
-
-        Option = namedtuple("Option", ["label", "command", "ticked",])
-        all_options = [
-            Option("Uncalibrated histogram plots", "svhistplot", True),
-            Option("X diagnostic plots", "svxdiags", True),
-            Option("S diagnostic plots", "svsdiags", False),
-            Option("Linearity plots", "svlinplots", False),
-            Option("Per-channel X spectra plots", "svxplots", False),
-            Option("Per-channel S spectra plots", "svsplots", False),
-            Option("Energy resolution map", "svmapres", True),
-            Option("Channel counts map", "svmapcounts", True),
-            Option("Fit tables", "svtabfit", True),
-            Option("Save calibrated events to fits file", "svevents", False),
-        ]
-
-        options = [o for o in all_options if self.can(o.command)]
-        options_labels = [o.label for o in options]
-        options_commands = [o.command for o in options]
-        options_ticked = [i for i, v in enumerate(options) if v.ticked]
-
-        selection = select_multiple(
-            options_labels,
-            self.console,
-            ticked_indices=options_ticked,
-            return_indices=True,
-        )
-
-        for cmd in [options_commands[i] for i in selection]:
-            do = getattr(self, cmd)
-            do("")
-
     def do_quit(self, arg):
         """Quits mescal.
         It's the only do-command to return True.
@@ -435,8 +392,71 @@ class Mescal(Cmd):
         plt.show(block=False)
         return False
 
-    def can_svhistplot(self):
-        return True
+    def do_mapcounts(self, arg):
+        """Plots a map of counts per-channel."""
+        fig, ax = mapcounts(self.calibration.counts(), self.calibration.detector.map)
+        plt.show(block=False)
+        return False
+
+    def do_export(self, arg):
+        """Prompts user on optional exports."""
+        cmds = [
+            "svhistplot",
+            "svdiags",
+            "svtabfit",
+            "svxplots",
+            "svlinplots",
+            "svsplots",
+            "svmapres",
+            "svmapcounts",
+        ]
+
+        Option = namedtuple("Option", ["label", "command", "ticked",])
+        all_options = [
+            Option("Uncalibrated histogram plots", "svhistplot", True),
+            Option("X diagnostic plots", "svxdiags", True),
+            Option("S diagnostic plots", "svsdiags", False),
+            Option("Linearity plots", "svlinplots", False),
+            Option("Per-channel X spectra plots", "svxplots", False),
+            Option("Per-channel S spectra plots", "svsplots", False),
+            Option("Energy resolution map", "svmapres", True),
+            Option("Channel counts map", "svmapcounts", True),
+            Option("Fit tables", "svtabfit", True),
+            Option("Save calibrated events to fits file", "svevents", False),
+        ]
+
+        options = [o for o in all_options if self.can(o.command)]
+        options_labels = [o.label for o in options]
+        options_commands = [o.command for o in options]
+        options_ticked = [i for i, v in enumerate(options) if v.ticked]
+
+        selection = select_multiple(
+            options_labels,
+            self.console,
+            ticked_indices=options_ticked,
+            return_indices=True,
+        )
+
+        for cmd in [options_commands[i] for i in selection]:
+            do = getattr(self, cmd)
+            do("")
+
+    def can(self, x):
+        if "can_" + x not in dir(self.__class__):
+            return True
+        else:
+            func = getattr(self, "can_" + x)
+            return func()
+
+    def svmapcounts(self, arg):
+        """Saves a map of per-channel counts."""
+        with self.console.status(self.spinner_message):
+            draw_and_save_mapcounts(
+                self.calibration.counts(),
+                self.calibration.detector.map,
+                paths.CNTPLOT(self.args.filepath),
+            )
+        return False
 
     def svhistplot(self, arg):
         """Save raw acquisition histogram plots."""
@@ -449,48 +469,14 @@ class Mescal(Cmd):
             )
         return False
 
-    def can_mapcounts(self):
-        return True
-
-    def do_mapcounts(self, arg):
-        """Plots a map of counts per-channel."""
-        if not self.can_mapcounts():
-            self.console.print(self.invalid_command_message)
-            return False
-        fig, ax = mapcounts(self.calibration.counts(), self.calibration.detector.map,)
-        plt.show(block=False)
-        return False
-
-    def can_svmapcounts(self):
-        if self.can_mapcounts():
-            return True
-        return False
-
-    def svmapcounts(self, arg):
-        if not self.can_mapcounts():
-            self.console.print(self.invalid_command_message)
-            return False
-
-        with self.console.status(self.spinner_message):
-            draw_and_save_mapcounts(
-                self.calibration.counts(),
-                self.calibration.detector.map,
-                paths.CNTPLOT(self.args.filepath),
-            )
-        return False
-
-    def can_mapres(self):
+    def can_svmapres(self):
         if self.calibration.xradsources().keys() and self.calibration.en_res:
             return True
         return False
 
-    def can_svmapres(self):
-        if self.can_mapres():
-            return True
-        return False
-
     def svmapres(self, arg):
-        if not self.can_mapres():
+        """Saves a map of channels' energy resolution."""
+        if not self.can_svmapres():
             self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
