@@ -41,7 +41,6 @@ def _render_option_select_multiple(
     if ticked:
         prefix = f"\[[{tick_style}]{tick_character}[/{tick_style}]]"  # noqa: W605
     if selected:
-        prefix = "> " + prefix
         option = f"[{cursor_style}]{option}[/{cursor_style}]"
     return f"{prefix} {option}"
 

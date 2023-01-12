@@ -524,9 +524,10 @@ def mapcounts(counts, detmap):
             channels = counts[quad].index
             chns_indeces = quadmap[channels]
             values = counts[quad]["counts"].values
-
-            rows, cols = chns_indeces.T
-            mat[rows + ty, cols + tx] = values
+            # next line protects against noise from unbound channels
+            mask = (quadmap[channels] >= 0).all(axis=1)
+            rows, cols = chns_indeces[mask].T
+            mat[rows + ty, cols + tx] = values[mask]
 
     fig, ax = _mapplot(mat, detmap, colorlabel="Counts", maskvalue=0, figsize=(8, 8),)
     ax.set_title("Per-channel counts (pixel events)")
