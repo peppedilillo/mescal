@@ -185,8 +185,7 @@ class Cmd:
         command entered.
 
         """
-        if self.lastcmd:
-            return self.onecmd(self.lastcmd)
+        return False
 
     def default(self, line):
         """Called on an input line when the command prefix is not recognized.
@@ -304,79 +303,10 @@ class Cmd:
             columns = int(self.console.width / 2)
             space = " " * max(int((columns - len(header)) / 2), 0)
             message = space + "%s" % str(header)
-            self.console.print("\n%s" % str(message))
+            renderable = ["\n%s" % str(message)]
             if self.ruler:
-                doc_rule = Rule(style="green")
-                self.console.print(doc_rule, width=columns)
-            self.columnize(cmds, columns)
-
-    def columnize(self, list, displaywidth=80):
-        """Display a list of strings as a compact set of columns.
-
-        Each column is only as wide as necessary.
-        Columns are separated by two spaces (one was not legible enough).
-        """
-        if not list:
-            self.console.print("<empty>\n")
-            return
-
-        nonstrings = [i for i in range(len(list)) if not isinstance(list[i], str)]
-        if nonstrings:
-            raise TypeError(
-                "list[i] not a string for i in %s" % ", ".join(map(str, nonstrings))
-            )
-        size = len(list)
-        if size == 1:
-            self.console.print("%s\n" % str(list[0]))
-            return
-        # Try every row count from 1 upwards
-        for nrows in range(1, len(list)):
-            ncols = (size + nrows - 1) // nrows
-            colwidths = []
-            totwidth = -2
-            for col in range(ncols):
-                colwidth = 0
-                for row in range(nrows):
-                    i = row + nrows * col
-                    if i >= size:
-                        break
-                    x = list[i]
-                    colwidth = max(colwidth, len(x))
-                colwidths.append(colwidth)
-                totwidth += colwidth + 2
-                if totwidth > displaywidth:
-                    break
-            if totwidth <= displaywidth:
-                break
-        else:
-            nrows = len(list)
-            ncols = 1
-            colwidths = [0]
-        for row in range(nrows):
-            texts = []
-            cmds = []
-            for col in range(ncols):
-                i = row + nrows * col
-                if i >= size:
-                    x = ""
-                else:
-                    x = list[i]
-                    texts.append(x)
-                    cmds.append(x)
-            while texts and not texts[-1]:
-                del texts[-1]
-            for col in range(len(texts)):
-                texts[col] = texts[col].ljust(colwidths[col])
-            # markup in red unavailable commands
-            for i, (text, cmd) in enumerate(zip(texts, cmds)):
-                if not self.can(cmd):
-                    texts[i] = "[red]" + text + "[/]"
-            self.console.print("%s" % str("  ".join(texts)))
-        self.console.print()
-
-    def can(self, x):
-        if "can_" + x not in dir(self.__class__):
-            return True
-        else:
-            func = getattr(self, "can_" + x)
-            return func()
+                doc_rule = [Rule(style="green")]
+                renderable += doc_rule
+            cols = Columns(cmds, expand=True, padding=(0, 2))
+            renderable += [cols] + ["\n"]
+            self.console.print(*renderable, width=columns)

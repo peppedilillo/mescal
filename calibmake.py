@@ -134,8 +134,8 @@ def check_system():
     elif sys.platform.startswith("mac"):
         if "macosx" in matplotlib.rcsetup.all_backends:
             matplotlib.use("macosx")
-
     systhreads = min(4, cpu_count())
+
     logging.info("detected {} os".format(sys.platform))
     logging.info("using matplotlib backend {}".format(matplotlib.get_backend()))
     logging.info("running over {} threads".format(systhreads))
@@ -430,19 +430,28 @@ class Mescal(Cmd):
         options_commands = [o.command for o in options]
         options_ticked = [i for i, v in enumerate(options) if v.ticked]
 
-        selection = select_multiple(
-            options_labels,
-            self.console,
-            ticked_indices=options_ticked,
-            return_indices=True,
-        )
+        prompt_user_with_menu = True
+        if prompt_user_with_menu:
+            selection = select_multiple(
+                options_labels,
+                self.console,
+                ticked_indices=options_ticked,
+                return_indices=True,
+            )
+        else:
+            # do them all
+            selection = [i for i, _ in enumerate(options)]
 
         for cmd in [options_commands[i] for i in selection]:
             do = getattr(self, cmd)
             do("")
+        return False
 
     def can(self, x):
+        """Checks if a command can be executed."""
         if "can_" + x not in dir(self.__class__):
+            # if a can_ method is not defined we assume the command
+            # to always be executable.
             return True
         else:
             func = getattr(self, "can_" + x)
@@ -671,7 +680,7 @@ def parse_limits(arg):
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    start_logger(args)
+    user_arguments = parse_args()
+    start_logger(user_arguments)
     systhreads = check_system()
-    Mescal(args, systhreads)
+    Mescal(user_arguments, systhreads)
