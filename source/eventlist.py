@@ -48,7 +48,7 @@ def _convert_gamma_events(data, scint_calibrations, couples):
     channel = out["CHN"] + qm
     scint_ucid = channel.map(companion_to_channel).fillna(channel).astype(int)
     ucid_calibs = _as_ucid_dataframe(scint_calibrations)
-    if scint_ucid.isin(ucid_calibs.index).all():
+    if scint_ucid.isin(ucid_calibs.index).all(bool_only=True):
         electrons = out["ELECTRONS"]
         light_outs = ucid_calibs.loc[scint_ucid]["light_out"].values
     elif scint_ucid.isin(ucid_calibs.index).any(bool_only=True):

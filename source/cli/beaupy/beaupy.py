@@ -308,7 +308,7 @@ def select_multiple(
     """
     rendered = ""
     with _cursor_hidden(console), Live(
-        rendered, console=console, auto_refresh=False, transient=True
+        rendered, console=console, auto_refresh=False, transient=True,
     ) as live:
         if not options:
             if strict:
@@ -330,7 +330,7 @@ def select_multiple(
         error_message = ""
         while True:
             rendered = (
-                "Select one or more.\n\n"
+                "[i]Select one or more.[/]\n\n"
                 + "\n".join(
                     [
                         _render_option_select_multiple(
@@ -344,7 +344,7 @@ def select_multiple(
                         for i, option in enumerate(options)
                     ]
                 )
-                + "\n\n(Mark with [bold]space[/bold], confirm with [bold]enter[/bold], cancel with [bold]esc[/bold])"  # noqa: W503
+                + "\n\n(mark=[bold]space[/bold], confirm=[bold]enter[/bold], cancel=[bold]esc[/bold])"  # noqa: W503
             )
             if error_message:
                 rendered = f"{rendered}\n[red]Error:[/red] {error_message}"

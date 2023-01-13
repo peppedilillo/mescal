@@ -13,10 +13,9 @@ import pandas as pd
 
 from source import paths
 from source.calibrate import PEAKS_PARAMS, Calibrate
-from source.cli import interface
+from source.cli import elementsui as ui
 from source.cli.beaupy.beaupy import select_multiple
-from source.cli.interface import logo, sections_rule
-from source.cmd import Cmd
+from source.cli.cmd import Cmd
 from source.detectors import Detector
 from source.io import (
     get_writer,
@@ -94,8 +93,8 @@ def start_logger(args):
     """
     logfile = paths.LOGFILE(args.filepath)
     with open(logfile, "w") as f:
-        f.write(logo())
-        len_logo = len(logo().split("\n")[0])
+        f.write(ui.logo())
+        len_logo = len(ui.logo().split("\n")[0])
         version_message = "version " + get_version()
         if len_logo > len(version_message) + 1:
             f.write(
@@ -232,13 +231,13 @@ class Mescal(Cmd):
     )
 
     def __init__(self, args, threads):
-        console = interface.hello()
+        console = ui.hello()
         super().__init__(console)
         self.args = args
         self.config = unpack_configuration(args.adc)
         self.threads = threads
 
-        sections_rule(console, "[bold italic]Calibration log", style="green")
+        ui.sections_rule(console, "[bold italic]Calibration log", style="green")
         with console.status("Initializing.."):
             data = get_from(self.args.filepath, self.console, self.args.cache)
             radsources = radsources_dicts(self.args.radsources)
@@ -258,10 +257,10 @@ class Mescal(Cmd):
             self._process_results(self.args.fmt, self.args.filepath)
 
         if any(self.calibration.flagged):
-            sections_rule(console, "[bold italic]Warning", style="red")
+            ui.sections_rule(console, "[bold italic]Warning", style="red")
             self._warn_about_flagged()
 
-        sections_rule(console, "[bold italic]Shell", style="green")
+        ui.sections_rule(console, "[bold italic]Shell", style="green")
         self.cmdloop()
 
     def _warn_about_flagged(self):
@@ -342,10 +341,10 @@ class Mescal(Cmd):
     def do_retry(self, arg):
         """Launches calibration again."""
         with self.console.status(self.spinner_message):
-            sections_rule(self.console, "[bold italic]Calibration log", style="green")
+            ui.sections_rule(self.console, "[bold italic]Calibration log", style="green")
             self.calibration._calibrate()
             self._process_results(self.args.fmt, self.args.filepath)
-            sections_rule(self.console, "[bold italic]Shell", style="green")
+            ui.sections_rule(self.console, "[bold italic]Shell", style="green")
         return False
 
     def do_setxlim(self, arg):
@@ -413,16 +412,16 @@ class Mescal(Cmd):
 
         Option = namedtuple("Option", ["label", "command", "ticked",])
         all_options = [
-            Option("Uncalibrated histogram plots", "svhistplot", True),
+            Option("uncalibrated histogram plots", "svhistplot", True),
             Option("X diagnostic plots", "svxdiags", True),
             Option("S diagnostic plots", "svsdiags", False),
-            Option("Linearity plots", "svlinplots", False),
-            Option("Per-channel X spectra plots", "svxplots", False),
-            Option("Per-channel S spectra plots", "svsplots", False),
-            Option("Energy resolution map", "svmapres", True),
-            Option("Channel counts map", "svmapcounts", True),
-            Option("Fit tables", "svtabfit", True),
-            Option("Save calibrated events to fits file", "svevents", False),
+            Option("linearity plots", "svlinplots", False),
+            Option("per-channel X spectra plots", "svxplots", False),
+            Option("per-channel S spectra plots", "svsplots", False),
+            Option("energy resolution map", "svmapres", True),
+            Option("channel counts map", "svmapcounts", True),
+            Option("fit tables", "svtabfit", True),
+            Option("calibrated events fits file", "svevents", False),
         ]
 
         options = [o for o in all_options if self.can(o.command)]
@@ -430,21 +429,29 @@ class Mescal(Cmd):
         options_commands = [o.command for o in options]
         options_ticked = [i for i, v in enumerate(options) if v.ticked]
 
-        prompt_user_with_menu = True
-        if prompt_user_with_menu:
-            selection = select_multiple(
-                options_labels,
-                self.console,
-                ticked_indices=options_ticked,
-                return_indices=True,
-            )
-        else:
-            # do them all
-            selection = [i for i, _ in enumerate(options)]
+        with ui.small_section(self.console, "Export menu") as ss:
+            prompt_user_with_menu = True
+            if prompt_user_with_menu:
+                selection = select_multiple(
+                    options_labels,
+                    self.console,
+                    ticked_indices=options_ticked,
+                    return_indices=True,
+                )
+            else:
+                # do them all
+                selection = [i for i, _ in enumerate(options)]
 
-        for cmd in [options_commands[i] for i in selection]:
-            do = getattr(self, cmd)
-            do("")
+            if selection:
+                for i in sorted(
+                        selection,
+                        key=lambda i: -len(options_labels[i]),
+                ):
+                    do = getattr(self, options_commands[i])
+                    do("")
+                    ss.print("Saved {}.".format(options_labels[i]))
+            else:
+                ss.print("Nothing saved.")
         return False
 
     def can(self, x):
