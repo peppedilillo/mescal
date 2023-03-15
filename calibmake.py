@@ -216,18 +216,19 @@ class Mescal(Cmd):
     prompt = "[cyan]\[mescalSH] "
     spinner_message = "Working.."
     unknown_command_message = (
-        "[red]Unknown command.[/]\nType help or ? for a list of commands."
+        "[red]Unknown command.[/]\n[i]"
+        "Type help or ? for a list of commands.[/i]\n"
     )
     invalid_command_message = (
-        "[red]Command unavailable.[/]\nCannnot execute with present calibration."
+        "[red]Command unavailable.[/]\n"
     )
     invalid_channel_message = (
         "[red]Invalid channel.[/]\n"
-        "Channel ID not in standard form (e.g., d04, A30, B02)."
+        "[i]Channel ID must be in standard form (e.g., d04, A30, B02).[/i]\n"
     )
     invalid_limits_message = (
         "[red]Invalid limits.[/]\n"
-        "Entry must be two different sorted integers (e.g., 19800 20100)."
+        "[i]Entries must be two different sorted integers (e.g., 19800 20100).[/i]\n"
     )
 
     def __init__(self, args, threads):
@@ -398,22 +399,9 @@ class Mescal(Cmd):
         return False
 
     def do_export(self, arg):
-        """Prompts user on optional exports."""
+        """Prompts user on optional data product exports."""
 
         Option = namedtuple("Option", ["label", "command", "ticked",])
-        # all_options = [
-        #     Option("uncalibrated histogram plots", "svhistplot", True),
-        #     Option("X diagnostic plots", "svxdiags", True),
-        #     Option("S diagnostic plots", "svsdiags", False),
-        #     Option("linearity plots", "svlinplots", False),
-        #     Option("per-channel X spectra plots", "svxplots", False),
-        #     Option("per-channel S spectra plots", "svsplots", False),
-        #     Option("energy resolution map", "svmapres", True),
-        #     Option("channel counts map", "svmapcounts", True),
-        #     Option("fit tables", "svtabfit", True),
-        #     Option("calibrated events fits file", "svevents", False),
-        # ]
-
         all_options = [
             Option("uncalibrated plots", "svhistplot", True),
             Option("diagnostic plots", "svxdiags", True),

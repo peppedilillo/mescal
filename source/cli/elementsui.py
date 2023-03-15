@@ -77,7 +77,6 @@ class small_section():
 
     def __exit__(self,exc_type, exc_val, exc_tb):
         self.console.print("")
-
         # from fluent python
         if exc_type is ZeroDivisionError:
             print('Please DO NOT divide by zero!')

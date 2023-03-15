@@ -264,11 +264,11 @@ class Cmd:
                 try:
                     doc = getattr(self, "do_" + arg).__doc__
                     if doc:
-                        self.console.print("%s" % str(doc))
+                        self.console.print("[i]%s[/i]\n" % str(doc))
                         return
                 except AttributeError:
                     pass
-                self.console.print("%s\n" % str(self.nohelp % (arg,)))
+                self.console.print("[i]%s[/i]\n" % str(self.nohelp % (arg,)))
                 return
             func()
         else:
