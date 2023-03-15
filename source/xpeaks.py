@@ -148,7 +148,9 @@ def widthscores(peaks_combinations_widths, bins, energies, gain_guess):
         """
         return (np.sqrt(E * 1000. / 3.6 * 0.118) * 2.35 * 3.6) / 1000
 
-    widths_keV = (bins[peaks_combinations_widths.astype(int)] - bins[0]) / gain_guess[0]
+    gain_mean, _ = gain_guess
+    widths_bins = (bins[peaks_combinations_widths.astype(int)] - bins[0])
+    widths_keV = widths_bins / gain_mean
     fano_keV = np.reshape(np.array([
             [
                 fano(e)
