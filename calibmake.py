@@ -48,7 +48,7 @@ parser = argparse.ArgumentParser(description=description)
 
 parser.add_argument(
     "model",
-    choices=["dm", "fm1", "pfm", "fm2", "fm3"],
+    choices=["dm", "fm1", "pfm", "fm2", "fm3", "fm4"],
     help="hermes flight model to calibrate. ",
 )
 

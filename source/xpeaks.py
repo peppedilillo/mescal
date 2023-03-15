@@ -101,7 +101,7 @@ def find_xpeaks(
     # baseline distance from 2keV
     blscores_ = baselinescores(bins, counts, fitparameters)
     # width coefficient of variation
-    widthscores_ = widthscores(pcombo_widths, bins, energies, gain_guess)
+    widthscores_ = widthscores(bins, gain_guess, pcombo_widths)
 
     # we rank the combinations by each metric score
     posteriorranking = np.argsort(np.argsort(posteriorscore_))
@@ -136,7 +136,7 @@ def find_xpeaks(
     return limits
 
 
-def widthscores(peaks_combinations_widths, bins, energies, gain_guess):
+def widthscores(bins, gain_guess, peaks_combinations_widths):
     """
     evaluates coefficient of variation in peaks width.
     """
@@ -151,15 +151,7 @@ def widthscores(peaks_combinations_widths, bins, energies, gain_guess):
     gain_mean, _ = gain_guess
     widths_bins = (bins[peaks_combinations_widths.astype(int)] - bins[0])
     widths_keV = widths_bins / gain_mean
-    fano_keV = np.reshape(np.array([
-            [
-                fano(e)
-                for e in energies
-            ] * len(peaks_combinations_widths)
-        ]),
-            (len(peaks_combinations_widths), len(energies))
-    )
-    corrected_widths_keV = widths_keV - fano_keV
+    corrected_widths_keV = fano(widths_keV)
     scores = -np.std(corrected_widths_keV, axis=1) / np.mean(corrected_widths_keV)
     return scores
 
@@ -261,7 +253,6 @@ def peaks_with_enough_stat(counts, mincounts, pars, smoothing=1, maxdepth=20):
         pars["prominence"] = pars["prominence"] / 2
         peaks, peaks_props = scipy.signal.find_peaks(smooth_counts, **pars)
         if not enough_statistics(mincounts, counts, peaks, peaks_props):
-            # print("stopped at prominence {}".format(pars["prominence"]))
             break
     if i == maxdepth - 1:
         raise TimeoutError(
@@ -269,9 +260,7 @@ def peaks_with_enough_stat(counts, mincounts, pars, smoothing=1, maxdepth=20):
             "are you using the right ADC configuration?"
         )
     if peaks.any():
-        # print("candidate peaks: {} peaks".format(len(peaks)))
         peaks, peaks_props = remove_small_peaks(mincounts, counts, peaks, peaks_props)
-        # print("after small peaks filter: {} peaks".format(len(peaks)))
     return peaks, peaks_props
 
 

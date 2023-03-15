@@ -1,8 +1,8 @@
 # fmt: off
 import numpy as np
 
-UNBOND = (-1, -1)
 
+UNBOND = (-1, -1)
 
 dm = {
     'A': ((5, 0), (5, 1), (5, 2), (5, 3), UNBOND, (4, 1), (4, 0), (3, 0),
@@ -99,18 +99,29 @@ fm3 = {
           (1, 2), (1, 3), (1, 4), (0, 4), (0, 3), (0, 2), (0, 1), (0, 0)),
 }
 
+fm4 = {
+    'D': ((0, 2), (0, 4), (0, 1), UNBOND, (0, 3), (0, 0), UNBOND, (1, 3),
+          (1, 0), (1, 4), (1, 1), (1, 2), (2, 4), (2, 2), (2, 3), (2, 1),
+          (2, 0), (3, 0), (3, 1), (3, 3), (3, 2), (3, 4), (4, 2), (4, 1),
+          (4, 0), (5, 1), (4, 4), (5, 3), (4, 3), (5, 4), (5, 2), (5, 0)),
+    'C': ((0, 0), (0, 1), (0, 4), (0, 3), (0, 2), (1, 0), (1, 3), (1, 1),
+          (1, 4), (1, 2), (2, 2), (2, 4), (2, 1), (2, 3), (2, 0), (3, 0),
+          (3, 3), (3, 1), (3, 4), (3, 2), (4, 4), (4, 2), (4, 1), (4, 0),
+          (4, 3), (5, 0), UNBOND, UNBOND, (5, 3), (5, 1), (5, 4), (5, 2)),
+    'B': ((5, 4), (5, 3), (5, 2), (5, 0), (5, 1), (4, 4), (4, 0), (4, 1),
+          (4, 3), (3, 0), (4, 2), (3, 1), (3, 2), (3, 4), (3, 3), (2, 1),
+          (2, 4), (2, 0), (2, 3), (2, 2), UNBOND, (1, 2), UNBOND, (1, 3),
+          (1, 0), (1, 4), (1, 1), (0, 4), (0, 3), (0, 1), (0, 2), (0, 0)),
+    'A': ((5, 0), (5, 1), (5, 2), UNBOND, (5, 3), (4, 1), (4, 0), (3, 0),
+          (3, 1), (5, 4), UNBOND, (3, 4), (4, 4), (3, 2), (4, 3), (3, 3),
+          (4, 2), (2, 4), (2, 3), (2, 2), (2, 1), (2, 0), (1, 0), (1, 1),
+          (1, 2), (1, 3), (1, 4), (0, 4), (0, 3), (0, 2), (0, 1), (0, 0)),
+}
+
 
 def get_quadrant_map(model: str, quad: str, arr_borders):
-    if model == "dm":
-        detector_map = dm
-    elif model == "fm1":
-        detector_map = fm1
-    elif model == "pfm":
-        detector_map = pfm
-    elif model == "fm2":
-        detector_map = fm2
-    elif model == "fm3":
-        detector_map = fm3
+    if model in _maps:
+        detector_map= _maps[model]
     else:
         raise ValueError("Model Unknown.")
 
@@ -148,6 +159,15 @@ class Detector:
         self.couples = get_couples(model)
 
 
+_maps = {
+    'dm': dm,
+    'fm1': fm1,
+    "pfm": pfm,
+    "fm2": fm2,
+    "fm3": fm3,
+    "fm4": fm4,
+}
+
 # will run some test on detector maps
 if __name__ == '__main__':
     TOT_QUAD = 4
@@ -156,10 +176,7 @@ if __name__ == '__main__':
     ROWS = 6
     COLS = 5
 
-    for map, model in zip(
-            [dm, fm1, pfm, fm2, fm3],
-            ['dm', 'fm1', 'pfm', 'fm2', 'fm3']
-    ):
+    for model, map in _maps.items():
         # checks for 4 quadrants
         assert len(map.keys()) == TOT_QUAD
         for quadrant in map.keys():
