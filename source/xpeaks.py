@@ -24,9 +24,10 @@ def find_xpeaks(
     channel_id=None,
 ):
     """
-    given a histogram of channel counts, a list of energies
-    and a prior on the expected gain and offset parameters
-    returns guesses on the respective spectral line positions.
+    given a histogram of channel counts, a list of spectrum
+    energies and a prior on the expected gain and offset
+    parameters returns best guess of spectral line positions
+    according different criteria
 
     Args:
         bins: array of int (histograms bin edges)
@@ -100,7 +101,7 @@ def find_xpeaks(
     # baseline distance from 2keV
     blscores_ = baselinescores(bins, counts, fitparameters)
     # width coefficient of variation
-    widthscores_ = widthscores(peaks_combo, pcombo_widths)
+    widthscores_ = widthscores(pcombo_widths, bins, energies, gain_guess)
 
     # we rank the combinations by each metric score
     posteriorranking = np.argsort(np.argsort(posteriorscore_))
@@ -135,13 +136,29 @@ def find_xpeaks(
     return limits
 
 
-def widthscores(peaks_combinations, peaks_combinations_widths):
+def widthscores(peaks_combinations_widths, bins, energies, gain_guess):
     """
     evaluates coefficient of variation in peaks width.
     """
-    scores = []
-    for peaks, widths in zip(peaks_combinations, peaks_combinations_widths):
-        scores.append(-np.std(widths) / np.mean(widths))
+
+    def fano(E):
+        """
+        Returns Fano noise in keV FWHM
+        Input: energy in keV
+        """
+        return (np.sqrt(E * 1000. / 3.6 * 0.118) * 2.35 * 3.6) / 1000
+
+    widths_keV = (bins[peaks_combinations_widths.astype(int)] - bins[0]) / gain_guess[0]
+    fano_keV = np.reshape(np.array([
+            [
+                fano(e)
+                for e in energies
+            ] * len(peaks_combinations_widths)
+        ]),
+            (len(peaks_combinations_widths), len(energies))
+    )
+    corrected_widths_keV = widths_keV - fano_keV
+    scores = -np.std(corrected_widths_keV, axis=1) / np.mean(corrected_widths_keV)
     return scores
 
 
