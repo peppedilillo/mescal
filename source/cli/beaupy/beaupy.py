@@ -308,7 +308,7 @@ def select_multiple(
     """
     rendered = ""
     with _cursor_hidden(console), Live(
-        rendered, console=console, auto_refresh=False, transient=True,
+        rendered, console=console, auto_refresh=False, transient=False,
     ) as live:
         if not options:
             if strict:
@@ -330,8 +330,7 @@ def select_multiple(
         error_message = ""
         while True:
             rendered = (
-                "[i]Select one or more.[/]\n\n"
-                + "\n".join(
+                "\n".join(
                     [
                         _render_option_select_multiple(
                             option=preprocessor(option),
@@ -375,8 +374,40 @@ def select_multiple(
                 if minimal_count > len(ticked_indices):
                     error_message = f"Must select at least {minimal_count} options"
                 else:
+                    rendered = (
+                        "\n".join(
+                            [
+                                _render_option_select_multiple(
+                                    option=preprocessor(option),
+                                    ticked=i in ticked_indices,
+                                    tick_character=tick_character,
+                                    tick_style=tick_style,
+                                    selected=i in [],
+                                    cursor_style=cursor_style,
+                                )
+                                for i, option in enumerate(options)
+                            ]
+                        )
+                    )
+                    _update_rendered(live, rendered)
                     break
             elif keypress in DefaultKeys.escape:
+                rendered = (
+                    "\n".join(
+                        [
+                            _render_option_select_multiple(
+                                option=preprocessor(option),
+                                ticked=i in [],
+                                tick_character=tick_character,
+                                tick_style=tick_style,
+                                selected=i in [],
+                                cursor_style=cursor_style,
+                            )
+                            for i, option in enumerate(options)
+                        ]
+                    )
+                )
+                _update_rendered(live, rendered)
                 return []
         if return_indices:
             return ticked_indices

@@ -301,6 +301,6 @@ class Cmd:
 
     def print_topics(self, header, cmds, message=''):
         if cmds:
-            with small_section(self.console, header, message) as ss:
+            with small_section(self.console, message=message) as ss:
                 cols = Columns(cmds, expand=True, padding=(0, 2))
                 ss.print(cols)

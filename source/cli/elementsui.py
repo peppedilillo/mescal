@@ -59,17 +59,18 @@ def shell_section_header(console, header):
 
 
 class small_section():
-    def __init__(self, console, header, message=''):
+    def __init__(self, console='', header='', message=''):
         self.console = console
         self.width = int(self.console.width / 2)
         self.header = header
         self.message = message
 
     def __enter__(self):
-        space = " " * max((self.width - len(self.header)) // 2, 0)
-        padded_header = space + "%s" % str(self.header)
-        self.print("\n[i]%s[/i]" % str(padded_header))
-        self.print(Rule(style="green"))
+        if self.header:
+            space = " " * max((self.width - len(self.header)) // 2, 0)
+            padded_header = space + "%s" % str(self.header)
+            self.print("\n[i]%s[/i]" % str(padded_header))
+            self.print(Rule(style="green"))
         if self.message:
             self.print("[i]" + self.message + "\n")
         return self

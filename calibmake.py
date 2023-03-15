@@ -415,13 +415,13 @@ class Mescal(Cmd):
         # ]
 
         all_options = [
-            Option("Save uncalibrated plots", "svhistplot", True),
-            Option("Save diagnostic plots", "svxdiags", True),
-            Option("Save linearity plots", "svlinplots", False),
-            Option("Save spectra plots per channel", "svchnplots", False),
-            Option("Save maps", "svmapres", True),
-            Option("Save fit tables", "svtabfit", True),
-            Option("Save calibrated events fits", "svevents", False),
+            Option("uncalibrated plots", "svhistplot", True),
+            Option("diagnostic plots", "svxdiags", True),
+            Option("linearity plots", "svlinplots", False),
+            Option("spectra plots per channel", "svchnplots", False),
+            Option("maps", "svmapres", True),
+            Option("fit tables", "svtabfit", True),
+            Option("calibrated events fits", "svevents", False),
         ]
 
         options = [o for o in all_options if self.can(o.command)]
@@ -429,7 +429,7 @@ class Mescal(Cmd):
         options_commands = [o.command for o in options]
         options_ticked = [i for i, v in enumerate(options) if v.ticked]
 
-        with ui.small_section(self.console, "Export menu") as ss:
+        with ui.small_section(self.console, message="Select one or more.") as ss:
             prompt_user_with_menu = True
             if prompt_user_with_menu:
                 selection = select_multiple(
@@ -449,9 +449,8 @@ class Mescal(Cmd):
                 ):
                     do = getattr(self, options_commands[i])
                     do("")
-                    ss.print("Saved {}.".format(options_labels[i]))
             else:
-                ss.print("Nothing saved.")
+                pass
         return False
 
     def can(self, x):
