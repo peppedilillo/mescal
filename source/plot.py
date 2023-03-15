@@ -14,9 +14,6 @@ matplotlib.rcParams = fcm.changeRCParams(
     matplotlib.rcParams, color="k", tickdir="in", mpl=matplotlib,
 )
 
-# colormap = matplotlib.cm.get_cmap('hot_ur') #'inferno_r' #'hot_ur'
-# colormapBi = matplotlib.cm.get_cmap('coldwhot_u')
-
 
 def _compute_lims_for_x(radsources: dict):
     if radsources and max([r.energy for r in radsources.values()]) > 40:
@@ -26,198 +23,6 @@ def _compute_lims_for_x(radsources: dict):
 
 def _compute_lims_for_s(radsources: dict):
     return 20.0, 1000.0
-
-
-def draw_and_save_qlooks(res_cal, path, nthreads=1):
-    for quad in res_cal.keys():
-        quad_res_cal = res_cal[quad]
-        if quad_res_cal.isnull().values.any():
-            message = warn_nan_in_sdd_calib(quad)
-            logging.warning(message)
-            quad_res_cal = quad_res_cal.fillna(0)
-        fig, axs = quicklook(quad_res_cal)
-        axs[0].set_title("Calibration quicklook - Quadrant {}".format(quad))
-        fig.savefig(path(quad))
-        plt.close(fig)
-    return
-
-
-def draw_and_save_slo(res_slo, path, nthreads=1):
-    for quad in res_slo.keys():
-        quad_res_slo = res_slo[quad]
-        if quad_res_slo.isnull().values.any():
-            message = warn_nan_in_slo_table(quad)
-            logging.warning(message)
-            quad_res_slo = quad_res_slo.fillna(0)
-        fig, ax = lightout(quad_res_slo)
-        ax.set_title("Light output - Quadrant {}".format(quad))
-        fig.savefig(path(quad))
-        plt.close(fig)
-    return
-
-
-def draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads=1):
-    def helper(quad):
-        for ch in range(32):
-            fig, ax = uncalibrated(
-                xhistograms.bins,
-                xhistograms.counts[quad][ch],
-                shistograms.bins,
-                shistograms.counts[quad][ch],
-                figsize=(8, 4.5),
-            )
-            ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
-            fig.savefig(path(quad, ch))
-            plt.close(fig)
-
-    return Parallel(n_jobs=nthreads)(
-        delayed(helper)(quad) for quad in xhistograms.counts.keys()
-    )
-
-
-def draw_and_save_diagns(histograms, res_fit, path, margin=500, nthreads=1):
-    def helper(quad):
-        for ch in res_fit[quad].index:
-            fig, ax = diagnostics(
-                histograms.bins,
-                histograms.counts[quad][ch],
-                res_fit[quad].loc[ch].loc[:, "center"],
-                res_fit[quad].loc[ch].loc[:, "amp"],
-                res_fit[quad].loc[ch].loc[:, "fwhm"],
-                res_fit[quad]
-                .loc[ch]
-                .loc[:, ["lim_low", "lim_high"]]
-                .values.reshape(2, -1)
-                .T,
-                margin=margin,
-                figsize=(8, 4.5),
-            )
-            ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, quad))
-            fig.savefig(path(quad, ch))
-            plt.close(fig)
-
-    return Parallel(n_jobs=nthreads, max_nbytes=None)(
-        delayed(helper)(quad) for quad in res_fit.keys()
-    )
-
-
-def draw_and_save_channels_xspectra(
-    histograms, res_cal, radsources: dict, path, nthreads=1
-):
-    def helper(quad):
-        for ch in res_cal[quad].index:
-            enbins = (histograms.bins - res_cal[quad].loc[ch]["offset"]) / res_cal[
-                quad
-            ].loc[ch]["gain"]
-            fig, ax = spectrum(
-                enbins,
-                histograms.counts[quad][ch],
-                radsources,
-                elims=_compute_lims_for_x(radsources),
-                figsize=(8, 4.5),
-            )
-            ax.set_title("Spectra plot X - CH{:02d}Q{}".format(ch, quad))
-            fig.savefig(path(quad, ch))
-            plt.close(fig)
-
-    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
-
-
-def draw_and_save_channels_sspectra(
-    histograms, res_cal, res_slo, radsources: dict, path, nthreads=1
-):
-    def helper(quad):
-        for ch in res_slo[quad].index:
-            xenbins = (histograms.bins - res_cal[quad].loc[ch]["offset"]) / res_cal[
-                quad
-            ].loc[ch]["gain"]
-            enbins = xenbins / res_slo[quad]["light_out"].loc[ch] / PHOTOEL_PER_KEV
-
-            fig, ax = spectrum(
-                enbins,
-                histograms.counts[quad][ch],
-                radsources,
-                elims=_compute_lims_for_s(radsources),
-                figsize=(8, 4.5),
-            )
-            ax.set_title("Spectra plot S - CH{:02d}Q{}".format(ch, quad))
-            fig.savefig(path(quad, ch))
-            plt.close(fig)
-
-    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_slo.keys())
-
-
-def draw_and_save_calibrated_spectra(
-    calibrated_events, xradsources: dict, sradsources: dict, xpath, spath
-):
-    draw_and_save_xspectrum(calibrated_events, xradsources, xpath)
-    draw_and_save_sspectrum(calibrated_events, sradsources, spath)
-    return True
-
-
-def draw_and_save_xspectrum(calibrated_events, radsources: dict, path):
-    xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
-    xcounts, xbins = np.histogram(xevs["ENERGY"], bins=np.arange(2, 40, 0.05))
-
-    fig, ax = spectrum(
-        xbins,
-        xcounts,
-        radsources,
-        elims=_compute_lims_for_x(radsources),
-        figsize=(8, 4.5),
-    )
-    ax.set_title("Spectrum X")
-    fig.savefig(path)
-    plt.close(fig)
-    return True
-
-
-def draw_and_save_sspectrum(calibrated_events, radsources: dict, path):
-    sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
-    scounts, sbins = np.histogram(sevs["ENERGY"], bins=np.arange(30, 1000, 2))
-
-    fig, ax = spectrum(
-        sbins,
-        scounts,
-        radsources,
-        elims=_compute_lims_for_s(radsources),
-        figsize=(8, 4.5),
-    )
-    ax.set_title("Spectrum S")
-    fig.savefig(path)
-    plt.close(fig)
-    return True
-
-
-def draw_and_save_lins(res_cal, res_fit, radsources: dict, path, nthreads=1):
-    def helper(quad):
-        for ch in res_cal[quad].index:
-            fig, ax = linearity(
-                *res_cal[quad].loc[ch][["gain", "gain_err", "offset", "offset_err"]],
-                res_fit[quad].loc[ch].loc[:, "center"],
-                res_fit[quad].loc[ch].loc[:, "center_err"],
-                radsources,
-                figsize=(7, 7),
-            )
-            ax[0].set_title("Linearity plot - CH{:02d}Q{}".format(ch, quad))
-            fig.savefig(path(quad, ch))
-            plt.close(fig)
-
-    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
-
-
-def draw_and_save_mapres(source, en_res, detmap, path):
-    fig, ax = mapenres(source, en_res, detmap)
-    fig.savefig(path)
-    plt.close(fig)
-    return True
-
-
-def draw_and_save_mapcounts(counts, detmap, path):
-    fig, ax = mapcounts(counts, detmap)
-    fig.savefig(path)
-    plt.close(fig)
-    return True
 
 
 def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
@@ -288,62 +93,18 @@ def spectrum(enbins, counts, radsources: dict, elims=None, **kwargs):
     return fig, ax
 
 
-def linearity(
-    gain, gain_err, offset, offset_err, adcs, adcs_err, radsources: dict, **kwargs
-):
-    radsources_energies = np.array([l.energy for l in radsources.values()])
-    measured_energies_err = np.sqrt(
-        (adcs_err ** 2) * (1 / gain) ** 2
-        + (gain_err ** 2) * ((adcs - offset) / gain ** 2) ** 2
-        + (offset_err ** 2) * (1 / gain) ** 2
-    )
-    residual = gain * radsources_energies + offset - adcs
-    res_err = np.sqrt(
-        (gain_err ** 2) * (radsources_energies ** 2) + offset_err ** 2 + adcs_err ** 2
-    )
-    perc_residual = 100 * residual / adcs
-    perc_residual_err = 100 * res_err / adcs
-
-    prediction_discrepancy = (adcs - offset) / gain - radsources_energies
-    perc_prediction_discrepancy = 100 * prediction_discrepancy / radsources_energies
-    perc_measured_energies_err = 100 * measured_energies_err / radsources_energies
-
-    margin = (radsources_energies[-1] - radsources_energies[0]) / 10
-    xs = np.linspace(
-        radsources_energies[0] - margin, radsources_energies[-1] + margin, 10
-    )
-
-    fig, axs = plt.subplots(
-        3, 1, gridspec_kw={"height_ratios": [6, 3, 3]}, sharex=True, **kwargs
-    )
-    axs[0].errorbar(radsources_energies, adcs, yerr=adcs_err, fmt="o")
-    axs[0].plot(xs, gain * xs + offset)
-    axs[1].errorbar(
-        radsources_energies, perc_residual, yerr=perc_residual_err, fmt="o", capsize=5,
-    )
-    axs[2].errorbar(
-        radsources_energies,
-        perc_prediction_discrepancy,
-        yerr=perc_measured_energies_err,
-        fmt="o",
-        capsize=5,
-    )
-    axs[0].set_ylabel("ADC")
-    axs[1].set_ylabel("Residual [%]")
-    axs[2].set_ylabel("Prediction error [%]")
-    axs[2].set_xlabel("Energy [keV]")
-    return fig, axs
-
-
-def quicklook(calres, **kwargs):
+def gainoffset(sdd_calibration, **kwargs):
     percentiles = (25, 75)
-    gainpercs = np.percentile(calres["gain"], percentiles)
-    offsetpercs = np.percentile(calres["offset"], percentiles)
+    gainpercs = np.percentile(sdd_calibration["gain"], percentiles)
+    offsetpercs = np.percentile(sdd_calibration["offset"], percentiles)
+    channels = sdd_calibration.index
+    gains = sdd_calibration["gain"]
+    gains_err = sdd_calibration["gain_err"]
+    offsets = sdd_calibration["offset"]
+    ossets_err = sdd_calibration["offset_err"]
 
     fig, axs = plt.subplots(2, 1, sharex=True, **kwargs)
-    axs[0].errorbar(
-        calres.index, calres["gain"], yerr=calres["gain_err"], fmt="o",
-    )
+    axs[0].errorbar(channels, gains, yerr=gains_err, fmt="o",)
     axs[0].axhspan(
         *gainpercs,
         color="red",
@@ -356,14 +117,12 @@ def quicklook(calres, **kwargs):
     axs[0].set_xlim((0, 32))
     axs[0].legend()
 
-    axs[1].errorbar(
-        calres.index, calres["offset"], yerr=calres["offset_err"], fmt="o",
-    )
+    axs[1].errorbar(channels, offsets, yerr=ossets_err, fmt="o")
     axs[1].axhspan(*offsetpercs, color="red", alpha=0.1)
     for vo in offsetpercs:
         axs[1].axhline(vo, color="r", lw=1)
-    axs[1].set_xticks(calres.index)
-    axs[1].set_xticklabels(calres.index, rotation=45)
+    axs[1].set_xticks(channels)
+    axs[1].set_xticklabels(channels, rotation=45)
     axs[1].minorticks_off()
     axs[1].set_xlabel("Channel")
     axs[1].set_ylabel("Offset")
@@ -371,13 +130,16 @@ def quicklook(calres, **kwargs):
     return fig, axs
 
 
-def lightout(res_slo, **kwargs):
+def lightout(effective_lightout, **kwargs):
     percentiles = (25, 75)
-    ypercs = np.percentile(res_slo["light_out"], percentiles)
+    ypercs = np.percentile(effective_lightout["light_out"], percentiles)
 
     fig, ax = plt.subplots(1, 1, **kwargs)
     ax.errorbar(
-        res_slo.index, res_slo["light_out"], yerr=res_slo["light_out_err"], fmt="o",
+        effective_lightout.index,
+        effective_lightout["light_out"],
+        yerr=effective_lightout["light_out_err"],
+        fmt="o",
     )
     ax.axhspan(
         *ypercs,
@@ -389,16 +151,15 @@ def lightout(res_slo, **kwargs):
         ax.axhline(vg, color="r", lw=1)
     ax.set_xlabel("Channel")
     ax.set_ylabel("Light Output [ph/keV]")
-    ax.set_xticks(res_slo.index)
-    ax.set_xticklabels(res_slo.index, rotation=45, ha="right")
+    ax.set_xticks(effective_lightout.index)
+    ax.set_xticklabels(effective_lightout.index, rotation=45, ha="right")
     ax.minorticks_off()
     ax.set_xlim((0, 32))
     ax.legend()
     return fig, ax
 
 
-# mapplot utilities
-
+# detector map plot utilities
 quadtext = np.array(
     [
         [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
@@ -491,17 +252,17 @@ def _mapplot(mat, detmap, colorlabel, maskvalue=None, **kwargs):
     return fig, ax
 
 
-def mapenres(source: str, en_res, detmap):
+def mapenres(source: str, energy_resolution, detmap):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
         [0, 1, 2, 3], ["A", "B", "C", "D"], [(0, 0), (5, 0), (0, 6), (5, 6)],
     ):
-        if quad in en_res.keys():
+        if quad in energy_resolution.keys():
             quadmap = np.array(detmap[quad])
-            channels = en_res[quad][source].index
+            channels = energy_resolution[quad][source].index
             chns_indeces = quadmap[channels]
-            values = en_res[quad][source]["resolution"].values
+            values = energy_resolution[quad][source]["resolution"].values
 
             rows, cols = chns_indeces.T
             mat[rows + ty, cols + tx] = values
@@ -510,6 +271,28 @@ def mapenres(source: str, en_res, detmap):
         mat, detmap, colorlabel="Energy resolution [keV]", maskvalue=0, figsize=(8, 8),
     )
     ax.set_title("{} energy resolution".format(source))
+    return fig, ax
+
+
+def maplightout(effective_lightout, detmap):
+    mat = np.zeros((12, 10))
+
+    for i, quad, (tx, ty) in zip(
+        [0, 1, 2, 3], ["A", "B", "C", "D"], [(0, 0), (5, 0), (0, 6), (5, 6)],
+    ):
+        if quad in effective_lightout.keys():
+            quadmap = np.array(detmap[quad])
+            channels = effective_lightout[quad].index
+            chns_indeces = quadmap[channels]
+            values = effective_lightout[quad]["light_out"].values
+
+            rows, cols = chns_indeces.T
+            mat[rows + ty, cols + tx] = values
+
+    fig, ax = _mapplot(
+        mat, detmap, colorlabel="Light output (ph/keV)", maskvalue=0, figsize=(8, 8),
+    )
+    ax.set_title("Light output")
     return fig, ax
 
 
@@ -532,3 +315,189 @@ def mapcounts(counts, detmap):
     fig, ax = _mapplot(mat, detmap, colorlabel="Counts", maskvalue=0, figsize=(8, 8),)
     ax.set_title("Per-channel counts (pixel events)")
     return fig, ax
+
+
+# next functions prepare and ship plots via export
+def draw_and_save_gainoffset(sdd_calibration, path, nthreads=1):
+    for quad in sdd_calibration.keys():
+        quad_res_cal = sdd_calibration[quad]
+        if quad_res_cal.isnull().values.any():
+            message = warn_nan_in_sdd_calib(quad)
+            logging.warning(message)
+            quad_res_cal = quad_res_cal.fillna(0)
+        fig, axs = gainoffset(quad_res_cal)
+        axs[0].set_title("Calibration quicklook - Quadrant {}".format(quad))
+        fig.savefig(path(quad))
+        plt.close(fig)
+    return
+
+
+def draw_and_save_lightout(effective_lightout, path):
+    for quad in effective_lightout.keys():
+        quad_res_slo = effective_lightout[quad]
+        if quad_res_slo.isnull().values.any():
+            message = warn_nan_in_slo_table(quad)
+            logging.warning(message)
+            quad_res_slo = quad_res_slo.fillna(0)
+        fig, ax = lightout(quad_res_slo)
+        ax.set_title("Light output - Quadrant {}".format(quad))
+        fig.savefig(path(quad))
+        plt.close(fig)
+    return
+
+
+def draw_and_save_uncalibrated(xhistograms, shistograms, path, nthreads=1):
+    def helper(quad):
+        for ch in range(32):
+            fig, ax = uncalibrated(
+                xhistograms.bins,
+                xhistograms.counts[quad][ch],
+                shistograms.bins,
+                shistograms.counts[quad][ch],
+                figsize=(8, 4.5),
+            )
+            ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
+            fig.savefig(path(quad, ch))
+            plt.close(fig)
+
+    return Parallel(n_jobs=nthreads)(
+        delayed(helper)(quad) for quad in xhistograms.counts.keys()
+    )
+
+
+def draw_and_save_diagns(histograms, fit_results, path, margin=500, nthreads=1):
+    def helper(quad):
+        for ch in fit_results[quad].index:
+            fig, ax = diagnostics(
+                histograms.bins,
+                histograms.counts[quad][ch],
+                fit_results[quad].loc[ch].loc[:, "center"],
+                fit_results[quad].loc[ch].loc[:, "amp"],
+                fit_results[quad].loc[ch].loc[:, "fwhm"],
+                fit_results[quad]
+                .loc[ch]
+                .loc[:, ["lim_low", "lim_high"]]
+                .values.reshape(2, -1)
+                .T,
+                margin=margin,
+                figsize=(8, 4.5),
+            )
+            ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, quad))
+            fig.savefig(path(quad, ch))
+            plt.close(fig)
+
+    return Parallel(n_jobs=nthreads, max_nbytes=None)(
+        delayed(helper)(quad) for quad in fit_results.keys()
+    )
+
+
+def draw_and_save_channels_xspectra(
+    histograms, sdd_calibration, radsources: dict, path, nthreads=1
+):
+    def helper(quad):
+        for ch in sdd_calibration[quad].index:
+            offsets = sdd_calibration[quad].loc[ch]["offset"]
+            gains = sdd_calibration[quad].loc[ch]["gain"]
+
+            enbins = (histograms.bins - offsets) / gains
+            fig, ax = spectrum(
+                enbins,
+                histograms.counts[quad][ch],
+                radsources,
+                elims=_compute_lims_for_x(radsources),
+                figsize=(8, 4.5),
+            )
+            ax.set_title("Spectra plot X - CH{:02d}Q{}".format(ch, quad))
+            fig.savefig(path(quad, ch))
+            plt.close(fig)
+
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in sdd_calibration.keys())
+
+
+def draw_and_save_channels_sspectra(
+    histograms, sdd_calibration, effective_lightout, radsources: dict, path, nthreads=1
+):
+    def helper(quad):
+        for ch in effective_lightout[quad].index:
+            offsets = sdd_calibration[quad].loc[ch]["offset"]
+            gains = sdd_calibration[quad].loc[ch]["gain"]
+            light_outs = effective_lightout[quad]["light_out"].loc[ch]
+
+            xenbins = (histograms.bins - offsets) / gains
+            enbins = xenbins / light_outs / PHOTOEL_PER_KEV
+
+            fig, ax = spectrum(
+                enbins,
+                histograms.counts[quad][ch],
+                radsources,
+                elims=_compute_lims_for_s(radsources),
+                figsize=(8, 4.5),
+            )
+            ax.set_title("Spectra plot S - CH{:02d}Q{}".format(ch, quad))
+            fig.savefig(path(quad, ch))
+            plt.close(fig)
+
+    return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in effective_lightout.keys())
+
+
+def draw_and_save_calibrated_spectra(
+    calibrated_events, xradsources: dict, sradsources: dict, xpath, spath
+):
+    draw_and_save_xspectrum(calibrated_events, xradsources, xpath)
+    draw_and_save_sspectrum(calibrated_events, sradsources, spath)
+    return True
+
+
+def draw_and_save_xspectrum(calibrated_events, radsources: dict, path):
+    xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
+    xcounts, xbins = np.histogram(xevs["ENERGY"], bins=np.arange(2, 40, 0.05))
+
+    fig, ax = spectrum(
+        xbins,
+        xcounts,
+        radsources,
+        elims=_compute_lims_for_x(radsources),
+        figsize=(8, 4.5),
+    )
+    ax.set_title("Spectrum X")
+    fig.savefig(path)
+    plt.close(fig)
+    return True
+
+
+def draw_and_save_sspectrum(calibrated_events, radsources: dict, path):
+    sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
+    scounts, sbins = np.histogram(sevs["ENERGY"], bins=np.arange(30, 1000, 2))
+
+    fig, ax = spectrum(
+        sbins,
+        scounts,
+        radsources,
+        elims=_compute_lims_for_s(radsources),
+        figsize=(8, 4.5),
+    )
+    ax.set_title("Spectrum S")
+    fig.savefig(path)
+    plt.close(fig)
+    return True
+
+
+def draw_and_save_maplightout(effective_lightout, detmap, path):
+    fig, ax = maplightout(effective_lightout, detmap)
+    fig.savefig(path)
+    plt.close(fig)
+    return True
+
+
+def draw_and_save_mapenres(source, energy_resolution, detmap, path):
+    fig, ax = mapenres(source, energy_resolution, detmap)
+    fig.savefig(path)
+    plt.close(fig)
+    return True
+
+
+def draw_and_save_mapcounts(counts, detmap, path):
+    fig, ax = mapcounts(counts, detmap)
+    fig.savefig(path)
+    plt.close(fig)
+    return True

@@ -30,7 +30,7 @@ def logo():
 
 
 def hello():
-    console = Console(theme=Theme({"log.time": "cyan"}))
+    console = Console(theme=Theme({"log.time": "dim cyan"}))
     for i, line in enumerate(logo().split("\n")):
         console.print(
             line, style="bold color({})".format(int(i + 160)), justify="center",
@@ -68,10 +68,10 @@ class small_section():
     def __enter__(self):
         space = " " * max((self.width - len(self.header)) // 2, 0)
         padded_header = space + "%s" % str(self.header)
-        self.print("\n[i]%s[/i]" % str(padded_header))
+        self.print("[i]%s[/i]" % str(padded_header), justify="right")
         self.print(Rule(style="green"))
         if self.message:
-            self.print("[i]" + self.message + "\n")
+            self.print("[i]" + self.message + "\n", justify="right")
         return self
 
     def __exit__(self,exc_type, exc_val, exc_tb):

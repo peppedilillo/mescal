@@ -99,18 +99,29 @@ fm3 = {
           (1, 2), (1, 3), (1, 4), (0, 4), (0, 3), (0, 2), (0, 1), (0, 0)),
 }
 
+fm4 = {
+    'D': ((0, 2), (0, 4), (0, 1), UNBOND, (0, 3), (0, 0), UNBOND, (1, 3),
+          (1, 0), (1, 4), (1, 1), (1, 2), (2, 4), (2, 2), (2, 3), (2, 1),
+          (2, 0), (3, 0), (3, 1), (3, 3), (3, 2), (3, 4), (4, 2), (4, 1),
+          (4, 0), (5, 1), (4, 4), (5, 3), (4, 3), (5, 4), (5, 2), (5, 0)),
+    'C': ((0, 0), (0, 1), (0, 4), (0, 3), (0, 2), (1, 0), (1, 3), (1, 1),
+          (1, 4), (1, 2), (2, 2), (2, 4), (2, 1), (2, 3), (2, 0), (3, 0),
+          (3, 3), (3, 1), (3, 4), (3, 2), (4, 4), (4, 2), (4, 1), (4, 0),
+          (4, 3), (5, 0), UNBOND, UNBOND, (5, 3), (5, 1), (5, 4), (5, 2)),
+    'B': ((5, 4), (5, 3), (5, 2), (5, 0), (5, 1), (4, 4), (4, 0), (4, 1),
+          (4, 3), (3, 0), (4, 2), (3, 1), (3, 2), (3, 4), (3, 3), (2, 1),
+          (2, 4), (2, 0), (2, 3), (2, 2), UNBOND, (1, 2), UNBOND, (1, 3),
+          (1, 0), (1, 4), (1, 1), (0, 4), (0, 3), (0, 1), (0, 2), (0, 0)),
+    'A': ((5, 0), (5, 1), (5, 2), UNBOND, (5, 3), (4, 1), (4, 0), (3, 0),
+          (3, 1), (5, 4), UNBOND, (3, 4), (4, 4), (3, 2), (4, 3), (3, 3),
+          (4, 2), (2, 4), (2, 3), (2, 2), (2, 1), (2, 0), (1, 0), (1, 1),
+          (1, 2), (1, 3), (1, 4), (0, 4), (0, 3), (0, 2), (0, 1), (0, 0)),
+}
+
 
 def get_quadrant_map(model: str, quad: str, arr_borders):
-    if model == "dm":
-        detector_map = dm
-    elif model == "fm1":
-        detector_map = fm1
-    elif model == "pfm":
-        detector_map = pfm
-    elif model == "fm2":
-        detector_map = fm2
-    elif model == "fm3":
-        detector_map = fm3
+    if model in available_detectors:
+        detector_map = available_detectors[model]
     else:
         raise ValueError("Model Unknown.")
 
@@ -142,11 +153,21 @@ def get_couples(model):
 
 class Detector:
     UNBOND = UNBOND
+
     def __init__(self, model):
         self.label = model
         self.map = get_map(model)
         self.couples = get_couples(model)
 
+
+available_detectors = {
+    "dm" : dm,
+    "fm1": fm1,
+    "pfm": pfm,
+    "fm2": fm2,
+    "fm3": fm3,
+    "fm4": fm4,
+}
 
 # will run some test on detector maps
 if __name__ == '__main__':
@@ -156,16 +177,13 @@ if __name__ == '__main__':
     ROWS = 6
     COLS = 5
 
-    for map, model in zip(
-            [dm, fm1, pfm, fm2, fm3],
-            ['dm', 'fm1', 'pfm', 'fm2', 'fm3']
-    ):
+    for model, map_ in available_detectors.items():
         # checks for 4 quadrants
-        assert len(map.keys()) == TOT_QUAD
-        for quadrant in map.keys():
+        assert len(map_.keys()) == TOT_QUAD
+        for quadrant in map_.keys():
             print("testing quadrant {} of {}..".format(quadrant, model))
-            channels = [sdd for sdd in map[quadrant]]
-            bonded = [sdd for sdd in map[quadrant] if sdd != UNBOND]
+            channels = [sdd for sdd in map_[quadrant]]
+            bonded = [sdd for sdd in map_[quadrant] if sdd != UNBOND]
             # checks for 32 channels
             assert len(channels) == TOT_CH
             # checks for no duplicates in each quadrant
@@ -174,11 +192,11 @@ if __name__ == '__main__':
             for row, col in bonded:
                 assert row < ROWS
                 assert col < COLS
-            if not ((model=='dm') and quadrant in ['B', 'C', 'D']):
+            if not ((model == 'dm') and quadrant in ['B', 'C', 'D']):
                 # checks for 2 unbounded channels
                 assert len(set(bonded)) == TOT_BONDED
                 # check for all places to be assigned
                 for row in range(ROWS):
                     for column in range(COLS):
                         assert (row, column) in bonded
-    print("Good news! All tests passed.")
+    print("\nGood news! All tests passed.")

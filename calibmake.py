@@ -16,7 +16,7 @@ from source.calibrate import PEAKS_PARAMS, Calibrate
 from source.cli import elementsui as ui
 from source.cli.beaupy.beaupy import select_multiple
 from source.cli.cmd import Cmd
-from source.detectors import Detector
+from source.detectors import Detector, available_detectors
 from source.io import (
     get_writer,
     pandas_from_LV0d5,
@@ -28,11 +28,11 @@ from source.plot import (
     draw_and_save_channels_sspectra,
     draw_and_save_channels_xspectra,
     draw_and_save_diagns,
-    draw_and_save_lins,
     draw_and_save_mapcounts,
-    draw_and_save_mapres,
-    draw_and_save_qlooks,
-    draw_and_save_slo,
+    draw_and_save_maplightout,
+    draw_and_save_mapenres,
+    draw_and_save_gainoffset,
+    draw_and_save_lightout,
     draw_and_save_uncalibrated,
     mapcounts,
     uncalibrated,
@@ -48,7 +48,7 @@ parser = argparse.ArgumentParser(description=description)
 
 parser.add_argument(
     "model",
-    choices=["dm", "fm1", "pfm", "fm2", "fm3"],
+    choices=available_detectors,
     help="hermes flight model to calibrate. ",
 )
 
@@ -97,9 +97,8 @@ def start_logger(args):
         len_logo = len(ui.logo().split("\n")[0])
         version_message = "version " + get_version()
         if len_logo > len(version_message) + 1:
-            f.write(
-                " " * (len_logo - len(version_message) + 1) + version_message + "\n\n"
-            )
+            padding = " " * (len_logo - len(version_message) + 1)
+            f.write(padding + version_message + "\n\n")
         else:
             f.write(version_message + "\n\n")
     logging.basicConfig(
@@ -282,40 +281,39 @@ class Mescal(Cmd):
         """Prepares and exports base calibration results."""
         write_report = get_writer(output_format)
 
-        if not self.calibration.sdd_cal and not self.calibration.optical_coupling:
+        if not self.calibration.sdd_calibration and not self.calibration.effective_lightout:
             self.console.log("[bold red]:red_circle: Calibration failed.")
-        elif not self.calibration.sdd_cal or not self.calibration.optical_coupling:
+        elif not self.calibration.sdd_calibration or not self.calibration.effective_lightout:
             self.console.log(
                 "[bold yellow]:yellow_circle: Calibration partially complete. "
             )
         else:
             self.console.log(":green_circle: Calibration complete.")
 
-        if self.calibration.sdd_cal:
+        if self.calibration.sdd_calibration:
             write_report(
-                self.calibration.sdd_cal, path=paths.CALREPORT(filepath),
+                self.calibration.sdd_calibration, path=paths.CALREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote SDD calibration results.")
             write_report(
-                self.calibration.en_res, path=paths.RESREPORT(filepath),
+                self.calibration.energy_resolution, path=paths.RESREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote energy resolution results.")
-            draw_and_save_qlooks(
-                self.calibration.sdd_cal,
+            draw_and_save_gainoffset(
+                self.calibration.sdd_calibration,
                 path=paths.QLKPLOT(filepath),
                 nthreads=self.threads,
             )
             self.console.log(":chart_increasing: Saved X fit quicklook plots.")
 
-        if self.calibration.optical_coupling:
+        if self.calibration.effective_lightout:
             write_report(
-                self.calibration.optical_coupling, path=paths.SLOREPORT(filepath),
+                self.calibration.effective_lightout, path=paths.SLOREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote scintillators calibration results.")
-            draw_and_save_slo(
-                self.calibration.optical_coupling,
+            draw_and_save_lightout(
+                self.calibration.effective_lightout,
                 path=paths.SLOPLOT(filepath),
-                nthreads=self.threads,
             )
             self.console.log(":chart_increasing: Saved light-output plots.")
 
@@ -330,7 +328,14 @@ class Mescal(Cmd):
             self.console.log(":chart_increasing: Saved calibrated spectra plots.")
         return True
 
-    # shell prompt commands
+    def can(self, x):
+        """Checks if a command can be executed."""
+        assert("can" + x in dir(self.__class__))
+        func = getattr(self, "can" + x)
+        return func()
+
+    # to each command accessible from the shell corresponds one "do_" function.
+    # only actions not requiring calibration should have a "do_" function.
     def do_quit(self, arg):
         """Quits mescal.
         It's the only do-command to return True.
@@ -398,30 +403,19 @@ class Mescal(Cmd):
         return False
 
     def do_export(self, arg):
-        """Prompts user on optional exports."""
-        cmds = [
-            "svhistplot",
-            "svdiags",
-            "svtabfit",
-            "svxplots",
-            "svlinplots",
-            "svsplots",
-            "svmapres",
-            "svmapcounts",
-        ]
-
+        """Prompts user on plots and tables to export."""
         Option = namedtuple("Option", ["label", "command", "ticked",])
         all_options = [
-            Option("uncalibrated histogram plots", "svhistplot", True),
-            Option("X diagnostic plots", "svxdiags", True),
-            Option("S diagnostic plots", "svsdiags", False),
-            Option("linearity plots", "svlinplots", False),
-            Option("per-channel X spectra plots", "svxplots", False),
-            Option("per-channel S spectra plots", "svsplots", False),
-            Option("energy resolution map", "svmapres", True),
-            Option("channel counts map", "svmapcounts", True),
-            Option("fit tables", "svtabfit", True),
-            Option("calibrated events fits file", "svevents", False),
+            Option("raw histogram plots", "_svhistplot", True),
+            Option("X diagnostic plots", "_svxdiags", True),
+            Option("S diagnostic plots", "_svsdiags", False),
+            Option("X spectra plots", "_svxplots", False),
+            Option("S spectra plots", "_svsplots", False),
+            Option("energy resolution map", "_svmapres", False),
+            Option("channel counts map", "_svmapcounts", True),
+            Option("effective light output map", "_svmapslo", False),
+            Option("fit tables", "_svtabfit", True),
+            Option("calibrated events fits", "_svevents", False),
         ]
 
         options = [o for o in all_options if self.can(o.command)]
@@ -429,7 +423,11 @@ class Mescal(Cmd):
         options_commands = [o.command for o in options]
         options_ticked = [i for i, v in enumerate(options) if v.ticked]
 
-        with ui.small_section(self.console, "Export menu") as ss:
+        with ui.small_section(
+                self.console,
+                "Export menu",
+                message="Select one or more."
+        ) as ss:
             prompt_user_with_menu = True
             if prompt_user_with_menu:
                 selection = select_multiple(
@@ -443,10 +441,7 @@ class Mescal(Cmd):
                 selection = [i for i, _ in enumerate(options)]
 
             if selection:
-                for i in sorted(
-                        selection,
-                        key=lambda i: -len(options_labels[i]),
-                ):
+                for i in selection:
                     do = getattr(self, options_commands[i])
                     do("")
                     ss.print("Saved {}.".format(options_labels[i]))
@@ -454,28 +449,30 @@ class Mescal(Cmd):
                 ss.print("Nothing saved.")
         return False
 
-    def can(self, x):
-        """Checks if a command can be executed."""
-        if "can_" + x not in dir(self.__class__):
-            # if a can_ method is not defined we assume the command
-            # to always be executable.
-            return True
-        else:
-            func = getattr(self, "can_" + x)
-            return func()
+    def can_svmapcounts(self):
+        return True
 
-    def svmapcounts(self, arg):
+    def _svmapcounts(self, arg):
         """Saves a map of per-channel counts."""
+        if not self.can_svmapcounts():
+            self.console.print(self.invalid_command_message)
+            return False
         with self.console.status(self.spinner_message):
             draw_and_save_mapcounts(
                 self.calibration.counts(),
                 self.calibration.detector.map,
-                paths.CNTPLOT(self.args.filepath),
+                paths.CNTMAP(self.args.filepath),
             )
         return False
 
-    def svhistplot(self, arg):
+    def can_svhistplot(self):
+        return True
+
+    def _svhistplot(self, arg):
         """Save raw acquisition histogram plots."""
+        if not self.can_svhistplot():
+            self.console.print(self.invalid_command_message)
+            return False
         with self.console.status(self.spinner_message):
             draw_and_save_uncalibrated(
                 self.calibration.xhistograms,
@@ -486,11 +483,11 @@ class Mescal(Cmd):
         return False
 
     def can_svmapres(self):
-        if self.calibration.xradsources().keys() and self.calibration.en_res:
+        if self.calibration.xradsources().keys() and self.calibration.energy_resolution:
             return True
         return False
 
-    def svmapres(self, arg):
+    def _svmapres(self, arg):
         """Saves a map of channels' energy resolution."""
         if not self.can_svmapres():
             self.console.print(self.invalid_command_message)
@@ -498,11 +495,29 @@ class Mescal(Cmd):
         with self.console.status(self.spinner_message):
             decays = self.calibration.xradsources()
             source = sorted(decays, key=lambda source: decays[source].energy)[0]
-            draw_and_save_mapres(
+            draw_and_save_mapenres(
                 source,
-                self.calibration.en_res,
+                self.calibration.energy_resolution,
                 self.calibration.detector.map,
-                paths.RESPLOT(self.args.filepath),
+                paths.ERESMAP(self.args.filepath),
+            )
+        return False
+
+    def can_svmapslo(self):
+        if self.calibration.effective_lightout:
+            return True
+        return False
+
+    def _svmapslo(self, arg):
+        """Saves a map of channels' energy resolution."""
+        if not self.can_svmapslo():
+            self.console.print(self.invalid_command_message)
+            return False
+        with self.console.status(self.spinner_message):
+            draw_and_save_maplightout(
+                self.calibration.effective_lightout,
+                self.calibration.detector.map,
+                paths.SLOMAP(self.args.filepath),
             )
         return False
 
@@ -511,7 +526,7 @@ class Mescal(Cmd):
             return True
         return False
 
-    def svxdiags(self, arg):
+    def _svxdiags(self, arg):
         """Save X peak detection diagnostics plots."""
         if not self.can_svxdiags():
             self.console.print(self.invalid_command_message)
@@ -531,7 +546,7 @@ class Mescal(Cmd):
             return True
         return False
 
-    def svsdiags(self, arg):
+    def _svsdiags(self, arg):
         """Save X peak detection diagnostics plots."""
         if not self.can_svsdiags():
             self.console.print(self.invalid_command_message)
@@ -551,7 +566,7 @@ class Mescal(Cmd):
             return True
         return False
 
-    def svtabfit(self, arg):
+    def _svtabfit(self, arg):
         """Save X fit tables."""
         if not self.can_svtabfit():
             self.console.print(self.invalid_command_message)
@@ -568,11 +583,11 @@ class Mescal(Cmd):
         return False
 
     def can_svxplots(self):
-        if self.calibration.sdd_cal:
+        if self.calibration.sdd_calibration:
             return True
         return False
 
-    def svxplots(self, arg):
+    def _svxplots(self, arg):
         """Save calibrated X channel spectra."""
         if not self.can_svxplots():
             self.console.print(self.invalid_command_message)
@@ -580,39 +595,19 @@ class Mescal(Cmd):
         with self.console.status(self.spinner_message):
             draw_and_save_channels_xspectra(
                 self.calibration.xhistograms,
-                self.calibration.sdd_cal,
+                self.calibration.sdd_calibration,
                 self.calibration.xradsources(),
                 paths.XCSPLOT(self.args.filepath),
                 nthreads=self.threads,
             )
         return False
 
-    def can_svlinplots(self):
-        if self.calibration.sdd_cal:
-            return True
-        return False
-
-    def svlinplots(self, arg):
-        """Save SDD linearity plots."""
-        if not self.can_svlinplots():
-            self.console.print(self.invalid_command_message)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_lins(
-                self.calibration.sdd_cal,
-                self.calibration.xfit,
-                self.calibration.xradsources(),
-                paths.LINPLOT(self.args.filepath),
-                nthreads=self.threads,
-            )
-        return False
-
     def can_svsplots(self):
-        if self.calibration.optical_coupling:
+        if self.calibration.effective_lightout:
             return True
         return False
 
-    def svsplots(self, arg):
+    def _svsplots(self, arg):
         """Save calibrated gamma channel spectra."""
         if not self.can_svsplots():
             self.console.print(self.invalid_command_message)
@@ -620,8 +615,8 @@ class Mescal(Cmd):
         with self.console.status(self.spinner_message):
             draw_and_save_channels_sspectra(
                 self.calibration.shistograms,
-                self.calibration.sdd_cal,
-                self.calibration.optical_coupling,
+                self.calibration.sdd_calibration,
+                self.calibration.effective_lightout,
                 self.calibration.sradsources(),
                 paths.SCSPLOT(self.args.filepath),
                 nthreads=self.threads,
@@ -633,7 +628,7 @@ class Mescal(Cmd):
             return True
         return False
 
-    def svevents(self, arg):
+    def _svevents(self, arg):
         """Save calibrated events to fits file."""
         if not self.can_svevents():
             self.console.print(self.invalid_command_message)

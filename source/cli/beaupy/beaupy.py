@@ -330,8 +330,7 @@ def select_multiple(
         error_message = ""
         while True:
             rendered = (
-                "[i]Select one or more.[/]\n\n"
-                + "\n".join(
+                "\n".join(
                     [
                         _render_option_select_multiple(
                             option=preprocessor(option),
@@ -344,7 +343,7 @@ def select_multiple(
                         for i, option in enumerate(options)
                     ]
                 )
-                + "\n\n(mark=[bold]space[/bold], confirm=[bold]enter[/bold], cancel=[bold]esc[/bold])"  # noqa: W503
+                + "\n\n[bold]space[/bold] mark, [bold]enter[/bold] confirm, [bold]esc[/bold] cancel"
             )
             if error_message:
                 rendered = f"{rendered}\n[red]Error:[/red] {error_message}"

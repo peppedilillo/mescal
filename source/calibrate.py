@@ -197,10 +197,10 @@ class Calibrate:
         self.xfit = {}
         self.sfit = {}
         self.efit = {}
-        self.sdd_cal = {}
-        self.en_res = {}
-        self.scint_cal = {}
-        self.optical_coupling = {}
+        self.sdd_calibration = {}
+        self.energy_resolution = {}
+        self.scintillator_calibration = {}
+        self.effective_lightout = {}
         self.flagged = {}
         self.console = console
         self.nthreads = nthreads
@@ -270,8 +270,8 @@ class Calibrate:
                 message = err.warn_failed_peak_detection(quad, ch)
                 logging.warning(message)
         self.xfit = self._fit_xradsources()
-        self.sdd_cal = self._calibrate_sdds()
-        self.en_res = self._compute_energy_resolution()
+        self.sdd_calibration = self._calibrate_sdds()
+        self.energy_resolution = self._compute_energy_resolution()
         self._print(":white_check_mark: Analyzed X events.")
 
         # S calibration
@@ -280,21 +280,21 @@ class Calibrate:
         self.speaks = self._detect_speaks()
         self.sfit = self._fit_sradsources()
         electron_evlist = make_electron_list(
-            self.data, self.sdd_cal, self.sfit, self.detector.couples, self.nthreads,
+            self.data, self.sdd_calibration, self.sfit, self.detector.couples, self.nthreads,
         )
         self.ebins = linrange(1000, 25000, 50)
         self.ehistograms = self._make_ehistograms(electron_evlist)
         self.epeaks = self._detect_epeaks()
         self.efit = self._fit_gamma_electrons()
-        self.scint_cal = self._calibrate_scintillators()
-        self.optical_coupling = self._compute_effective_light_outputs()
+        self.scintillator_calibration = self._calibrate_scintillators()
+        self.effective_lightout = self._compute_effective_light_outputs()
         self._print(":white_check_mark: Analyzed S events.")
 
-        if not self.scint_cal:
+        if not self.scintillator_calibration:
             return None
         try:
             eventlist = electrons_to_energy(
-                electron_evlist, self.scint_cal, self.detector.couples
+                electron_evlist, self.scintillator_calibration, self.detector.couples
             )
         except err.CalibratedEventlistError:
             logging.warning("Event list creation failed.")
@@ -475,11 +475,11 @@ class Calibrate:
         energies = [s.energy for s in radiation_sources.values()]
 
         results = {}
-        for quad in self.sdd_cal.keys():
-            for ch in self.sdd_cal[quad].index:
+        for quad in self.sdd_calibration.keys():
+            for ch in self.sdd_calibration[quad].index:
                 counts = self.shistograms.counts[quad][ch]
-                gain = self.sdd_cal[quad].loc[ch]["gain"]
-                offset = self.sdd_cal[quad].loc[ch]["offset"]
+                gain = self.sdd_calibration[quad].loc[ch]["gain"]
+                offset = self.sdd_calibration[quad].loc[ch]["offset"]
 
                 try:
                     limits = find_speaks(
@@ -487,7 +487,7 @@ class Calibrate:
                     )
                 except err.DetectPeakError:
                     companion = self._companion(quad, ch)
-                    if companion in self.sdd_cal[quad].index:
+                    if companion in self.sdd_calibration[quad].index:
                         message = err.warn_failed_peak_detection(quad, ch)
                         logging.warning(message)
                     else:
@@ -647,9 +647,9 @@ class Calibrate:
         results = {}
         radiation_sources = self.xradsources()
 
-        for quad in self.sdd_cal.keys():
+        for quad in self.sdd_calibration.keys():
             fit = self.xfit[quad]
-            cal = self.sdd_cal[quad]
+            cal = self.sdd_calibration[quad]
 
             assert np.isin(cal.index, fit.index).all()
             for ch in cal.index:
@@ -705,9 +705,9 @@ class Calibrate:
             "offset",
             "offset_err",
         ]
-        cell_cal = self.sdd_cal[quad].loc[scint][params].to_list()
+        cell_cal = self.sdd_calibration[quad].loc[scint][params].to_list()
         companion = self.detector.couples[quad][cell]
-        comp_cal = self.sdd_cal[quad].loc[companion][params].to_list()
+        comp_cal = self.sdd_calibration[quad].loc[companion][params].to_list()
 
         centers_cell = self.sfit[quad].loc[cell][:, "center"].values
         centers_comp = self.sfit[quad].loc[companion][:, "center"].values
@@ -735,7 +735,7 @@ class Calibrate:
 
                 try:
                     lo, lo_err = (
-                        self.scint_cal[quad]
+                        self.scintillator_calibration[quad]
                         .loc[scint][["light_out", "light_out_err",]]
                         .to_list()
                     )
@@ -747,14 +747,14 @@ class Calibrate:
 
                 else:
                     centers = self.sfit[quad].loc[ch][:, "center"].values
-                    gain, offset = self.sdd_cal[quad].loc[ch][["gain", "offset"]].values
+                    gain, offset = self.sdd_calibration[quad].loc[ch][["gain", "offset"]].values
                     centers_electrons = (centers - offset) / gain / PHOTOEL_PER_KEV
 
                     centers_companion = (
                         self.sfit[quad].loc[companion][:, "center"].values
                     )
                     gain_comp, offset_comp = (
-                        self.sdd_cal[quad].loc[companion][["gain", "offset"]].values
+                        self.sdd_calibration[quad].loc[companion][["gain", "offset"]].values
                     )
                     centers_electrons_comp = (
                         (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
