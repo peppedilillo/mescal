@@ -399,29 +399,29 @@ class Mescal(Cmd):
 
     def do_export(self, arg):
         """Prompts user on optional exports."""
-        cmds = [
-            "svhistplot",
-            "svdiags",
-            "svtabfit",
-            "svxplots",
-            "svlinplots",
-            "svsplots",
-            "svmapres",
-            "svmapcounts",
-        ]
 
         Option = namedtuple("Option", ["label", "command", "ticked",])
+        # all_options = [
+        #     Option("uncalibrated histogram plots", "svhistplot", True),
+        #     Option("X diagnostic plots", "svxdiags", True),
+        #     Option("S diagnostic plots", "svsdiags", False),
+        #     Option("linearity plots", "svlinplots", False),
+        #     Option("per-channel X spectra plots", "svxplots", False),
+        #     Option("per-channel S spectra plots", "svsplots", False),
+        #     Option("energy resolution map", "svmapres", True),
+        #     Option("channel counts map", "svmapcounts", True),
+        #     Option("fit tables", "svtabfit", True),
+        #     Option("calibrated events fits file", "svevents", False),
+        # ]
+
         all_options = [
-            Option("uncalibrated histogram plots", "svhistplot", True),
-            Option("X diagnostic plots", "svxdiags", True),
-            Option("S diagnostic plots", "svsdiags", False),
-            Option("linearity plots", "svlinplots", False),
-            Option("per-channel X spectra plots", "svxplots", False),
-            Option("per-channel S spectra plots", "svsplots", False),
-            Option("energy resolution map", "svmapres", True),
-            Option("channel counts map", "svmapcounts", True),
-            Option("fit tables", "svtabfit", True),
-            Option("calibrated events fits file", "svevents", False),
+            Option("Save uncalibrated plots", "svhistplot", True),
+            Option("Save diagnostic plots", "svxdiags", True),
+            Option("Save linearity plots", "svlinplots", False),
+            Option("Save spectra plots per channel", "svchnplots", False),
+            Option("Save maps", "svmapres", True),
+            Option("Save fit tables", "svtabfit", True),
+            Option("Save calibrated events fits", "svevents", False),
         ]
 
         options = [o for o in all_options if self.can(o.command)]
@@ -506,6 +506,22 @@ class Mescal(Cmd):
             )
         return False
 
+    def can_svdiags(self):
+        if self.calibration.xfit or self.calibration.sfit:
+            return True
+        return False
+
+    def svdiags(self, arg):
+        """Save X and S peak detection diagnostics plots."""
+        if not self.can_svdiags():
+            self.console.print(self.invalid_command_message)
+            return False
+        if self.can_svxdiags():
+            self.svxdiags(arg)
+        if self.can_svsdiags():
+            self.svsdiags(arg)
+        return False
+
     def can_svxdiags(self):
         if self.calibration.xfit:
             return True
@@ -565,6 +581,22 @@ class Mescal(Cmd):
                 write_report_to_excel(
                     self.calibration.sfit, paths.SFTREPORT(self.args.filepath),
                 )
+        return False
+
+    def can_svchnplots(self):
+        if self.can_svxplots() or self.can_svsplots():
+            return True
+        return False
+
+    def svchnplots(self, arg):
+        """Save calibrated X channel spectra."""
+        if not self.can_svchnplots():
+            self.console.print(self.invalid_command_message)
+            return False
+        if self.can_svxplots():
+            self.svxplots(arg)
+        if self.can_svsplots():
+            self.svsplots(arg)
         return False
 
     def can_svxplots(self):
