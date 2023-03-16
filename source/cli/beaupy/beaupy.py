@@ -343,7 +343,10 @@ def select_multiple(
                         for i, option in enumerate(options)
                     ]
                 )
-                + "\n\n(mark=[bold]space[/bold], confirm=[bold]enter[/bold], cancel=[bold]esc[/bold])"  # noqa: W503
+                + "\n\n"
+                  "(mark=[bold]space[/bold], "
+                  "confirm=[bold]enter[/bold], "
+                  "cancel=[bold]esc[/bold])"  # noqa: W503
             )
             if error_message:
                 rendered = f"{rendered}\n[red]Error:[/red] {error_message}"
@@ -374,30 +377,11 @@ def select_multiple(
                 if minimal_count > len(ticked_indices):
                     error_message = f"Must select at least {minimal_count} options"
                 else:
-                    rendered = (
-                        "\n".join(
-                            [
-                                _render_option_select_multiple(
-                                    option=preprocessor(option),
-                                    ticked=i in ticked_indices,
-                                    tick_character=tick_character,
-                                    tick_style=tick_style,
-                                    selected=i in [],
-                                    cursor_style=cursor_style,
-                                )
-                                for i, option in enumerate(options)
-                            ]
-                        )
-                    )
-                    _update_rendered(live, rendered)
-                    break
-            elif keypress in DefaultKeys.escape:
-                rendered = (
-                    "\n".join(
+                    rendered = "\n".join(
                         [
                             _render_option_select_multiple(
                                 option=preprocessor(option),
-                                ticked=i in [],
+                                ticked=i in ticked_indices,
                                 tick_character=tick_character,
                                 tick_style=tick_style,
                                 selected=i in [],
@@ -406,6 +390,21 @@ def select_multiple(
                             for i, option in enumerate(options)
                         ]
                     )
+                    _update_rendered(live, rendered)
+                    break
+            elif keypress in DefaultKeys.escape:
+                rendered = "\n".join(
+                    [
+                        _render_option_select_multiple(
+                            option=preprocessor(option),
+                            ticked=i in [],
+                            tick_character=tick_character,
+                            tick_style=tick_style,
+                            selected=i in [],
+                            cursor_style=cursor_style,
+                        )
+                        for i, option in enumerate(options)
+                    ]
                 )
                 _update_rendered(live, rendered)
                 return []

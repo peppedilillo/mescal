@@ -216,8 +216,8 @@ class Mescal(Cmd):
     prompt = "[cyan]\[mescalSH] "
     spinner_message = "Working.."
     unknown_command_message = (
-        "[red]Unknown command.[/]\n[i]"
-        "Type help or ? for a list of commands.[/i]\n"
+        "[red]Unknown command.[/]\n"
+        "[i]Type help or ? for a list of commands.[/i]\n"
     )
     invalid_command_message = (
         "[red]Command unavailable.[/]\n"
