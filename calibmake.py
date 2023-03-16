@@ -416,7 +416,7 @@ class Mescal(Cmd):
         )
         all_options = [
             Option("uncalibrated plots", "svhistplot", True),
-            Option("diagnostic plots", "svxdiags", True),
+            Option("diagnostic plots", "svdiags", True),
             Option("linearity plots", "svlinplots", False),
             Option("spectra plots per channel", "svchnplots", False),
             Option("maps", "svmapres", True),
