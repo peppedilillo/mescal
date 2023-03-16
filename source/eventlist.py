@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
@@ -44,12 +46,30 @@ def _convert_gamma_events(data, scint_calibrations, couples):
         )
     )
     channel = out["CHN"] + qm
-    scint_ucid = channel.map(companion_to_channel).fillna(channel)
+    scint_ucid = channel.map(companion_to_channel).fillna(channel).astype(int)
     ucid_calibs = _as_ucid_dataframe(scint_calibrations)
-    if scint_ucid.isin(ucid_calibs.index).all():
-        energies = out["ELECTRONS"] / ucid_calibs.loc[scint_ucid]["light_out"].values
+    if np.all(scint_ucid.isin(ucid_calibs.index).values):
+        electrons = out["ELECTRONS"]
+        light_outs = ucid_calibs.loc[scint_ucid]["light_out"].values
+    elif np.any(scint_ucid.isin(ucid_calibs.index).values):
+        mask = scint_ucid.isin(ucid_calibs.index)
+        electrons = out[mask]["ELECTRONS"]
+        light_outs = ucid_calibs.loc[scint_ucid[mask]]["light_out"].values
+        uncalibrated_events = out[~mask]
+        bad_channels = (
+            uncalibrated_events[["CHN", "QUADID"]].drop_duplicates().values.tolist()
+        )
+        logging.warning(
+            "{} ({:.2f} %) events from channels {} were not calibrated.".format(
+                len(uncalibrated_events),
+                100 * len(uncalibrated_events) / len(electrons),
+                str([quad + "{:02d}".format(ch) for (ch, quad) in bad_channels])[1:-1],
+            )
+        )
     else:
         raise err.CalibratedEventlistError("failed event calibration.")
+    energies = electrons / light_outs
+
     out.insert(0, "ENERGY", energies)
     out.drop(columns=["ELECTRONS"])
     return out
@@ -63,7 +83,11 @@ def electrons_to_energy(data, scint_calibrations, couples):
 
 
 def make_electron_list(
-    data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=1,
+    data,
+    calibrated_sdds,
+    sfit_results,
+    scintillator_couples,
+    nthreads=1,
 ):
     columns = ["TIME", "ELECTRONS", "EVTYPE", "CHN", "QUADID"]
     types = ["float64", "float32", "U1", "int8", "U1"]
@@ -71,7 +95,11 @@ def make_electron_list(
     container = np.recarray(shape=0, dtype=[*dtypes.items()])
 
     disorganized_events = _get_calibrated_events(
-        data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=nthreads,
+        data,
+        calibrated_sdds,
+        sfit_results,
+        scintillator_couples,
+        nthreads=nthreads,
     )
 
     for quadrant in disorganized_events.keys():
@@ -110,12 +138,14 @@ def _get_calibrated_events(
             (data["QUADID"] == quadrant) & (data["CHN"].isin(coupled_channels))
         ]
         quadrant_data = _insert_electron_column(
-            quadrant_data, calibrated_sdds[quadrant]
+            quadrant_data,
+            calibrated_sdds[quadrant],
         )
 
         x_events = _extract_x_events(quadrant_data)
         gamma_events = _extract_gamma_events(
-            quadrant_data, scintillator_couples[quadrant]
+            quadrant_data,
+            scintillator_couples[quadrant],
         )
 
         return quadrant, (x_events, gamma_events)
@@ -145,6 +175,7 @@ def _get_coupled_channels(channels, couples):
 
 
 def _extract_gamma_events(quadrant_data, scintillator_couples):
+    assert np.any(quadrant_data.values)
     gamma_events = quadrant_data[quadrant_data["EVTYPE"] == "S"]
     channels = gamma_events["CHN"]
     companion_to_chn = {k: v for v, k in scintillator_couples.items()}
@@ -214,7 +245,10 @@ def perchannel_counts(data, channels):
             dict_.setdefault(quad, {})[ch] = counts
 
     out = {
-        k: pd.DataFrame(dict_[k], index=["counts"],).T.rename_axis("channel")
+        k: pd.DataFrame(
+            dict_[k],
+            index=["counts"],
+        ).T.rename_axis("channel")
         for k in dict_
     }
     return out
