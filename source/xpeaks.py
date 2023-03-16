@@ -54,13 +54,22 @@ def find_xpeaks(
     # look over the smoothed channel histogram counts for
     # peaks larger than a minimum.
     peaks, peaks_props = peaks_with_enough_stat(
-        counts, mincounts, initial_search_pars, smoothing=smoothing,
+        counts,
+        mincounts,
+        initial_search_pars,
+        smoothing=smoothing,
     )
     # crash and burn if we found no suitable peaks
     if len(peaks) == 0:
         raise err.DetectPeakError("no peaks!")
 
-    peaks, peaks_props = remove_baseline(bins, counts, gain_guess, peaks, peaks_props,)
+    peaks, peaks_props = remove_baseline(
+        bins,
+        counts,
+        gain_guess,
+        peaks,
+        peaks_props,
+    )
     # crash and burn if not enough peaks.
     if len(peaks) < len(energies):
         raise err.DetectPeakError("not enough peaks!")
@@ -146,10 +155,10 @@ def widthscores(bins, gain_guess, peaks_combinations_widths):
         Returns Fano noise in keV FWHM
         Input: energy in keV
         """
-        return (np.sqrt(E * 1000. / 3.6 * 0.118) * 2.35 * 3.6) / 1000
+        return (np.sqrt(E * 1000.0 / 3.6 * 0.118) * 2.35 * 3.6) / 1000
 
     gain_mean, _ = gain_guess
-    widths_bins = (bins[peaks_combinations_widths.astype(int)] - bins[0])
+    widths_bins = bins[peaks_combinations_widths.astype(int)] - bins[0]
     widths_keV = widths_bins / gain_mean
     corrected_widths_keV = fano(widths_keV)
     scores = -np.std(corrected_widths_keV, axis=1) / np.mean(corrected_widths_keV)
@@ -189,7 +198,11 @@ def linscores(bins, energies, peaks_combinations):
     for peaks in peaks_combinations:
         lmod = LinearModel()
         pars = lmod.guess(peaks, x=energies)
-        resultlin = lmod.fit(bins[peaks], pars, x=energies,)
+        resultlin = lmod.fit(
+            bins[peaks],
+            pars,
+            x=energies,
+        )
         gain = resultlin.params["slope"].value
         offset = resultlin.params["intercept"].value
         model_predictions = gain * np.array(energies) + offset
@@ -444,13 +457,19 @@ def debug_helper(
     plt.axvline(bins[baseline])
     for peak, lo, hi in zip(peaks, peaks_props["left_ips"], peaks_props["right_ips"]):
         plt.axvspan(
-            bins[int(lo)], bins[int(hi)], alpha=0.1, color="grey",
+            bins[int(lo)],
+            bins[int(hi)],
+            alpha=0.1,
+            color="grey",
         )
     for peak, lo, hi in zip(
         winpeaks, winpeaks_props["left_ips"], winpeaks_props["right_ips"]
     ):
         plt.axvspan(
-            bins[int(lo)], bins[int(hi)], alpha=0.2, color="red",
+            bins[int(lo)],
+            bins[int(hi)],
+            alpha=0.2,
+            color="red",
         )
     plt.show()
     plt.close()

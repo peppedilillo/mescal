@@ -295,11 +295,11 @@ class Cmd:
                         cmds_doc.append(cmd)
                     else:
                         cmds_undoc.append(cmd)
-            self.print_topics(self.doc_header, cmds_doc,  message="Type help <topic>.")
+            self.print_topics(self.doc_header, cmds_doc, message="Type help <topic>.")
             self.print_topics(self.misc_header, sorted(topics))
             self.print_topics(self.undoc_header, cmds_undoc)
 
-    def print_topics(self, header, cmds, message=''):
+    def print_topics(self, header, cmds, message=""):
         if cmds:
             with small_section(self.console, message=message) as ss:
                 cols = Columns(cmds, expand=True, padding=(0, 2))

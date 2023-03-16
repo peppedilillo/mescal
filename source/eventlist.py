@@ -56,10 +56,11 @@ def _convert_gamma_events(data, scint_calibrations, couples):
         electrons = out[mask]["ELECTRONS"]
         light_outs = ucid_calibs.loc[scint_ucid[mask]]["light_out"].values
         uncalibrated_events = out[~mask]
-        bad_channels = uncalibrated_events[["CHN", "QUADID"]].drop_duplicates().values.tolist()
+        bad_channels = (
+            uncalibrated_events[["CHN", "QUADID"]].drop_duplicates().values.tolist()
+        )
         logging.warning(
-            "{} ({:.2f} %) events from channels {} were not calibrated.".
-            format(
+            "{} ({:.2f} %) events from channels {} were not calibrated.".format(
                 len(uncalibrated_events),
                 100 * len(uncalibrated_events) / len(electrons),
                 str([quad + "{:02d}".format(ch) for (ch, quad) in bad_channels])[1:-1],
@@ -82,7 +83,11 @@ def electrons_to_energy(data, scint_calibrations, couples):
 
 
 def make_electron_list(
-    data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=1,
+    data,
+    calibrated_sdds,
+    sfit_results,
+    scintillator_couples,
+    nthreads=1,
 ):
     columns = ["TIME", "ELECTRONS", "EVTYPE", "CHN", "QUADID"]
     types = ["float64", "float32", "U1", "int8", "U1"]
@@ -90,7 +95,11 @@ def make_electron_list(
     container = np.recarray(shape=0, dtype=[*dtypes.items()])
 
     disorganized_events = _get_calibrated_events(
-        data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=nthreads,
+        data,
+        calibrated_sdds,
+        sfit_results,
+        scintillator_couples,
+        nthreads=nthreads,
     )
 
     for quadrant in disorganized_events.keys():
@@ -166,7 +175,7 @@ def _get_coupled_channels(channels, couples):
 
 
 def _extract_gamma_events(quadrant_data, scintillator_couples):
-    assert(np.any(quadrant_data.values))
+    assert np.any(quadrant_data.values)
     gamma_events = quadrant_data[quadrant_data["EVTYPE"] == "S"]
     channels = gamma_events["CHN"]
     companion_to_chn = {k: v for v, k in scintillator_couples.items()}
@@ -236,7 +245,10 @@ def perchannel_counts(data, channels):
             dict_.setdefault(quad, {})[ch] = counts
 
     out = {
-        k: pd.DataFrame(dict_[k], index=["counts"],).T.rename_axis("channel")
+        k: pd.DataFrame(
+            dict_[k],
+            index=["counts"],
+        ).T.rename_axis("channel")
         for k in dict_
     }
     return out

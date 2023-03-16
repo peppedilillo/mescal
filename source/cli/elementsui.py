@@ -12,14 +12,25 @@ mescal_text = "[magenta]mescal[/]"
 
 header_text = (
     Text()
-    .append("\nWelcome to ", style="italic",)
-    .append(Text().from_markup(mescal_text),)
-    .append(", a software to analyze data from the HERMES payloads.\n", style="italic",)
+    .append(
+        "\nWelcome to ",
+        style="italic",
+    )
+    .append(
+        Text().from_markup(mescal_text),
+    )
+    .append(
+        ", a software to analyze data from the HERMES payloads.\n",
+        style="italic",
+    )
     .append(
         "Made with <3 by the HERMES-TP/SP calibration team. Since 2021.\n",
         style="italic",
     )
-    .append("Software version: {}".format(get_version()), style="italic",)
+    .append(
+        "Software version: {}".format(get_version()),
+        style="italic",
+    )
 )
 
 
@@ -33,7 +44,9 @@ def hello():
     console = Console(theme=Theme({"log.time": "cyan"}))
     for i, line in enumerate(logo().split("\n")):
         console.print(
-            line, style="bold color({})".format(int(i + 160)), justify="center",
+            line,
+            style="bold color({})".format(int(i + 160)),
+            justify="center",
         )
         sleep(0.1)
     console.print(header_text, justify="center")
@@ -58,8 +71,8 @@ def shell_section_header(console, header):
     return renderable
 
 
-class small_section():
-    def __init__(self, console='', header='', message=''):
+class small_section:
+    def __init__(self, console="", header="", message=""):
         self.console = console
         self.width = int(self.console.width / 2)
         self.header = header
@@ -75,11 +88,11 @@ class small_section():
             self.print("[i]" + self.message + "\n")
         return self
 
-    def __exit__(self,exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.console.print("")
         # from fluent python
         if exc_type is ZeroDivisionError:
-            print('Please DO NOT divide by zero!')
+            print("Please DO NOT divide by zero!")
             return True
 
     def print(self, *args, **kwargs):

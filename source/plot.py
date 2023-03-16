@@ -11,7 +11,10 @@ from source.constants import PHOTOEL_PER_KEV
 from source.errors import warn_nan_in_sdd_calib, warn_nan_in_slo_table
 
 matplotlib.rcParams = fcm.changeRCParams(
-    matplotlib.rcParams, color="k", tickdir="in", mpl=matplotlib,
+    matplotlib.rcParams,
+    color="k",
+    tickdir="in",
+    mpl=matplotlib,
 )
 
 # colormap = matplotlib.cm.get_cmap('hot_ur') #'inferno_r' #'hot_ur'
@@ -235,7 +238,7 @@ def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
 
 normal = (
     lambda x, amp, sigma, x0: amp
-    * np.exp(-((x - x0) ** 2) / (2 * sigma ** 2))
+    * np.exp(-((x - x0) ** 2) / (2 * sigma**2))
     / (sigma * sqrt(2 * pi))
 )
 
@@ -293,13 +296,13 @@ def linearity(
 ):
     radsources_energies = np.array([l.energy for l in radsources.values()])
     measured_energies_err = np.sqrt(
-        (adcs_err ** 2) * (1 / gain) ** 2
-        + (gain_err ** 2) * ((adcs - offset) / gain ** 2) ** 2
-        + (offset_err ** 2) * (1 / gain) ** 2
+        (adcs_err**2) * (1 / gain) ** 2
+        + (gain_err**2) * ((adcs - offset) / gain**2) ** 2
+        + (offset_err**2) * (1 / gain) ** 2
     )
     residual = gain * radsources_energies + offset - adcs
     res_err = np.sqrt(
-        (gain_err ** 2) * (radsources_energies ** 2) + offset_err ** 2 + adcs_err ** 2
+        (gain_err**2) * (radsources_energies**2) + offset_err**2 + adcs_err**2
     )
     perc_residual = 100 * residual / adcs
     perc_residual_err = 100 * res_err / adcs
@@ -319,7 +322,11 @@ def linearity(
     axs[0].errorbar(radsources_energies, adcs, yerr=adcs_err, fmt="o")
     axs[0].plot(xs, gain * xs + offset)
     axs[1].errorbar(
-        radsources_energies, perc_residual, yerr=perc_residual_err, fmt="o", capsize=5,
+        radsources_energies,
+        perc_residual,
+        yerr=perc_residual_err,
+        fmt="o",
+        capsize=5,
     )
     axs[2].errorbar(
         radsources_energies,
@@ -342,7 +349,10 @@ def quicklook(calres, **kwargs):
 
     fig, axs = plt.subplots(2, 1, sharex=True, **kwargs)
     axs[0].errorbar(
-        calres.index, calres["gain"], yerr=calres["gain_err"], fmt="o",
+        calres.index,
+        calres["gain"],
+        yerr=calres["gain_err"],
+        fmt="o",
     )
     axs[0].axhspan(
         *gainpercs,
@@ -357,7 +367,10 @@ def quicklook(calres, **kwargs):
     axs[0].legend()
 
     axs[1].errorbar(
-        calres.index, calres["offset"], yerr=calres["offset_err"], fmt="o",
+        calres.index,
+        calres["offset"],
+        yerr=calres["offset_err"],
+        fmt="o",
     )
     axs[1].axhspan(*offsetpercs, color="red", alpha=0.1)
     for vo in offsetpercs:
@@ -377,7 +390,10 @@ def lightout(res_slo, **kwargs):
 
     fig, ax = plt.subplots(1, 1, **kwargs)
     ax.errorbar(
-        res_slo.index, res_slo["light_out"], yerr=res_slo["light_out_err"], fmt="o",
+        res_slo.index,
+        res_slo["light_out"],
+        yerr=res_slo["light_out_err"],
+        fmt="o",
     )
     ax.axhspan(
         *ypercs,
@@ -481,12 +497,20 @@ def _mapplot(mat, detmap, colorlabel, maskvalue=None, **kwargs):
             ax.text(
                 (xs[2 * i] + xs[2 * i + 1]) / 2 - wx,
                 ys[2 * j] + wy,
-                "{}{:02d}".format(["A", "B", "C", "D"][quad], chtext[::-1][j, i],),
+                "{}{:02d}".format(
+                    ["A", "B", "C", "D"][quad],
+                    chtext[::-1][j, i],
+                ),
                 color="gainsboro",
             )
     ax.set_axis_off()
     fig.colorbar(
-        pos, label=colorlabel, ax=ax, aspect=30, pad=wy / 10, location="bottom",
+        pos,
+        label=colorlabel,
+        ax=ax,
+        aspect=30,
+        pad=wy / 10,
+        location="bottom",
     )
     return fig, ax
 
@@ -495,7 +519,9 @@ def mapenres(source: str, en_res, detmap):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
-        [0, 1, 2, 3], ["A", "B", "C", "D"], [(0, 0), (5, 0), (0, 6), (5, 6)],
+        [0, 1, 2, 3],
+        ["A", "B", "C", "D"],
+        [(0, 0), (5, 0), (0, 6), (5, 6)],
     ):
         if quad in en_res.keys():
             quadmap = np.array(detmap[quad])
@@ -507,7 +533,11 @@ def mapenres(source: str, en_res, detmap):
             mat[rows + ty, cols + tx] = values
 
     fig, ax = _mapplot(
-        mat, detmap, colorlabel="Energy resolution [keV]", maskvalue=0, figsize=(8, 8),
+        mat,
+        detmap,
+        colorlabel="Energy resolution [keV]",
+        maskvalue=0,
+        figsize=(8, 8),
     )
     ax.set_title("{} energy resolution".format(source))
     return fig, ax
@@ -517,7 +547,9 @@ def mapcounts(counts, detmap):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
-        [0, 1, 2, 3], ["A", "B", "C", "D"], [(0, 0), (5, 0), (0, 6), (5, 6)],
+        [0, 1, 2, 3],
+        ["A", "B", "C", "D"],
+        [(0, 0), (5, 0), (0, 6), (5, 6)],
     ):
         if quad in counts.keys():
             quadmap = np.array(detmap[quad])
@@ -529,6 +561,12 @@ def mapcounts(counts, detmap):
             rows, cols = chns_indeces[mask].T
             mat[rows + ty, cols + tx] = values[mask]
 
-    fig, ax = _mapplot(mat, detmap, colorlabel="Counts", maskvalue=0, figsize=(8, 8),)
+    fig, ax = _mapplot(
+        mat,
+        detmap,
+        colorlabel="Counts",
+        maskvalue=0,
+        figsize=(8, 8),
+    )
     ax.set_title("Per-channel counts (pixel events)")
     return fig, ax

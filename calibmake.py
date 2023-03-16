@@ -60,7 +60,8 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "filepath", help="input acquisition file in standard 0.5 fits format.",
+    "filepath",
+    help="input acquisition file in standard 0.5 fits format.",
 )
 
 parser.add_argument(
@@ -216,12 +217,9 @@ class Mescal(Cmd):
     prompt = "[cyan]\[mescalSH] "
     spinner_message = "Working.."
     unknown_command_message = (
-        "[red]Unknown command.[/]\n"
-        "[i]Type help or ? for a list of commands.[/i]\n"
+        "[red]Unknown command.[/]\n" "[i]Type help or ? for a list of commands.[/i]\n"
     )
-    invalid_command_message = (
-        "[red]Command unavailable.[/]\n"
-    )
+    invalid_command_message = "[red]Command unavailable.[/]\n"
     invalid_channel_message = (
         "[red]Invalid channel.[/]\n"
         "[i]Channel ID must be in standard form (e.g., d04, A30, B02).[/i]\n"
@@ -270,7 +268,9 @@ class Mescal(Cmd):
         """
         sublists = self.calibration.flagged.values()
         num_flagged = len(set([item for sublist in sublists for item in sublist]))
-        num_channels = len([ch for quad, chs in self.calibration.channels.items() for ch in chs])
+        num_channels = len(
+            [ch for quad, chs in self.calibration.channels.items() for ch in chs]
+        )
         message = (
             "In total, {} channels out of {} were flagged.\n"
             "For more details, see the log file.".format(num_flagged, num_channels)
@@ -294,11 +294,13 @@ class Mescal(Cmd):
 
         if self.calibration.sdd_cal:
             write_report(
-                self.calibration.sdd_cal, path=paths.CALREPORT(filepath),
+                self.calibration.sdd_cal,
+                path=paths.CALREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote SDD calibration results.")
             write_report(
-                self.calibration.en_res, path=paths.RESREPORT(filepath),
+                self.calibration.en_res,
+                path=paths.RESREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote energy resolution results.")
             draw_and_save_qlooks(
@@ -310,7 +312,8 @@ class Mescal(Cmd):
 
         if self.calibration.optical_coupling:
             write_report(
-                self.calibration.optical_coupling, path=paths.SLOREPORT(filepath),
+                self.calibration.optical_coupling,
+                path=paths.SLOREPORT(filepath),
             )
             self.console.log(":blue_book: Wrote scintillators calibration results.")
             draw_and_save_slo(
@@ -342,7 +345,9 @@ class Mescal(Cmd):
     def do_retry(self, arg):
         """Launches calibration again."""
         with self.console.status(self.spinner_message):
-            ui.sections_rule(self.console, "[bold italic]Calibration log", style="green")
+            ui.sections_rule(
+                self.console, "[bold italic]Calibration log", style="green"
+            )
             self.calibration._calibrate()
             self._process_results(self.args.fmt, self.args.filepath)
             ui.sections_rule(self.console, "[bold italic]Shell", style="green")
@@ -401,7 +406,14 @@ class Mescal(Cmd):
     def do_export(self, arg):
         """Prompts user on optional data product exports."""
 
-        Option = namedtuple("Option", ["label", "command", "ticked",])
+        Option = namedtuple(
+            "Option",
+            [
+                "label",
+                "command",
+                "ticked",
+            ],
+        )
         all_options = [
             Option("uncalibrated plots", "svhistplot", True),
             Option("diagnostic plots", "svxdiags", True),
@@ -432,8 +444,8 @@ class Mescal(Cmd):
 
             if selection:
                 for i in sorted(
-                        selection,
-                        key=lambda i: -len(options_labels[i]),
+                    selection,
+                    key=lambda i: -len(options_labels[i]),
                 ):
                     do = getattr(self, options_commands[i])
                     do("")
@@ -562,11 +574,13 @@ class Mescal(Cmd):
         with self.console.status(self.spinner_message):
             if self.calibration.xfit:
                 write_report_to_excel(
-                    self.calibration.xfit, paths.XFTREPORT(self.args.filepath),
+                    self.calibration.xfit,
+                    paths.XFTREPORT(self.args.filepath),
                 )
             if self.calibration.sfit:
                 write_report_to_excel(
-                    self.calibration.sfit, paths.SFTREPORT(self.args.filepath),
+                    self.calibration.sfit,
+                    paths.SFTREPORT(self.args.filepath),
                 )
         return False
 
@@ -659,7 +673,8 @@ class Mescal(Cmd):
             return False
         with self.console.status(self.spinner_message):
             write_eventlist_to_fits(
-                self.eventlist, paths.EVLFITS(self.args.filepath),
+                self.eventlist,
+                paths.EVLFITS(self.args.filepath),
             )
         return False
 

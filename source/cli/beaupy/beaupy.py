@@ -308,7 +308,10 @@ def select_multiple(
     """
     rendered = ""
     with _cursor_hidden(console), Live(
-        rendered, console=console, auto_refresh=False, transient=False,
+        rendered,
+        console=console,
+        auto_refresh=False,
+        transient=False,
     ) as live:
         if not options:
             if strict:
@@ -344,9 +347,9 @@ def select_multiple(
                     ]
                 )
                 + "\n\n"
-                  "(mark=[bold]space[/bold], "
-                  "confirm=[bold]enter[/bold], "
-                  "cancel=[bold]esc[/bold])"  # noqa: W503
+                "(mark=[bold]space[/bold], "
+                "confirm=[bold]enter[/bold], "
+                "cancel=[bold]esc[/bold])"  # noqa: W503
             )
             if error_message:
                 rendered = f"{rendered}\n[red]Error:[/red] {error_message}"

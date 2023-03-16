@@ -23,7 +23,9 @@ def write_report_to_excel(result_df, path):
     with pd.ExcelWriter(path) as output:
         for quad in result_df.keys():
             result_df[quad].to_excel(
-                output, sheet_name=quad, engine="xlsxwriter",
+                output,
+                sheet_name=quad,
+                engine="xlsxwriter",
             )
     return True
 
@@ -72,7 +74,8 @@ def write_eventlist_to_fits(eventlist, path):
     output = fitsio.HDUList([header])
     table_quad = fitsio.BinTableHDU.from_columns(
         eventlist.to_records(
-            index=False, column_dtypes={"EVTYPE": "U1", "CHN": "i8", "QUADID": "U1"},
+            index=False,
+            column_dtypes={"EVTYPE": "U1", "CHN": "i8", "QUADID": "U1"},
         ),
         name="Event list",
     )
