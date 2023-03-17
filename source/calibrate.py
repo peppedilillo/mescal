@@ -869,7 +869,7 @@ class Calibrate:
         x_stop = bisect_right(x, stop)
         if x_stop - x_start < 5:
             raise err.FailedFitError("too few bins to fit.")
-        x_fit = (x[x_start:x_stop + 1][1:] + x[x_start:x_stop + 1][:-1]) / 2
+        x_fit = (x[x_start : x_stop + 1][1:] + x[x_start : x_stop + 1][:-1]) / 2
         y_fit = y[x_start:x_stop]
         if np.sum(y_fit) < min_counts:
             raise err.FailedFitError("too few counts to fit.")

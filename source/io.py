@@ -183,7 +183,9 @@ class Exporter:
         res_cal = self.calibration.sdd_cal
         radsources = self.calibration.xradsources()
         nthreads = self.nthreads
-        return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
+        return Parallel(n_jobs=nthreads)(
+            delayed(helper)(quad) for quad in res_cal.keys()
+        )
 
     def draw_sspectra(self):
         def helper(quad):
@@ -210,7 +212,9 @@ class Exporter:
         res_slo = self.calibration.optical_coupling
         radsources = self.calibration.sradsources()
         nthreads = self.nthreads
-        return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_slo.keys())
+        return Parallel(n_jobs=nthreads)(
+            delayed(helper)(quad) for quad in res_slo.keys()
+        )
 
     def draw_spectrum(self):
         self.draw_xspectrum()
@@ -258,7 +262,9 @@ class Exporter:
         def helper(quad):
             for ch in res_cal[quad].index:
                 fig, ax = plot.linearity(
-                    *res_cal[quad].loc[ch][["gain", "gain_err", "offset", "offset_err"]],
+                    *res_cal[quad].loc[ch][
+                        ["gain", "gain_err", "offset", "offset_err"]
+                    ],
                     res_fit[quad].loc[ch].loc[:, "center"],
                     res_fit[quad].loc[ch].loc[:, "center_err"],
                     radsources,
@@ -274,7 +280,9 @@ class Exporter:
         radsources = self.calibration.xradsources()
         nthreads = self.nthreads
         path = paths.LINPLOT(self.filepath)
-        return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
+        return Parallel(n_jobs=nthreads)(
+            delayed(helper)(quad) for quad in res_cal.keys()
+        )
 
     def draw_map_resolution(self):
         path = paths.RESPLOT(self.filepath)
@@ -316,7 +324,9 @@ def write_report_to_excel(result_df, path):
     with pd.ExcelWriter(path) as output:
         for quad in result_df.keys():
             result_df[quad].to_excel(
-                output, sheet_name=quad, engine="xlsxwriter",
+                output,
+                sheet_name=quad,
+                engine="xlsxwriter",
             )
     return True
 
@@ -365,7 +375,8 @@ def write_eventlist_to_fits(eventlist, path):
     output = fitsio.HDUList([header])
     table_quad = fitsio.BinTableHDU.from_columns(
         eventlist.to_records(
-            index=False, column_dtypes={"EVTYPE": "U1", "CHN": "i8", "QUADID": "U1"},
+            index=False,
+            column_dtypes={"EVTYPE": "U1", "CHN": "i8", "QUADID": "U1"},
         ),
         name="Event list",
     )
@@ -401,4 +412,3 @@ def pandas_from_LV0d5(fits: Path):
         dtypes
     )
     return df
-

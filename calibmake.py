@@ -301,7 +301,9 @@ class Mescal(Cmd):
             self.console.log(":chart_increasing: Saved light-output plots.")
             self.console.log(":chart_increasing: Saved light-output plots.")
 
-        if (self.calibration.eventlist is not None) and (not self.calibration.eventlist.empty):
+        if (self.calibration.eventlist is not None) and (
+            not self.calibration.eventlist.empty
+        ):
             self.exporter.draw_spectrum()
             self.console.log(":chart_increasing: Saved calibrated spectra plots.")
         return True

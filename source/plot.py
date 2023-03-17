@@ -70,6 +70,7 @@ def diagnostics(bins, counts, centers, amps, fwhms, limits, margin=500, **kwargs
     ax.set_xlabel("ADU")
     return fig, ax
 
+
 def spectrum_x(enbins, counts, radsources: dict, **kwargs):
     fig, ax = _spectrum(
         enbins,
@@ -90,6 +91,7 @@ def spectrum_s(enbins, counts, radsources: dict, **kwargs):
         **kwargs,
     )
     return fig, ax
+
 
 def _spectrum(enbins, counts, radsources: dict, elims=None, **kwargs):
     radsources_keys = radsources.keys()
