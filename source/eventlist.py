@@ -236,10 +236,18 @@ def add_evtype_tag(data, couples):
     return data
 
 
-def perchannel_counts(data, channels):
+def perchannel_counts(data, channels, key="all"):
     dict_ = {}
     for quad in channels.keys():
-        quaddata = data[data["QUADID"] == quad]
+        if key == "all":
+            quaddata = data[data["QUADID"] == quad]
+        elif key == "x":
+            quaddata = data[(data["QUADID"] == quad) & (data["EVTYPE"] == "X")]
+        elif key == "s":
+            quaddata = data[(data["QUADID"] == quad) & (data["EVTYPE"] == "S")]
+        else:
+            raise ValueError("wrong event type key.")
+
         for ch in channels[quad]:
             counts = len(quaddata[(quaddata["CHN"] == ch)])
             dict_.setdefault(quad, {})[ch] = counts
@@ -255,13 +263,23 @@ def perchannel_counts(data, channels):
 
 
 def filter_spurious(data):
-    return data[(data["NMULT"] < 2) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))]
+    mask = (data["NMULT"] < 2) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))
+    spirit = data[mask]
+    waste = data[~mask]
+    return spirit, waste
 
 
 def filter_delay(data, hold_time):
     unique_times = data.TIME.unique()
     bad_events = unique_times[np.where(np.diff(unique_times) < hold_time)[0] + 1]
-    return data.drop(data.index[data["TIME"].isin(bad_events)]).reset_index(drop=True)
+    mask = ~(data["TIME"].isin(bad_events))
+    spirit = data[mask]
+    waste = data[~mask]
+    return spirit, waste
+# def filter_delay(data, hold_time):
+#     unique_times = data.TIME.unique()
+#     bad_events = unique_times[np.where(np.diff(unique_times) < hold_time)[0] + 1]
+#     return data.drop(data.index[data["TIME"].isin(bad_events)]).reset_index(drop=True)
 
 
 def infer_onchannels(data):

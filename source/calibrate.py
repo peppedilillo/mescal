@@ -205,8 +205,9 @@ class Calibrate:
         self.radsources = radsources
         self.detector = detector
         self.configuration = configuration
-        self._counts = None
+        self._counts = {"all": None, "x": None, "s": None}
         self.data = None
+        self.waste = None
         self.channels = None
         self.xbins = None
         self.sbins = None
@@ -261,13 +262,14 @@ class Calibrate:
         data = add_evtype_tag(data, self.detector.couples)
         events_pre_filter = len(data)
         self.console.log(":white_check_mark: Tagged X and S events.")
-
         if retrigger_delay:
-            data = filter_delay(data, retrigger_delay)
+            data, waste = filter_delay(data, retrigger_delay)
+            self.waste = waste
         else:
             self.console.log(":exclamation_mark: Retrigger filter is off.")
         if spurious_bool:
-            data = filter_spurious(data)
+            data, waste = filter_spurious(data)
+            self.waste = pd.concat((self.waste, waste))
         else:
             self.console.log(":exclamation_mark: Spurious filter is off.")
 
@@ -301,7 +303,13 @@ class Calibrate:
         # S calibration
         if not self.sradsources():
             return None
-        self.speaks = self._detect_speaks()
+        # see note above for self._detect_xpeaks
+        if self.speaks is None:
+            self.speaks = self._detect_speaks()
+        elif "speak" in self.flagged:
+            for quad, ch in self.flagged["speak"]:
+                message = err.warn_failed_peak_detection(quad, ch)
+                logging.warning(message)
         self.sfit = self._fit_sradsources()
         electron_evlist = make_electron_list(
             self.data,
@@ -854,7 +862,7 @@ class Calibrate:
         return results
 
     @staticmethod
-    def _peak_fitter(x, y, limits):
+    def _peak_fitter(x, y, limits, min_counts=100):
         start, stop = limits
         # select index of the smallest subset of x larger than [start, stop]
         x_start = max(bisect_right(x, start) - 1, 0)
@@ -863,6 +871,8 @@ class Calibrate:
             raise err.FailedFitError("too few bins to fit.")
         x_fit = (x[x_start : x_stop + 1][1:] + x[x_start : x_stop + 1][:-1]) / 2
         y_fit = y[x_start:x_stop]
+        if np.sum(y_fit) < 100:
+            raise err.FailedFitError("too few counts to fit.")
         errors = np.clip(np.sqrt(y_fit), 1, None)
 
         mod = GaussianModel()
@@ -917,7 +927,13 @@ class Calibrate:
         fit_results = self._fit_peaks(x, y, intervals)
         return intervals, fit_results
 
-    def counts(self):
-        if self._counts is None:
-            self._counts = perchannel_counts(self.data, self.channels)
-        return self._counts
+    def count(self, key="all"):
+        assert key in self._counts
+        if self._counts[key] is None:
+            self._counts[key] = perchannel_counts(self.data, self.channels, key=key)
+        return self._counts[key]
+
+    def waste_count(self, key="all"):
+        if self.waste is not None:
+            return perchannel_counts(self.waste, self.channels, key=key)
+        return {}
