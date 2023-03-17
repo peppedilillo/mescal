@@ -35,6 +35,7 @@ from source.plot import (
     draw_and_save_slo,
     draw_and_save_uncalibrated,
     mapcounts,
+    mapenres,
     uncalibrated,
 )
 from source.radsources import radsources_dicts
@@ -334,6 +335,16 @@ class Mescal(Cmd):
             self.console.log(":chart_increasing: Saved calibrated spectra plots.")
         return True
 
+    def can(self, x):
+        """Checks if a command can be executed."""
+        if "can_" + x not in dir(self.__class__):
+            # if a can_ method is not defined we assume the command
+            # to always be executable.
+            return True
+        else:
+            func = getattr(self, "can_" + x)
+            return func()
+
     # shell prompt commands
     def do_quit(self, arg):
         """Quits mescal.
@@ -379,6 +390,32 @@ class Mescal(Cmd):
         logging.info(message)
         return False
 
+    def do_setslim(self, arg):
+        """Reset channel S peaks position for user selected channels."""
+        parsed_arg = parse_chns(arg)
+        if parsed_arg is INVALID_ENTRY:
+            self.console.print(self.invalid_channel_message)
+            return False
+
+        quad, ch = parsed_arg
+        for source, decay in self.calibration.sradsources().items():
+            arg = self.console.input(source + ": ")
+            parsed_arg = parse_limits(arg)
+            if parsed_arg is INVALID_ENTRY:
+                self.console.print(self.invalid_limits_message)
+                return False
+            elif parsed_arg is None:
+                continue
+            else:
+                lim_lo, lim_hi = parsed_arg
+                label_lo, label_hi = PEAKS_PARAMS
+                self.calibration.speaks[quad].loc[ch, (source, label_lo)] = int(lim_lo)
+                self.calibration.speaks[quad].loc[ch, (source, label_hi)] = int(lim_hi)
+
+        message = "reset sfit limits for channel {}{}".format(quad, ch)
+        logging.info(message)
+        return False
+
     def do_plothist(self, arg):
         """Plots uncalibrated data from a channel."""
         parsed_arg = parse_chns(arg)
@@ -397,9 +434,68 @@ class Mescal(Cmd):
         plt.show(block=False)
         return False
 
-    def do_mapcounts(self, arg):
+    def can_map(self, arg):
+        if self.eventlist is not None:
+            return True
+        return False
+
+    def do_map(self, arg):
         """Plots a map of counts per-channel."""
-        fig, ax = mapcounts(self.calibration.counts(), self.calibration.detector.map)
+        counts = self.calibration.count()
+        fig, ax = mapcounts(counts, self.calibration.detector.map)
+        plt.show(block=False)
+        return False
+
+    def can_mapx(self, arg):
+        if self.eventlist is not None:
+            return True
+        return False
+
+    def do_mapx(self, arg):
+        """Plots a map of counts per-channel."""
+        counts = self.calibration.count(key="x")
+        fig, ax = mapcounts(counts, self.calibration.detector.map)
+        plt.show(block=False)
+        return False
+
+    def can_maps(self, arg):
+        if self.eventlist is not None:
+            return True
+        return False
+
+    def do_maps(self, arg):
+        """Plots a map of S counts per-channel."""
+        counts = self.calibration.count(key="s")
+        fig, ax = mapcounts(counts, self.calibration.detector.map)
+        plt.show(block=False)
+        return False
+
+    def can_mapbad(self, arg):
+        if self.calibration.waste is not None:
+            return True
+        return False
+
+    def do_mapbad(self, arg):
+        """Plots a map of counts per-channel from filtered data."""
+        counts = self.calibration.waste_count(key="all")
+        fig, ax = mapcounts(counts, self.calibration.detector.map)
+        plt.show(block=False)
+        return False
+
+    def can_mapres(self):
+        if self.calibration.xradsources().keys() and self.calibration.en_res:
+            return True
+        return False
+
+    def do_mapres(self, arg):
+        """Saves a map of channels' energy resolution."""
+        decays = self.calibration.xradsources()
+        source = sorted(decays, key=lambda source: decays[source].energy)[0]
+        fig, ax = mapenres(
+            source,
+            self.calibration.en_res,
+            self.calibration.detector.map,
+        )
         plt.show(block=False)
         return False
 
@@ -428,46 +524,30 @@ class Mescal(Cmd):
         options_labels = [o.label for o in options]
         options_commands = [o.command for o in options]
         options_ticked = [i for i, v in enumerate(options) if v.ticked]
-
-        with ui.small_section(self.console, message="Select one or more.") as ss:
-            prompt_user_with_menu = True
-            if prompt_user_with_menu:
+        if arg != "all":
+            with ui.small_section(self.console, message="Select one or more.") as ss:
                 selection = select_multiple(
                     options_labels,
                     self.console,
                     ticked_indices=options_ticked,
                     return_indices=True,
                 )
-            else:
-                # do them all
-                selection = [i for i, _ in enumerate(options)]
-
-            if selection:
-                for i in sorted(
-                    selection,
-                    key=lambda i: -len(options_labels[i]),
-                ):
-                    do = getattr(self, options_commands[i])
-                    do("")
-            else:
-                pass
-        return False
-
-    def can(self, x):
-        """Checks if a command can be executed."""
-        if "can_" + x not in dir(self.__class__):
-            # if a can_ method is not defined we assume the command
-            # to always be executable.
-            return True
         else:
-            func = getattr(self, "can_" + x)
-            return func()
+            # do them all
+            selection = [i for i, _ in enumerate(options)]
+        for i in sorted(
+            selection,
+            key=lambda i: -len(options_labels[i]),
+        ):
+            do = getattr(self, options_commands[i])
+            do("")
+        return False
 
     def svmapcounts(self, arg):
         """Saves a map of per-channel counts."""
         with self.console.status(self.spinner_message):
             draw_and_save_mapcounts(
-                self.calibration.counts(),
+                self.calibration.count(),
                 self.calibration.detector.map,
                 paths.CNTPLOT(self.args.filepath),
             )

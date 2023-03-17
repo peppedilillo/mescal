@@ -1,8 +1,9 @@
 name: mescal
 dependencies:
-  - numpy
-  - pandas
-  - matplotlib
+  - python=3.10
+  - numpy=1.23.5
+  - pandas=1.5.2
+  - matplotlib=3.6.2
   - astropy
   - openpyxl
   - joblib
