@@ -17,10 +17,70 @@ from source.errors import warn_nan_in_sdd_calib, warn_nan_in_slo_table
 
 class Exporter:
     def __init__(self, calibration, filepath, table_format, nthreads=1):
+        # calibration must have been executed to export
+        assert calibration.data is not None
+
         self.calibration = calibration
         self.writer = get_writer(table_format)
         self.filepath = filepath
         self.nthreads = nthreads
+        self.can__write_sdd_calibration_report = False
+        if self.calibration.sdd_cal:
+            self.can__write_sdd_calibration_report = True
+        self.can__write_energy_res_report = False
+        if self.calibration.sdd_cal:
+            self.can__write_energy_res_report = True
+        self.can__write_scintillator_report = False
+        if self.calibration.optical_coupling:
+            self.can__write_scintillator_report = True
+        self.can__write_xfit_report = False
+        if self.calibration.xfit:
+            self.can__write_xfit_report = True
+        self.can__write_sfit_report = False
+        if self.calibration.sfit:
+            self.can__write_sfit_report = True
+        self.can__draw_qlooks_sdd = False
+        if self.calibration.sdd_cal:
+            self.can__draw_qlooks_sdd = True
+        self.can__draw_qlook_scint = False
+        if self.calibration.scint_cal:
+            self.can__draw_qlook_scint = True
+        self.can__draw_rawspectra = False
+        if self.calibration.data:
+            self.can__draw_rawspectra = True
+        self.can__draw_sdiagnostics = False
+        if self.calibration.speaks:
+            self.can__draw_sdiagnostics = True
+        self.can__draw_xdiagnostic = False
+        if self.calibration.xfit:
+            self.can__draw_xdiagnostic = True
+        self.can__draw_xspectra = False
+        if self.calibration.sdd_cal:
+            self.can__draw_xspectra = True
+        self.can__draw_sspectra = False
+        if self.calibration.scint_cal:
+            self.can__draw_sspectra = True
+        self.can__draw_spectrum = False
+        if self.calibration.eventlist:
+            self.can__draw_spectrum = True
+        self.can__draw_xspectrum = False
+        if self.calibration.sdd_cal:
+            self.can__draw_xspectrum = True
+        self.can__draw_sspectrum = False
+        if self.calibration.scint_cal:
+            self.can__draw_sspectrum = True
+        self.can__draw_linearity = False
+        if self.calibration.sdd_cal:
+            self.can__draw_linearity = True
+        self.can__draw_map_resolution = False
+        if self.calibration.enres:
+            self.can__draw_map_resolution = True
+        self.can__draw_map_counts = False
+        if self.calibration.data:
+            self.can__draw_map_counts = True
+        self.can__write_eventlist = False
+        if self.calibration.eventlist:
+            self.can__write_eventlist = True
 
     def write_sdd_calibration_report(self):
         self.writer(
@@ -66,7 +126,12 @@ class Exporter:
             axs[0].set_title("Calibration quicklook - Quadrant {}".format(quad))
             fig.savefig(path(quad))
             plt.close(fig)
-        return
+
+    def write_eventlist(self):
+        write_eventlist_to_fits(
+            self.calibration.eventlist,
+            paths.EVLFITS(self.filepath),
+        )
 
     def draw_qlook_scint(self):
         res_slo = self.calibration.optical_coupling
@@ -82,7 +147,6 @@ class Exporter:
             ax.set_title("Light output - Quadrant {}".format(quad))
             fig.savefig(path(quad))
             plt.close(fig)
-        return
 
     def draw_rawspectra(self):
         def helper(quad):
