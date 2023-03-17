@@ -52,7 +52,7 @@ class Exporter:
             paths.SFTREPORT(self.filepath),
         )
 
-    def draw_and_save_qlooks(self):
+    def draw_qlooks_sdd(self):
         res_cal = self.calibration.sdd_cal
         path = paths.QLKPLOT(self.filepath)
 
@@ -68,7 +68,7 @@ class Exporter:
             plt.close(fig)
         return
 
-    def draw_and_save_slo(self):
+    def draw_qlook_scint(self):
         res_slo = self.calibration.optical_coupling
         path = paths.SLOPLOT(self.filepath)
 
@@ -84,7 +84,7 @@ class Exporter:
             plt.close(fig)
         return
 
-    def draw_and_save_uncalibrated(self):
+    def draw_rawspectra(self):
         def helper(quad):
             for ch in range(32):
                 fig, ax = plot.uncalibrated(
@@ -106,7 +106,7 @@ class Exporter:
             delayed(helper)(quad) for quad in xhistograms.counts.keys()
         )
 
-    def draw_and_save_sdiagns(self):
+    def draw_sdiagnostics(self):
         def helper(quad):
             for ch in res_fit[quad].index:
                 fig, ax = plot.diagnostics(
@@ -134,7 +134,7 @@ class Exporter:
             delayed(helper)(quad) for quad in res_fit.keys()
         )
 
-    def draw_and_save_xdiagns(self):
+    def draw_xdiagnostic(self):
         def helper(quad):
             for ch in res_fit[quad].index:
                 fig, ax = plot.diagnostics(
@@ -162,12 +162,12 @@ class Exporter:
             delayed(helper)(quad) for quad in res_fit.keys()
         )
 
-    def draw_and_save_channels_xspectra(self):
+    def draw_xspectra(self):
         def helper(quad):
             for ch in res_cal[quad].index:
-                enbins = (histograms.bins - res_cal[quad].loc[ch]["offset"]) / res_cal[
-                    quad
-                ].loc[ch]["gain"]
+                offset = res_cal[quad].loc[ch]["offset"]
+                gain = res_cal[quad].loc[ch]["gain"]
+                enbins = (histograms.bins - offset) / gain
                 fig, ax = plot.spectrum_x(
                     enbins,
                     histograms.counts[quad][ch],
@@ -185,13 +185,14 @@ class Exporter:
         nthreads = self.nthreads
         return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
 
-    def draw_and_save_channels_sspectra(self):
+    def draw_sspectra(self):
         def helper(quad):
             for ch in res_slo[quad].index:
-                xenbins = (histograms.bins - res_cal[quad].loc[ch]["offset"]) / res_cal[
-                    quad
-                ].loc[ch]["gain"]
-                enbins = xenbins / res_slo[quad]["light_out"].loc[ch] / PHOTOEL_PER_KEV
+                offset = res_cal[quad].loc[ch]["offset"]
+                gain = res_cal[quad].loc[ch]["gain"]
+                lightout = res_slo[quad]["light_out"].loc[ch]
+                xenbins = (histograms.bins - offset) / gain
+                enbins = xenbins / lightout / PHOTOEL_PER_KEV
 
                 fig, ax = plot.spectrum_s(
                     enbins,
@@ -211,12 +212,12 @@ class Exporter:
         nthreads = self.nthreads
         return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_slo.keys())
 
-    def draw_and_save_calibrated_spectra(self):
-        self.draw_and_save_xspectrum()
-        self.draw_and_save_sspectrum()
+    def draw_spectrum(self):
+        self.draw_xspectrum()
+        self.draw_sspectrum()
         return True
 
-    def draw_and_save_xspectrum(self):
+    def draw_xspectrum(self):
         path = paths.XSPPLOT(self.filepath)
         calibrated_events = self.calibration.eventlist
         radsources = self.calibration.xradsources()
@@ -235,7 +236,7 @@ class Exporter:
         plt.close(fig)
         return True
 
-    def draw_and_save_sspectrum(self):
+    def draw_sspectrum(self):
         path = paths.SSPPLOT(self.filepath)
         calibrated_events = self.calibration.eventlist
         radsources = self.calibration.sradsources()
@@ -253,7 +254,7 @@ class Exporter:
         plt.close(fig)
         return True
 
-    def draw_and_save_lins(self):
+    def draw_linearity(self):
         def helper(quad):
             for ch in res_cal[quad].index:
                 fig, ax = plot.linearity(
@@ -275,7 +276,7 @@ class Exporter:
         path = paths.LINPLOT(self.filepath)
         return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
 
-    def draw_and_save_mapres(self):
+    def draw_map_resolution(self):
         path = paths.RESPLOT(self.filepath)
         decays = self.calibration.xradsources()
         source = sorted(decays, key=lambda source: decays[source].energy)[0]
@@ -289,7 +290,7 @@ class Exporter:
         plt.close(fig)
         return True
 
-    def draw_and_save_mapcounts(self):
+    def draw_map_counts(self):
         path = paths.CNTPLOT(self.filepath)
         counts = self.calibration.count()
         detmap = self.calibration.detector.map

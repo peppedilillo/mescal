@@ -247,6 +247,7 @@ class Mescal(Cmd):
                 self.calibration,
                 self.args.filepath,
                 self.args.fmt,
+                nthreads=self.threads,
             )
             self._process_results(self.args.filepath)
 
@@ -290,18 +291,18 @@ class Mescal(Cmd):
             self.console.log(":blue_book: Wrote SDD calibration results.")
             self.exporter.write_energy_res_report()
             self.console.log(":blue_book: Wrote energy resolution results.")
-            self.exporter.draw_and_save_qlooks()
+            self.exporter.draw_qlooks_sdd()
             self.console.log(":chart_increasing: Saved X fit quicklook plots.")
 
         if self.calibration.optical_coupling:
             self.exporter.write_scintillator_report()
             self.console.log(":blue_book: Wrote scintillators calibration results.")
-            self.exporter.draw_and_save_slo()
+            self.exporter.draw_qlook_scint()
             self.console.log(":chart_increasing: Saved light-output plots.")
             self.console.log(":chart_increasing: Saved light-output plots.")
 
         if (self.calibration.eventlist is not None) and (not self.calibration.eventlist.empty):
-            self.exporter.draw_and_save_calibrated_spectra()
+            self.exporter.draw_spectrum()
             self.console.log(":chart_increasing: Saved calibrated spectra plots.")
         return True
 
@@ -516,13 +517,13 @@ class Mescal(Cmd):
     def svmapcounts(self, arg):
         """Saves a map of per-channel counts."""
         with self.console.status(self.spinner_message):
-            self.exporter.draw_and_save_mapcounts()
+            self.exporter.draw_map_counts()
         return False
 
     def svhistplot(self, arg):
         """Save raw acquisition histogram plots."""
         with self.console.status(self.spinner_message):
-            self.exporter.draw_and_save_uncalibrated()
+            self.exporter.draw_rawspectra()
         return False
 
     def can_svmapres(self):
@@ -538,7 +539,7 @@ class Mescal(Cmd):
         with self.console.status(self.spinner_message):
             decays = self.calibration.xradsources()
             source = sorted(decays, key=lambda source: decays[source].energy)[0]
-            self.exporter.draw_and_save_mapres()
+            self.exporter.draw_map_resolution()
         return False
 
     def can_svdiags(self):
@@ -569,7 +570,7 @@ class Mescal(Cmd):
             return False
         with self.console.status(self.spinner_message):
             if self.calibration.xfit:
-                self.exporter.draw_and_save_xdiagns()
+                self.exporter.draw_xdiagnostic()
         return False
 
     def can_svsdiags(self):
@@ -584,7 +585,7 @@ class Mescal(Cmd):
             return False
         with self.console.status(self.spinner_message):
             if self.calibration.sfit:
-                self.exporter.draw_and_save_sdiagns()
+                self.exporter.draw_sdiagnostics()
         return False
 
     def can_svtabfit(self):
@@ -631,7 +632,7 @@ class Mescal(Cmd):
             self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
-            self.exporter.draw_and_save_channels_xspectra()
+            self.exporter.draw_xspectra()
         return False
 
     def can_svlinplots(self):
@@ -645,7 +646,7 @@ class Mescal(Cmd):
             self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
-            self.exporter.draw_and_save_lins()
+            self.exporter.draw_linearity()
         return False
 
     def can_svsplots(self):
@@ -659,7 +660,7 @@ class Mescal(Cmd):
             self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
-            self.exporter.draw_and_save_channels_sspectra()
+            self.exporter.draw_sspectra()
         return False
 
     def can_svevents(self):
