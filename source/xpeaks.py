@@ -38,6 +38,7 @@ def find_xpeaks(
         distance: int, min bins between peaks
         width: int, min peak bins width
         mincounts: int, min counts under peak
+        smoothing: int, moving average smoothing parameter
         channel_id: (str, int) tuple, for debugging purpose
 
     Returns: array of 2-tuples, peaks guess limits indeces.
@@ -256,6 +257,7 @@ def peaks_with_enough_stat(counts, mincounts, pars, smoothing=1, maxdepth=20):
         mincounts: int
         pars: dict, initial peak search parameters
         smoothing: int, window length for SMA smoothing
+        maxdepth: maximum iterations
 
     Returns: peaks and peaks properties
 

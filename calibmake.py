@@ -23,16 +23,6 @@ from source.io import (
     write_eventlist_to_fits,
 )
 from source.plot import (
-    draw_and_save_calibrated_spectra,
-    draw_and_save_channels_sspectra,
-    draw_and_save_channels_xspectra,
-    draw_and_save_diagns,
-    draw_and_save_lins,
-    draw_and_save_mapcounts,
-    draw_and_save_mapres,
-    draw_and_save_qlooks,
-    draw_and_save_slo,
-    draw_and_save_uncalibrated,
     mapcounts,
     mapenres,
     uncalibrated,
@@ -250,7 +240,6 @@ class Mescal(Cmd):
                 console=self.console,
                 nthreads=self.threads,
             )
-            self.eventlist = self.calibration(data)
 
         with console.status("Processing results.."):
             self.exporter = Exporter(
@@ -300,31 +289,18 @@ class Mescal(Cmd):
             self.console.log(":blue_book: Wrote SDD calibration results.")
             self.exporter.write_energy_res_report()
             self.console.log(":blue_book: Wrote energy resolution results.")
-            draw_and_save_qlooks(
-                self.calibration.sdd_cal,
-                path=paths.QLKPLOT(filepath),
-                nthreads=self.threads,
-            )
+            self.exporter.draw_and_save_qlooks()
             self.console.log(":chart_increasing: Saved X fit quicklook plots.")
 
         if self.calibration.optical_coupling:
             self.exporter.write_scintillator_report()
             self.console.log(":blue_book: Wrote scintillators calibration results.")
-            draw_and_save_slo(
-                self.calibration.optical_coupling,
-                path=paths.SLOPLOT(filepath),
-                nthreads=self.threads,
-            )
+            self.exporter.draw_and_save_slo()
+            self.console.log(":chart_increasing: Saved light-output plots.")
             self.console.log(":chart_increasing: Saved light-output plots.")
 
-        if (self.eventlist is not None) and (not self.eventlist.empty):
-            draw_and_save_calibrated_spectra(
-                self.eventlist,
-                self.calibration.xradsources(),
-                self.calibration.sradsources(),
-                paths.XSPPLOT(filepath),
-                paths.SSPPLOT(filepath),
-            )
+        if (self.calibration.eventlist is not None) and (not self.calibration.eventlist.empty):
+            self.exporter.draw_and_save_calibrated_spectra()
             self.console.log(":chart_increasing: Saved calibrated spectra plots.")
         return True
 
@@ -428,7 +404,7 @@ class Mescal(Cmd):
         return False
 
     def can_map(self, arg):
-        if self.eventlist is not None:
+        if self.calibration.eventlist is not None:
             return True
         return False
 
@@ -440,7 +416,7 @@ class Mescal(Cmd):
         return False
 
     def can_mapx(self, arg):
-        if self.eventlist is not None:
+        if self.calibration.eventlist is not None:
             return True
         return False
 
@@ -452,7 +428,7 @@ class Mescal(Cmd):
         return False
 
     def can_maps(self, arg):
-        if self.eventlist is not None:
+        if self.calibration.eventlist is not None:
             return True
         return False
 
@@ -539,22 +515,13 @@ class Mescal(Cmd):
     def svmapcounts(self, arg):
         """Saves a map of per-channel counts."""
         with self.console.status(self.spinner_message):
-            draw_and_save_mapcounts(
-                self.calibration.count(),
-                self.calibration.detector.map,
-                paths.CNTPLOT(self.args.filepath),
-            )
+            self.exporter.draw_and_save_mapcounts()
         return False
 
     def svhistplot(self, arg):
         """Save raw acquisition histogram plots."""
         with self.console.status(self.spinner_message):
-            draw_and_save_uncalibrated(
-                self.calibration.xhistograms,
-                self.calibration.shistograms,
-                paths.UNCPLOT(self.args.filepath),
-                nthreads=self.threads,
-            )
+            self.exporter.draw_and_save_uncalibrated()
         return False
 
     def can_svmapres(self):
@@ -570,12 +537,7 @@ class Mescal(Cmd):
         with self.console.status(self.spinner_message):
             decays = self.calibration.xradsources()
             source = sorted(decays, key=lambda source: decays[source].energy)[0]
-            draw_and_save_mapres(
-                source,
-                self.calibration.en_res,
-                self.calibration.detector.map,
-                paths.RESPLOT(self.args.filepath),
-            )
+            self.exporter.draw_and_save_mapres()
         return False
 
     def can_svdiags(self):
@@ -606,12 +568,7 @@ class Mescal(Cmd):
             return False
         with self.console.status(self.spinner_message):
             if self.calibration.xfit:
-                draw_and_save_diagns(
-                    self.calibration.xhistograms,
-                    self.calibration.xfit,
-                    paths.XDNPLOT(self.args.filepath),
-                    nthreads=self.threads,
-                )
+                self.exporter.draw_and_save_xdiagns()
         return False
 
     def can_svsdiags(self):
@@ -626,12 +583,7 @@ class Mescal(Cmd):
             return False
         with self.console.status(self.spinner_message):
             if self.calibration.sfit:
-                draw_and_save_diagns(
-                    self.calibration.shistograms,
-                    self.calibration.sfit,
-                    paths.SDNPLOT(self.args.filepath),
-                    nthreads=self.threads,
-                )
+                self.exporter.draw_and_save_sdiagns()
         return False
 
     def can_svtabfit(self):
@@ -678,13 +630,7 @@ class Mescal(Cmd):
             self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
-            draw_and_save_channels_xspectra(
-                self.calibration.xhistograms,
-                self.calibration.sdd_cal,
-                self.calibration.xradsources(),
-                paths.XCSPLOT(self.args.filepath),
-                nthreads=self.threads,
-            )
+            self.exporter.draw_and_save_channels_xspectra()
         return False
 
     def can_svlinplots(self):
@@ -698,13 +644,7 @@ class Mescal(Cmd):
             self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
-            draw_and_save_lins(
-                self.calibration.sdd_cal,
-                self.calibration.xfit,
-                self.calibration.xradsources(),
-                paths.LINPLOT(self.args.filepath),
-                nthreads=self.threads,
-            )
+            self.exporter.draw_and_save_lins()
         return False
 
     def can_svsplots(self):
@@ -718,18 +658,11 @@ class Mescal(Cmd):
             self.console.print(self.invalid_command_message)
             return False
         with self.console.status(self.spinner_message):
-            draw_and_save_channels_sspectra(
-                self.calibration.shistograms,
-                self.calibration.sdd_cal,
-                self.calibration.optical_coupling,
-                self.calibration.sradsources(),
-                paths.SCSPLOT(self.args.filepath),
-                nthreads=self.threads,
-            )
+            self.exporter.draw_and_save_channels_sspectra()
         return False
 
     def can_svevents(self):
-        if self.eventlist is not None:
+        if self.calibration.eventlist is not None:
             return True
         return False
 
@@ -740,7 +673,7 @@ class Mescal(Cmd):
             return False
         with self.console.status(self.spinner_message):
             write_eventlist_to_fits(
-                self.eventlist,
+                self.calibration.eventlist,
                 paths.EVLFITS(self.args.filepath),
             )
         return False
