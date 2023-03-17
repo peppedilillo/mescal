@@ -17,11 +17,10 @@ from source.cli import elementsui as ui
 from source.cli.beaupy.beaupy import select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import Detector
+from source.io import Exporter
 from source.io import (
-    get_writer,
     pandas_from_LV0d5,
     write_eventlist_to_fits,
-    write_report_to_excel,
 )
 from source.plot import (
     draw_and_save_calibrated_spectra,
@@ -254,7 +253,12 @@ class Mescal(Cmd):
             self.eventlist = self.calibration(data)
 
         with console.status("Processing results.."):
-            self._process_results(self.args.fmt, self.args.filepath)
+            self.exporter = Exporter(
+                self.calibration,
+                self.args.filepath,
+                self.args.fmt,
+            )
+            self._process_results(self.args.filepath)
 
         if any(self.calibration.flagged):
             ui.sections_rule(console, "[bold italic]Warning", style="red")
@@ -280,10 +284,8 @@ class Mescal(Cmd):
         self.console.print(message)
         return True
 
-    def _process_results(self, output_format, filepath):
+    def _process_results(self, filepath):
         """Prepares and exports base calibration results."""
-        write_report = get_writer(output_format)
-
         if not self.calibration.sdd_cal and not self.calibration.optical_coupling:
             self.console.log("[bold red]:red_circle: Calibration failed.")
         elif not self.calibration.sdd_cal or not self.calibration.optical_coupling:
@@ -294,15 +296,9 @@ class Mescal(Cmd):
             self.console.log(":green_circle: Calibration complete.")
 
         if self.calibration.sdd_cal:
-            write_report(
-                self.calibration.sdd_cal,
-                path=paths.CALREPORT(filepath),
-            )
+            self.exporter.write_sdd_calibration_report()
             self.console.log(":blue_book: Wrote SDD calibration results.")
-            write_report(
-                self.calibration.en_res,
-                path=paths.RESREPORT(filepath),
-            )
+            self.exporter.write_energy_res_report()
             self.console.log(":blue_book: Wrote energy resolution results.")
             draw_and_save_qlooks(
                 self.calibration.sdd_cal,
@@ -312,10 +308,7 @@ class Mescal(Cmd):
             self.console.log(":chart_increasing: Saved X fit quicklook plots.")
 
         if self.calibration.optical_coupling:
-            write_report(
-                self.calibration.optical_coupling,
-                path=paths.SLOREPORT(filepath),
-            )
+            self.exporter.write_scintillator_report()
             self.console.log(":blue_book: Wrote scintillators calibration results.")
             draw_and_save_slo(
                 self.calibration.optical_coupling,
@@ -360,7 +353,7 @@ class Mescal(Cmd):
                 self.console, "[bold italic]Calibration log", style="green"
             )
             self.calibration._calibrate()
-            self._process_results(self.args.fmt, self.args.filepath)
+            self._process_results(self.args.filepath)
             ui.sections_rule(self.console, "[bold italic]Shell", style="green")
         return False
 
@@ -653,15 +646,9 @@ class Mescal(Cmd):
             return False
         with self.console.status(self.spinner_message):
             if self.calibration.xfit:
-                write_report_to_excel(
-                    self.calibration.xfit,
-                    paths.XFTREPORT(self.args.filepath),
-                )
+                self.exporter.write_xfit_report()
             if self.calibration.sfit:
-                write_report_to_excel(
-                    self.calibration.sfit,
-                    paths.SFTREPORT(self.args.filepath),
-                )
+                self.exporter.write_sfit_report()
         return False
 
     def can_svchnplots(self):

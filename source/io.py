@@ -5,7 +5,46 @@ import numpy as np
 import pandas as pd
 from astropy.io import fits as fitsio
 
+from source import paths
 from source.errors import FormatNotSupportedError
+
+
+class Exporter:
+    def __init__(self, calibration, filepath, table_format):
+        self.calibration = calibration
+        self.writer = get_writer(table_format)
+        self.filepath = filepath
+
+    def write_sdd_calibration_report(self):
+        self.writer(
+            self.calibration.sdd_cal,
+            path=paths.CALREPORT(self.filepath),
+        )
+
+    def write_energy_res_report(self):
+        self.writer(
+            self.calibration.en_res,
+            path=paths.RESREPORT(self.filepath),
+        )
+
+    def write_scintillator_report(self):
+        self.writer(
+            self.calibration.optical_coupling,
+            path=paths.SLOREPORT(self.filepath),
+        )
+
+    def write_xfit_report(self):
+        write_report_to_excel(
+            self.calibration.xfit,
+            paths.XFTREPORT(self.filepath),
+        )
+
+    def write_sfit_report(self):
+        write_report_to_excel(
+            self.calibration.sfit,
+            paths.SFTREPORT(self.filepath),
+        )
+
 
 
 def get_writer(fmt):
@@ -23,9 +62,7 @@ def write_report_to_excel(result_df, path):
     with pd.ExcelWriter(path) as output:
         for quad in result_df.keys():
             result_df[quad].to_excel(
-                output,
-                sheet_name=quad,
-                engine="xlsxwriter",
+                output, sheet_name=quad, engine="xlsxwriter",
             )
     return True
 
@@ -74,8 +111,7 @@ def write_eventlist_to_fits(eventlist, path):
     output = fitsio.HDUList([header])
     table_quad = fitsio.BinTableHDU.from_columns(
         eventlist.to_records(
-            index=False,
-            column_dtypes={"EVTYPE": "U1", "CHN": "i8", "QUADID": "U1"},
+            index=False, column_dtypes={"EVTYPE": "U1", "CHN": "i8", "QUADID": "U1"},
         ),
         name="Event list",
     )
