@@ -25,61 +25,61 @@ class Exporter:
         self.filepath = filepath
         self.nthreads = nthreads
         self.can__write_sdd_calibration_report = False
-        if self.calibration.sdd_cal:
+        if self.calibration.sdd_cal is not None:
             self.can__write_sdd_calibration_report = True
         self.can__write_energy_res_report = False
-        if self.calibration.sdd_cal:
+        if self.calibration.sdd_cal is not None:
             self.can__write_energy_res_report = True
         self.can__write_scintillator_report = False
-        if self.calibration.optical_coupling:
+        if self.calibration.optical_coupling is not None:
             self.can__write_scintillator_report = True
         self.can__write_xfit_report = False
-        if self.calibration.xfit:
+        if self.calibration.xfit is not None:
             self.can__write_xfit_report = True
         self.can__write_sfit_report = False
-        if self.calibration.sfit:
+        if self.calibration.sfit is not None:
             self.can__write_sfit_report = True
         self.can__draw_qlooks_sdd = False
-        if self.calibration.sdd_cal:
+        if self.calibration.sdd_cal is not None:
             self.can__draw_qlooks_sdd = True
         self.can__draw_qlook_scint = False
-        if self.calibration.scint_cal:
+        if self.calibration.scint_cal is not None:
             self.can__draw_qlook_scint = True
         self.can__draw_rawspectra = False
-        if self.calibration.data:
+        if True:
             self.can__draw_rawspectra = True
         self.can__draw_sdiagnostics = False
-        if self.calibration.speaks:
+        if self.calibration.speaks is not None:
             self.can__draw_sdiagnostics = True
         self.can__draw_xdiagnostic = False
-        if self.calibration.xfit:
+        if self.calibration.xfit is not None:
             self.can__draw_xdiagnostic = True
         self.can__draw_xspectra = False
-        if self.calibration.sdd_cal:
+        if self.calibration.sdd_cal is not None:
             self.can__draw_xspectra = True
         self.can__draw_sspectra = False
-        if self.calibration.scint_cal:
+        if self.calibration.scint_cal is not None:
             self.can__draw_sspectra = True
         self.can__draw_spectrum = False
-        if self.calibration.eventlist:
+        if self.calibration.eventlist is not None:
             self.can__draw_spectrum = True
         self.can__draw_xspectrum = False
-        if self.calibration.sdd_cal:
+        if self.calibration.sdd_cal is not None:
             self.can__draw_xspectrum = True
         self.can__draw_sspectrum = False
-        if self.calibration.scint_cal:
+        if self.calibration.scint_cal is not None:
             self.can__draw_sspectrum = True
         self.can__draw_linearity = False
-        if self.calibration.sdd_cal:
+        if self.calibration.sdd_cal is not None:
             self.can__draw_linearity = True
         self.can__draw_map_resolution = False
-        if self.calibration.enres:
+        if self.calibration.en_res is not None:
             self.can__draw_map_resolution = True
         self.can__draw_map_counts = False
-        if self.calibration.data:
+        if True:
             self.can__draw_map_counts = True
         self.can__write_eventlist = False
-        if self.calibration.eventlist:
+        if self.calibration.eventlist is not None:
             self.can__write_eventlist = True
 
     def write_sdd_calibration_report(self):

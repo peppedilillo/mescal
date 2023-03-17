@@ -205,6 +205,9 @@ class Calibrate:
         self.radsources = radsources
         self.detector = detector
         self.configuration = configuration
+        self.console = console
+        self.nthreads = nthreads
+        self.flagged = {}
         self._counts = {"all": None, "x": None, "s": None}
         self.eventlist = None
         self.data = None
@@ -219,16 +222,14 @@ class Calibrate:
         self.xpeaks = None
         self.speaks = None
         self.epeaks = None
-        self.xfit = {}
-        self.sfit = {}
-        self.efit = {}
-        self.sdd_cal = {}
-        self.en_res = {}
-        self.scint_cal = {}
-        self.optical_coupling = {}
-        self.flagged = {}
-        self.console = console
-        self.nthreads = nthreads
+        self.xfit = None
+        self.sfit = None
+        self.efit = None
+        self.sdd_cal = None
+        self.en_res = None
+        self.scint_cal = None
+        self.optical_coupling = None
+
 
     def __call__(self, data):
         self.channels = infer_onchannels(data)

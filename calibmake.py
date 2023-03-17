@@ -10,6 +10,7 @@ from pathlib import Path
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
+from rich.progress import track
 
 from source import paths
 from source.calibrate import PEAKS_PARAMS, Calibrate
@@ -554,6 +555,7 @@ class Mescal(Cmd):
         options = [o for o in all_options if any(o.conditions)]
         options_commands = [o.commands for o in options]
         options_conditions = [o.conditions for o in options]
+        options_labels = [o.label for o in options]
         if arg != "all":
             with ui.small_section(self.console, message="Select one or more.") as ss:
                 selection = select_multiple(
@@ -569,12 +571,16 @@ class Mescal(Cmd):
         else:
             # do them all
             selection = [i for i, _ in enumerate(options)]
-
-        for i in sorted(
-            options,
-            key=lambda o: -len(o.label),
+        for i in track(
+            sorted(
+                selection,
+                key=lambda i: -len(options_labels[i]),
+            ),
+            console=self.console,
+            transient=True
         ):
-            for f in options_commands[i]:
+            cmds = options_commands[i]
+            for f in cmds:
                 if options_conditions[i]:
                     f()
         return False
