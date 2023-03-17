@@ -236,7 +236,7 @@ class Exporter:
         return True
 
     def draw_and_save_sspectrum(self):
-        path = paths.SSPPLOT(self.filepath),
+        path = paths.SSPPLOT(self.filepath)
         calibrated_events = self.calibration.eventlist
         radsources = self.calibration.sradsources()
 
@@ -276,7 +276,7 @@ class Exporter:
         return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
 
     def draw_and_save_mapres(self):
-        path = paths.RESPLOT(self.filepath),
+        path = paths.RESPLOT(self.filepath)
         decays = self.calibration.xradsources()
         source = sorted(decays, key=lambda source: decays[source].energy)[0]
 

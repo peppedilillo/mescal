@@ -240,6 +240,7 @@ class Mescal(Cmd):
                 console=self.console,
                 nthreads=self.threads,
             )
+            self.calibration(data)
 
         with console.status("Processing results.."):
             self.exporter = Exporter(
