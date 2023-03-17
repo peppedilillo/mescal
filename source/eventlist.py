@@ -276,6 +276,8 @@ def filter_delay(data, hold_time):
     spirit = data[mask]
     waste = data[~mask]
     return spirit, waste
+
+
 # def filter_delay(data, hold_time):
 #     unique_times = data.TIME.unique()
 #     bad_events = unique_times[np.where(np.diff(unique_times) < hold_time)[0] + 1]
