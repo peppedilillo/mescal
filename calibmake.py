@@ -549,12 +549,9 @@ class Mescal(Cmd):
         ]
 
         options = [o for o in all_options if any(o.conditions)]
-        options_commands = [o.commands for o in options]
-        options_conditions = [o.conditions for o in options]
-        options_labels = [o.label for o in options]
         if arg != "all":
             with ui.small_section(self.console, message="Select one or more.") as ss:
-                selection = select_multiple(
+                indeces = select_multiple(
                     [o.label for o in options],
                     self.console,
                     ticked_indices=[i for i, v in enumerate(options) if v.ticked],
@@ -562,18 +559,17 @@ class Mescal(Cmd):
                 )
         else:
             # do them all
-            selection = [i for i, _ in enumerate(options)]
-        for i in track(
-            sorted(
-                selection,
-                key=lambda i: -len(options_labels[i]),
-            ),
-            console=self.console,
-            transient=True,
-        ):
-            cmds = options_commands[i]
-            for f in cmds:
-                if options_conditions[i]:
+            indeces = [i for i, _ in enumerate(options)]
+
+        selection = [options[i] for i in indeces]
+        commands = [c for o in selection for c in o.commands ]
+        conditions = [c for o in selection for c in o.conditions]
+        with ui.progress_bar(self.console) as p:
+            for condition, f in p.track(
+                    zip(conditions, commands),
+                    total=len(commands)
+            ):
+                if condition:
                     f()
         return False
 
