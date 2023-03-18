@@ -179,13 +179,13 @@ def find_adc_bins(data, binning, maxmargin=10, roundto=500, clipquant=0.996):
 
     """
     # _remove eventual zeros
-    min = data.min()
-    clipped_data = data[data > min + maxmargin]
+    min_ = data.min()
+    clipped_data = data[data > min_ + maxmargin]
     lo = clipped_data.quantile(1 - clipquant)
     lo = floor(lo / roundto) * roundto
     # _remove saturated data
-    max = data.max()
-    clipped_data = data[data < max - maxmargin]
+    max_ = data.max()
+    clipped_data = data[data < max_ - maxmargin]
     hi = clipped_data.quantile(clipquant)
     hi = ceil(hi / roundto) * roundto
 
@@ -205,7 +205,11 @@ class Calibrate:
         self.radsources = radsources
         self.detector = detector
         self.configuration = configuration
+        self.console = console
+        self.nthreads = nthreads
+        self.flagged = {}
         self._counts = {"all": None, "x": None, "s": None}
+        self.eventlist = None
         self.data = None
         self.waste = None
         self.channels = None
@@ -218,23 +222,20 @@ class Calibrate:
         self.xpeaks = None
         self.speaks = None
         self.epeaks = None
-        self.xfit = {}
-        self.sfit = {}
-        self.efit = {}
-        self.sdd_cal = {}
-        self.en_res = {}
-        self.scint_cal = {}
-        self.optical_coupling = {}
-        self.flagged = {}
-        self.console = console
-        self.nthreads = nthreads
+        self.xfit = None
+        self.sfit = None
+        self.efit = None
+        self.sdd_cal = None
+        self.en_res = None
+        self.scint_cal = None
+        self.optical_coupling = None
 
     def __call__(self, data):
         self.channels = infer_onchannels(data)
         self.data = self._preprocess(data)
         self._bin()
-        eventlist = self._calibrate()
-        return eventlist
+        self.eventlist = self._calibrate()
+        return self.eventlist
 
     def _bin(self):
         binning = self.configuration["binning"]
@@ -809,7 +810,6 @@ class Calibrate:
     def _compute_effective_light_outputs(self):
         results = {}
         for quad in self.sfit.keys():
-            quad_couples = self.detector.couples[quad]
             for ch in self.sfit[quad].index:
                 companion = self._companion(quad, ch)
                 scint = self._scintid(quad, ch)
@@ -871,7 +871,7 @@ class Calibrate:
             raise err.FailedFitError("too few bins to fit.")
         x_fit = (x[x_start : x_stop + 1][1:] + x[x_start : x_stop + 1][:-1]) / 2
         y_fit = y[x_start:x_stop]
-        if np.sum(y_fit) < 100:
+        if np.sum(y_fit) < min_counts:
             raise err.FailedFitError("too few counts to fit.")
         errors = np.clip(np.sqrt(y_fit), 1, None)
 

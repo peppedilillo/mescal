@@ -10,6 +10,7 @@ from pathlib import Path
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
+from rich.progress import track
 
 from source import paths
 from source.calibrate import PEAKS_PARAMS, Calibrate
@@ -17,23 +18,8 @@ from source.cli import elementsui as ui
 from source.cli.beaupy.beaupy import select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import Detector
-from source.io import (
-    get_writer,
-    pandas_from_LV0d5,
-    write_eventlist_to_fits,
-    write_report_to_excel,
-)
+from source.io import Exporter, pandas_from_LV0d5
 from source.plot import (
-    draw_and_save_calibrated_spectra,
-    draw_and_save_channels_sspectra,
-    draw_and_save_channels_xspectra,
-    draw_and_save_diagns,
-    draw_and_save_lins,
-    draw_and_save_mapcounts,
-    draw_and_save_mapres,
-    draw_and_save_qlooks,
-    draw_and_save_slo,
-    draw_and_save_uncalibrated,
     mapcounts,
     mapenres,
     uncalibrated,
@@ -211,7 +197,7 @@ INVALID_ENTRY = 0
 
 class Mescal(Cmd):
     """
-    Main program class implementing calibration workflow and shell loop.
+    A script implementing calibration workflow and shell loop.
     """
 
     intro = "Type help or ? for a list of commands.\n"
@@ -251,10 +237,17 @@ class Mescal(Cmd):
                 console=self.console,
                 nthreads=self.threads,
             )
-            self.eventlist = self.calibration(data)
+            self.calibration(data)
 
         with console.status("Processing results.."):
-            self._process_results(self.args.fmt, self.args.filepath)
+            self.exporter = Exporter(
+                self.calibration,
+                self.args.filepath,
+                self.args.fmt,
+                nthreads=self.threads,
+            )
+            self.export_essentials(self.args.filepath)
+            self.print_calibration_status()
 
         if any(self.calibration.flagged):
             ui.sections_rule(console, "[bold italic]Warning", style="red")
@@ -280,10 +273,8 @@ class Mescal(Cmd):
         self.console.print(message)
         return True
 
-    def _process_results(self, output_format, filepath):
+    def print_calibration_status(self):
         """Prepares and exports base calibration results."""
-        write_report = get_writer(output_format)
-
         if not self.calibration.sdd_cal and not self.calibration.optical_coupling:
             self.console.log("[bold red]:red_circle: Calibration failed.")
         elif not self.calibration.sdd_cal or not self.calibration.optical_coupling:
@@ -293,47 +284,25 @@ class Mescal(Cmd):
         else:
             self.console.log(":green_circle: Calibration complete.")
 
-        if self.calibration.sdd_cal:
-            write_report(
-                self.calibration.sdd_cal,
-                path=paths.CALREPORT(filepath),
-            )
+    def export_essentials(self, filepath):
+        if self.exporter.can__write_sdd_calibration_report:
+            self.exporter.write_sdd_calibration_report()
             self.console.log(":blue_book: Wrote SDD calibration results.")
-            write_report(
-                self.calibration.en_res,
-                path=paths.RESREPORT(filepath),
-            )
+        if self.exporter.can__write_energy_res_report:
+            self.exporter.write_energy_res_report()
             self.console.log(":blue_book: Wrote energy resolution results.")
-            draw_and_save_qlooks(
-                self.calibration.sdd_cal,
-                path=paths.QLKPLOT(filepath),
-                nthreads=self.threads,
-            )
+        if self.exporter.can__draw_qlooks_sdd:
+            self.exporter.draw_qlooks_sdd()
             self.console.log(":chart_increasing: Saved X fit quicklook plots.")
-
-        if self.calibration.optical_coupling:
-            write_report(
-                self.calibration.optical_coupling,
-                path=paths.SLOREPORT(filepath),
-            )
+        if self.exporter.can__write_scintillator_report:
+            self.exporter.write_scintillator_report()
             self.console.log(":blue_book: Wrote scintillators calibration results.")
-            draw_and_save_slo(
-                self.calibration.optical_coupling,
-                path=paths.SLOPLOT(filepath),
-                nthreads=self.threads,
-            )
+        if self.exporter.can__draw_qlook_scint:
+            self.exporter.draw_qlook_scint()
             self.console.log(":chart_increasing: Saved light-output plots.")
-
-        if (self.eventlist is not None) and (not self.eventlist.empty):
-            draw_and_save_calibrated_spectra(
-                self.eventlist,
-                self.calibration.xradsources(),
-                self.calibration.sradsources(),
-                paths.XSPPLOT(filepath),
-                paths.SSPPLOT(filepath),
-            )
+        if self.exporter.can__draw_spectrum:
+            self.exporter.draw_spectrum()
             self.console.log(":chart_increasing: Saved calibrated spectra plots.")
-        return True
 
     def can(self, x):
         """Checks if a command can be executed."""
@@ -360,7 +329,7 @@ class Mescal(Cmd):
                 self.console, "[bold italic]Calibration log", style="green"
             )
             self.calibration._calibrate()
-            self._process_results(self.args.fmt, self.args.filepath)
+            self._process_results(self.args.filepath)
             ui.sections_rule(self.console, "[bold italic]Shell", style="green")
         return False
 
@@ -435,7 +404,7 @@ class Mescal(Cmd):
         return False
 
     def can_map(self, arg):
-        if self.eventlist is not None:
+        if self.calibration.eventlist is not None:
             return True
         return False
 
@@ -447,7 +416,7 @@ class Mescal(Cmd):
         return False
 
     def can_mapx(self, arg):
-        if self.eventlist is not None:
+        if self.calibration.eventlist is not None:
             return True
         return False
 
@@ -459,7 +428,7 @@ class Mescal(Cmd):
         return False
 
     def can_maps(self, arg):
-        if self.eventlist is not None:
+        if self.calibration.eventlist is not None:
             return True
         return False
 
@@ -501,261 +470,111 @@ class Mescal(Cmd):
 
     def do_export(self, arg):
         """Prompts user on optional data product exports."""
-
         Option = namedtuple(
             "Option",
             [
                 "label",
-                "command",
+                "commands",
+                "conditions",
                 "ticked",
             ],
         )
         all_options = [
-            Option("uncalibrated plots", "svhistplot", True),
-            Option("diagnostic plots", "svdiags", True),
-            Option("linearity plots", "svlinplots", False),
-            Option("spectra plots per channel", "svchnplots", False),
-            Option("maps", "svmapres", True),
-            Option("fit tables", "svtabfit", True),
-            Option("calibrated events fits", "svevents", False),
+            Option(
+                "uncalibrated plots",
+                [self.exporter.draw_rawspectra],
+                [self.exporter.can__draw_rawspectra],
+                True,
+            ),
+            Option(
+                "diagnostic plots",
+                [
+                    self.exporter.draw_xdiagnostic,
+                    self.exporter.draw_sdiagnostics,
+                ],
+                [
+                    self.exporter.can__draw_xdiagnostic,
+                    self.exporter.can__draw_sdiagnostics,
+                ],
+                True,
+            ),
+            Option(
+                "linearity plots",
+                [self.exporter.draw_linearity],
+                [self.exporter.can__draw_linearity],
+                False,
+            ),
+            Option(
+                "spectra plots per channel",
+                [
+                    self.exporter.draw_sspectra,
+                    self.exporter.draw_xspectra,
+                ],
+                [
+                    self.exporter.can__draw_sspectra,
+                    self.exporter.can__draw_xspectra,
+                ],
+                False,
+            ),
+            Option(
+                "maps",
+                [
+                    self.exporter.draw_map_counts,
+                    self.exporter.draw_map_resolution,
+                ],
+                [
+                    self.exporter.can__draw_map_counts,
+                    self.exporter.can__draw_map_resolution,
+                ],
+                True,
+            ),
+            Option(
+                "fit tables",
+                [
+                    self.exporter.write_xfit_report,
+                    self.exporter.write_sfit_report,
+                ],
+                [
+                    self.exporter.can__write_xfit_report,
+                    self.exporter.can__write_sfit_report,
+                ],
+                True,
+            ),
+            Option(
+                "calibrated events fits",
+                [self.exporter.write_eventlist],
+                [self.exporter.can__write_eventlist],
+                False,
+            ),
         ]
 
-        options = [o for o in all_options if self.can(o.command)]
+        options = [o for o in all_options if any(o.conditions)]
+        options_commands = [o.commands for o in options]
+        options_conditions = [o.conditions for o in options]
         options_labels = [o.label for o in options]
-        options_commands = [o.command for o in options]
-        options_ticked = [i for i, v in enumerate(options) if v.ticked]
         if arg != "all":
             with ui.small_section(self.console, message="Select one or more.") as ss:
                 selection = select_multiple(
-                    options_labels,
+                    [o.label for o in options],
                     self.console,
-                    ticked_indices=options_ticked,
+                    ticked_indices=[i for i, v in enumerate(options) if v.ticked],
                     return_indices=True,
                 )
         else:
             # do them all
             selection = [i for i, _ in enumerate(options)]
-        for i in sorted(
-            selection,
-            key=lambda i: -len(options_labels[i]),
+        for i in track(
+            sorted(
+                selection,
+                key=lambda i: -len(options_labels[i]),
+            ),
+            console=self.console,
+            transient=True,
         ):
-            do = getattr(self, options_commands[i])
-            do("")
-        return False
-
-    def svmapcounts(self, arg):
-        """Saves a map of per-channel counts."""
-        with self.console.status(self.spinner_message):
-            draw_and_save_mapcounts(
-                self.calibration.count(),
-                self.calibration.detector.map,
-                paths.CNTPLOT(self.args.filepath),
-            )
-        return False
-
-    def svhistplot(self, arg):
-        """Save raw acquisition histogram plots."""
-        with self.console.status(self.spinner_message):
-            draw_and_save_uncalibrated(
-                self.calibration.xhistograms,
-                self.calibration.shistograms,
-                paths.UNCPLOT(self.args.filepath),
-                nthreads=self.threads,
-            )
-        return False
-
-    def can_svmapres(self):
-        if self.calibration.xradsources().keys() and self.calibration.en_res:
-            return True
-        return False
-
-    def svmapres(self, arg):
-        """Saves a map of channels' energy resolution."""
-        if not self.can_svmapres():
-            self.console.print(self.invalid_command_message)
-            return False
-        with self.console.status(self.spinner_message):
-            decays = self.calibration.xradsources()
-            source = sorted(decays, key=lambda source: decays[source].energy)[0]
-            draw_and_save_mapres(
-                source,
-                self.calibration.en_res,
-                self.calibration.detector.map,
-                paths.RESPLOT(self.args.filepath),
-            )
-        return False
-
-    def can_svdiags(self):
-        if self.calibration.xfit or self.calibration.sfit:
-            return True
-        return False
-
-    def svdiags(self, arg):
-        """Save X and S peak detection diagnostics plots."""
-        if not self.can_svdiags():
-            self.console.print(self.invalid_command_message)
-            return False
-        if self.can_svxdiags():
-            self.svxdiags(arg)
-        if self.can_svsdiags():
-            self.svsdiags(arg)
-        return False
-
-    def can_svxdiags(self):
-        if self.calibration.xfit:
-            return True
-        return False
-
-    def svxdiags(self, arg):
-        """Save X peak detection diagnostics plots."""
-        if not self.can_svxdiags():
-            self.console.print(self.invalid_command_message)
-            return False
-        with self.console.status(self.spinner_message):
-            if self.calibration.xfit:
-                draw_and_save_diagns(
-                    self.calibration.xhistograms,
-                    self.calibration.xfit,
-                    paths.XDNPLOT(self.args.filepath),
-                    nthreads=self.threads,
-                )
-        return False
-
-    def can_svsdiags(self):
-        if self.calibration.sfit:
-            return True
-        return False
-
-    def svsdiags(self, arg):
-        """Save X peak detection diagnostics plots."""
-        if not self.can_svsdiags():
-            self.console.print(self.invalid_command_message)
-            return False
-        with self.console.status(self.spinner_message):
-            if self.calibration.sfit:
-                draw_and_save_diagns(
-                    self.calibration.shistograms,
-                    self.calibration.sfit,
-                    paths.SDNPLOT(self.args.filepath),
-                    nthreads=self.threads,
-                )
-        return False
-
-    def can_svtabfit(self):
-        if self.calibration.xfit or self.calibration.sfit:
-            return True
-        return False
-
-    def svtabfit(self, arg):
-        """Save X fit tables."""
-        if not self.can_svtabfit():
-            self.console.print(self.invalid_command_message)
-            return False
-        with self.console.status(self.spinner_message):
-            if self.calibration.xfit:
-                write_report_to_excel(
-                    self.calibration.xfit,
-                    paths.XFTREPORT(self.args.filepath),
-                )
-            if self.calibration.sfit:
-                write_report_to_excel(
-                    self.calibration.sfit,
-                    paths.SFTREPORT(self.args.filepath),
-                )
-        return False
-
-    def can_svchnplots(self):
-        if self.can_svxplots() or self.can_svsplots():
-            return True
-        return False
-
-    def svchnplots(self, arg):
-        """Save calibrated X channel spectra."""
-        if not self.can_svchnplots():
-            self.console.print(self.invalid_command_message)
-            return False
-        if self.can_svxplots():
-            self.svxplots(arg)
-        if self.can_svsplots():
-            self.svsplots(arg)
-        return False
-
-    def can_svxplots(self):
-        if self.calibration.sdd_cal:
-            return True
-        return False
-
-    def svxplots(self, arg):
-        """Save calibrated X channel spectra."""
-        if not self.can_svxplots():
-            self.console.print(self.invalid_command_message)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_channels_xspectra(
-                self.calibration.xhistograms,
-                self.calibration.sdd_cal,
-                self.calibration.xradsources(),
-                paths.XCSPLOT(self.args.filepath),
-                nthreads=self.threads,
-            )
-        return False
-
-    def can_svlinplots(self):
-        if self.calibration.sdd_cal:
-            return True
-        return False
-
-    def svlinplots(self, arg):
-        """Save SDD linearity plots."""
-        if not self.can_svlinplots():
-            self.console.print(self.invalid_command_message)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_lins(
-                self.calibration.sdd_cal,
-                self.calibration.xfit,
-                self.calibration.xradsources(),
-                paths.LINPLOT(self.args.filepath),
-                nthreads=self.threads,
-            )
-        return False
-
-    def can_svsplots(self):
-        if self.calibration.optical_coupling:
-            return True
-        return False
-
-    def svsplots(self, arg):
-        """Save calibrated gamma channel spectra."""
-        if not self.can_svsplots():
-            self.console.print(self.invalid_command_message)
-            return False
-        with self.console.status(self.spinner_message):
-            draw_and_save_channels_sspectra(
-                self.calibration.shistograms,
-                self.calibration.sdd_cal,
-                self.calibration.optical_coupling,
-                self.calibration.sradsources(),
-                paths.SCSPLOT(self.args.filepath),
-                nthreads=self.threads,
-            )
-        return False
-
-    def can_svevents(self):
-        if self.eventlist is not None:
-            return True
-        return False
-
-    def svevents(self, arg):
-        """Save calibrated events to fits file."""
-        if not self.can_svevents():
-            self.console.print(self.invalid_command_message)
-            return False
-        with self.console.status(self.spinner_message):
-            write_eventlist_to_fits(
-                self.eventlist,
-                paths.EVLFITS(self.args.filepath),
-            )
+            cmds = options_commands[i]
+            for f in cmds:
+                if options_conditions[i]:
+                    f()
         return False
 
 

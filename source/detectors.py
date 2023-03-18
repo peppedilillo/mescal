@@ -176,13 +176,13 @@ if __name__ == '__main__':
     ROWS = 6
     COLS = 5
 
-    for model, map in _maps.items():
+    for model, map_ in _maps.items():
         # checks for 4 quadrants
-        assert len(map.keys()) == TOT_QUAD
-        for quadrant in map.keys():
+        assert len(map_.keys()) == TOT_QUAD
+        for quadrant in map_.keys():
             print("testing quadrant {} of {}..".format(quadrant, model))
-            channels = [sdd for sdd in map[quadrant]]
-            bonded = [sdd for sdd in map[quadrant] if sdd != UNBOND]
+            channels = [sdd for sdd in map_[quadrant]]
+            bonded = [sdd for sdd in map_[quadrant] if sdd != UNBOND]
             # checks for 32 channels
             assert len(channels) == TOT_CH
             # checks for no duplicates in each quadrant
