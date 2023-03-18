@@ -1,6 +1,6 @@
-# mescal
 ![Alt Text](mescal.gif)
 
+# mescal
 
 Hello and welcome to mescal, your favourite software to analyze HERMES-TP/SP data :).
 
