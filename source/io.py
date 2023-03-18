@@ -24,6 +24,9 @@ class Exporter:
         self.writer = get_writer(table_format)
         self.filepath = filepath
         self.nthreads = nthreads
+
+        self.can__draw_rawspectra = True
+        self.can__draw_map_counts = True
         self.can__write_sdd_calibration_report = False
         if self.calibration.sdd_cal is not None:
             self.can__write_sdd_calibration_report = True
@@ -45,9 +48,6 @@ class Exporter:
         self.can__draw_qlook_scint = False
         if self.calibration.scint_cal is not None:
             self.can__draw_qlook_scint = True
-        self.can__draw_rawspectra = False
-        if True:
-            self.can__draw_rawspectra = True
         self.can__draw_sdiagnostics = False
         if self.calibration.speaks is not None:
             self.can__draw_sdiagnostics = True
@@ -75,9 +75,6 @@ class Exporter:
         self.can__draw_map_resolution = False
         if self.calibration.en_res is not None:
             self.can__draw_map_resolution = True
-        self.can__draw_map_counts = False
-        if True:
-            self.can__draw_map_counts = True
         self.can__write_eventlist = False
         if self.calibration.eventlist is not None:
             self.can__write_eventlist = True

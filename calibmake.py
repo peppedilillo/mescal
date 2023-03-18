@@ -18,11 +18,7 @@ from source.cli import elementsui as ui
 from source.cli.beaupy.beaupy import select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import Detector
-from source.io import Exporter
-from source.io import (
-    pandas_from_LV0d5,
-    write_eventlist_to_fits,
-)
+from source.io import Exporter, pandas_from_LV0d5
 from source.plot import (
     mapcounts,
     mapenres,
@@ -201,7 +197,7 @@ INVALID_ENTRY = 0
 
 class Mescal(Cmd):
     """
-    Main program class implementing calibration workflow and shell loop.
+    A script implementing calibration workflow and shell loop.
     """
 
     intro = "Type help or ? for a list of commands.\n"
