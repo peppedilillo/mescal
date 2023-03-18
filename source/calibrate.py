@@ -230,7 +230,6 @@ class Calibrate:
         self.scint_cal = None
         self.optical_coupling = None
 
-
     def __call__(self, data):
         self.channels = infer_onchannels(data)
         self.data = self._preprocess(data)

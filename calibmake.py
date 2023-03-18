@@ -484,7 +484,7 @@ class Mescal(Cmd):
                 "uncalibrated plots",
                 [self.exporter.draw_rawspectra],
                 [self.exporter.can__draw_rawspectra],
-                True
+                True,
             ),
             Option(
                 "diagnostic plots",
@@ -496,13 +496,13 @@ class Mescal(Cmd):
                     self.exporter.can__draw_xdiagnostic,
                     self.exporter.can__draw_sdiagnostics,
                 ],
-                True
+                True,
             ),
             Option(
                 "linearity plots",
                 [self.exporter.draw_linearity],
                 [self.exporter.can__draw_linearity],
-                False
+                False,
             ),
             Option(
                 "spectra plots per channel",
@@ -514,7 +514,7 @@ class Mescal(Cmd):
                     self.exporter.can__draw_sspectra,
                     self.exporter.can__draw_xspectra,
                 ],
-                False
+                False,
             ),
             Option(
                 "maps",
@@ -526,7 +526,7 @@ class Mescal(Cmd):
                     self.exporter.can__draw_map_counts,
                     self.exporter.can__draw_map_resolution,
                 ],
-                True
+                True,
             ),
             Option(
                 "fit tables",
@@ -538,13 +538,13 @@ class Mescal(Cmd):
                     self.exporter.can__write_xfit_report,
                     self.exporter.can__write_sfit_report,
                 ],
-                True
+                True,
             ),
             Option(
                 "calibrated events fits",
                 [self.exporter.write_eventlist],
                 [self.exporter.can__write_eventlist],
-                False
+                False,
             ),
         ]
 
@@ -557,11 +557,7 @@ class Mescal(Cmd):
                 selection = select_multiple(
                     [o.label for o in options],
                     self.console,
-                    ticked_indices=[
-                        i
-                        for i, v in enumerate(options)
-                        if v.ticked
-                    ],
+                    ticked_indices=[i for i, v in enumerate(options) if v.ticked],
                     return_indices=True,
                 )
         else:
@@ -573,7 +569,7 @@ class Mescal(Cmd):
                 key=lambda i: -len(options_labels[i]),
             ),
             console=self.console,
-            transient=True
+            transient=True,
         ):
             cmds = options_commands[i]
             for f in cmds:
