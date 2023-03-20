@@ -16,8 +16,11 @@ from source.errors import warn_nan_in_sdd_calib, warn_nan_in_slo_table
 
 
 class Exporter:
+    """
+    A class administring what data product can be exported.
+    """
     def __init__(self, calibration, filepath, table_format, nthreads=1):
-        # calibration must have been executed to export
+        # calibration must have been executed  already to be exported
         assert calibration.data is not None
 
         self.calibration = calibration
@@ -80,36 +83,42 @@ class Exporter:
             self.can__write_eventlist = True
 
     def write_sdd_calibration_report(self):
+        assert self.can__write_sdd_calibration_report
         self.writer(
             self.calibration.sdd_cal,
             path=paths.CALREPORT(self.filepath),
         )
 
     def write_energy_res_report(self):
+        assert self.can__write_energy_res_report
         self.writer(
             self.calibration.en_res,
             path=paths.RESREPORT(self.filepath),
         )
 
     def write_scintillator_report(self):
+        assert self.can__write_scintillator_report
         self.writer(
             self.calibration.optical_coupling,
             path=paths.SLOREPORT(self.filepath),
         )
 
     def write_xfit_report(self):
+        assert self.can__write_xfit_report
         write_report_to_excel(
             self.calibration.xfit,
             paths.XFTREPORT(self.filepath),
         )
 
     def write_sfit_report(self):
+        assert self.can__write_sfit_report
         write_report_to_excel(
             self.calibration.sfit,
             paths.SFTREPORT(self.filepath),
         )
 
     def draw_qlooks_sdd(self):
+        assert self.can__draw_qlooks_sdd
         res_cal = self.calibration.sdd_cal
         path = paths.QLKPLOT(self.filepath)
 
@@ -125,12 +134,14 @@ class Exporter:
             plt.close(fig)
 
     def write_eventlist(self):
+        assert self.can__write_eventlist
         write_eventlist_to_fits(
             self.calibration.eventlist,
             paths.EVLFITS(self.filepath),
         )
 
     def draw_qlook_scint(self):
+        assert self.can__draw_qlook_scint
         res_slo = self.calibration.optical_coupling
         path = paths.SLOPLOT(self.filepath)
 
@@ -146,6 +157,7 @@ class Exporter:
             plt.close(fig)
 
     def draw_rawspectra(self):
+        assert self.can__draw_rawspectra
         def helper(quad):
             for ch in range(32):
                 fig, ax = plot.uncalibrated(
@@ -168,6 +180,7 @@ class Exporter:
         )
 
     def draw_sdiagnostics(self):
+        assert self.can__draw_sdiagnostics
         def helper(quad):
             for ch in res_fit[quad].index:
                 fig, ax = plot.diagnostics(
@@ -196,6 +209,7 @@ class Exporter:
         )
 
     def draw_xdiagnostic(self):
+        assert self.can__draw_xdiagnostic
         def helper(quad):
             for ch in res_fit[quad].index:
                 fig, ax = plot.diagnostics(
@@ -224,6 +238,7 @@ class Exporter:
         )
 
     def draw_xspectra(self):
+        assert self.can__draw_xspectra
         def helper(quad):
             for ch in res_cal[quad].index:
                 offset = res_cal[quad].loc[ch]["offset"]
@@ -249,6 +264,7 @@ class Exporter:
         )
 
     def draw_sspectra(self):
+        assert self.can__draw_sspectra
         def helper(quad):
             for ch in res_slo[quad].index:
                 offset = res_cal[quad].loc[ch]["offset"]
@@ -278,11 +294,13 @@ class Exporter:
         )
 
     def draw_spectrum(self):
+        assert self.can__draw_spectrum
         self.draw_xspectrum()
         self.draw_sspectrum()
         return True
 
     def draw_xspectrum(self):
+        assert self.can__draw_xspectrum
         path = paths.XSPPLOT(self.filepath)
         calibrated_events = self.calibration.eventlist
         radsources = self.calibration.xradsources()
@@ -302,6 +320,7 @@ class Exporter:
         return True
 
     def draw_sspectrum(self):
+        assert self.can__draw_sspectrum
         path = paths.SSPPLOT(self.filepath)
         calibrated_events = self.calibration.eventlist
         radsources = self.calibration.sradsources()
@@ -320,6 +339,7 @@ class Exporter:
         return True
 
     def draw_linearity(self):
+        assert self.can__draw_linearity
         def helper(quad):
             for ch in res_cal[quad].index:
                 fig, ax = plot.linearity(
@@ -346,6 +366,7 @@ class Exporter:
         )
 
     def draw_map_resolution(self):
+        assert self.can__draw_map_resolution
         path = paths.RESPLOT(self.filepath)
         decays = self.calibration.xradsources()
         source = sorted(decays, key=lambda source: decays[source].energy)[0]
@@ -360,6 +381,7 @@ class Exporter:
         return True
 
     def draw_map_counts(self):
+        assert self.can__draw_map_counts
         path = paths.CNTPLOT(self.filepath)
         counts = self.calibration.count()
         detmap = self.calibration.detector.map

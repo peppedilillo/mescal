@@ -237,6 +237,25 @@ class Calibrate:
         self.eventlist = self._calibrate()
         return self.eventlist
 
+    def count(self, key="all"):
+        assert key in self._counts
+        if self._counts[key] is None:
+            self._counts[key] = perchannel_counts(self.data, self.channels, key=key)
+        return self._counts[key]
+
+    def waste_count(self, key="all"):
+        if self.waste is not None:
+            return perchannel_counts(self.waste, self.channels, key=key)
+        return {}
+
+    def xradsources(self):
+        xradsources, _ = self.radsources
+        return xradsources
+
+    def sradsources(self):
+        _, sradsources = self.radsources
+        return sradsources
+
     def _bin(self):
         binning = self.configuration["binning"]
 
@@ -343,14 +362,6 @@ class Calibrate:
             self.console.log(message)
         else:
             print(message)
-
-    def xradsources(self):
-        xradsources, _ = self.radsources
-        return xradsources
-
-    def sradsources(self):
-        _, sradsources = self.radsources
-        return sradsources
 
     # TODO: to be later moved to a dedicated assembly model object
     def _companion(self, quad, ch):
@@ -926,14 +937,3 @@ class Calibrate:
         intervals = [*zip(centers + sigmas * lower, centers + sigmas * upper)]
         fit_results = self._fit_peaks(x, y, intervals)
         return intervals, fit_results
-
-    def count(self, key="all"):
-        assert key in self._counts
-        if self._counts[key] is None:
-            self._counts[key] = perchannel_counts(self.data, self.channels, key=key)
-        return self._counts[key]
-
-    def waste_count(self, key="all"):
-        if self.waste is not None:
-            return perchannel_counts(self.waste, self.channels, key=key)
-        return {}

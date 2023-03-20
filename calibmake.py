@@ -10,7 +10,6 @@ from pathlib import Path
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
-from rich.progress import track
 
 from source import paths
 from source.calibrate import PEAKS_PARAMS, Calibrate
@@ -246,17 +245,17 @@ class Mescal(Cmd):
                 self.args.fmt,
                 nthreads=self.threads,
             )
-            self.export_essentials(self.args.filepath)
             self.print_calibration_status()
+            self.export_essentials(self.args.filepath)
 
         if any(self.calibration.flagged):
             ui.sections_rule(console, "[bold italic]Warning", style="red")
-            self._warn_about_flagged()
+            self.warn_about_flagged()
 
         ui.sections_rule(console, "[bold italic]Shell", style="green")
         self.cmdloop()
 
-    def _warn_about_flagged(self):
+    def warn_about_flagged(self):
         """Tells user about channels for which calibration
         could not be completed.
         """
@@ -329,7 +328,7 @@ class Mescal(Cmd):
                 self.console, "[bold italic]Calibration log", style="green"
             )
             self.calibration._calibrate()
-            self._process_results(self.args.filepath)
+            self.export_essentials(self.args.filepath)
             ui.sections_rule(self.console, "[bold italic]Shell", style="green")
         return False
 
