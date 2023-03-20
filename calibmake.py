@@ -10,7 +10,6 @@ from pathlib import Path
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
-from rich.progress import track
 
 from source import paths
 from source.calibrate import PEAKS_PARAMS, Calibrate
@@ -246,17 +245,17 @@ class Mescal(Cmd):
                 self.args.fmt,
                 nthreads=self.threads,
             )
-            self.export_essentials(self.args.filepath)
             self.print_calibration_status()
+            self.export_essentials(self.args.filepath)
 
         if any(self.calibration.flagged):
             ui.sections_rule(console, "[bold italic]Warning", style="red")
-            self._warn_about_flagged()
+            self.warn_about_flagged()
 
         ui.sections_rule(console, "[bold italic]Shell", style="green")
         self.cmdloop()
 
-    def _warn_about_flagged(self):
+    def warn_about_flagged(self):
         """Tells user about channels for which calibration
         could not be completed.
         """
@@ -329,7 +328,7 @@ class Mescal(Cmd):
                 self.console, "[bold italic]Calibration log", style="green"
             )
             self.calibration._calibrate()
-            self._process_results(self.args.filepath)
+            self.export_essentials(self.args.filepath)
             ui.sections_rule(self.console, "[bold italic]Shell", style="green")
         return False
 
@@ -549,12 +548,9 @@ class Mescal(Cmd):
         ]
 
         options = [o for o in all_options if any(o.conditions)]
-        options_commands = [o.commands for o in options]
-        options_conditions = [o.conditions for o in options]
-        options_labels = [o.label for o in options]
         if arg != "all":
             with ui.small_section(self.console, message="Select one or more.") as ss:
-                selection = select_multiple(
+                indeces = select_multiple(
                     [o.label for o in options],
                     self.console,
                     ticked_indices=[i for i, v in enumerate(options) if v.ticked],
@@ -562,18 +558,17 @@ class Mescal(Cmd):
                 )
         else:
             # do them all
-            selection = [i for i, _ in enumerate(options)]
-        for i in track(
-            sorted(
-                selection,
-                key=lambda i: -len(options_labels[i]),
-            ),
-            console=self.console,
-            transient=True,
-        ):
-            cmds = options_commands[i]
-            for f in cmds:
-                if options_conditions[i]:
+            indeces = [i for i, _ in enumerate(options)]
+
+        selection = [options[i] for i in indeces]
+        commands = [c for o in selection for c in o.commands ]
+        conditions = [c for o in selection for c in o.conditions]
+        with ui.progress_bar(self.console) as p:
+            for condition, f in p.track(
+                    zip(conditions, commands),
+                    total=len(commands)
+            ):
+                if condition:
                     f()
         return False
 

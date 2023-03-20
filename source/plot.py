@@ -14,9 +14,6 @@ matplotlib.rcParams = fcm.changeRCParams(
     mpl=matplotlib,
 )
 
-# colormap = matplotlib.cm.get_cmap('hot_ur') #'inferno_r' #'hot_ur'
-# colormapBi = matplotlib.cm.get_cmap('coldwhot_u')
-
 
 def _compute_lims_for_x(radsources: dict):
     if radsources and max([r.energy for r in radsources.values()]) > 40:

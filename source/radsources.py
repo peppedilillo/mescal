@@ -51,6 +51,7 @@ GAMMA_SOURCES = {
     "CS": Cs,
 }
 
+
 def radsources_dicts(sources: list):
     xdecays = {}
     sdecays = {}

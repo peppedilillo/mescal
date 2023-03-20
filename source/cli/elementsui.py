@@ -4,6 +4,15 @@ from rich.console import Console
 from rich.text import Text
 from rich.theme import Theme
 from rich.rule import Rule
+from rich.progress import (
+    SpinnerColumn,
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 
 from source.paths import LOGOPATH
 from source.utils import get_version
@@ -72,7 +81,7 @@ def shell_section_header(console, header):
 
 
 class small_section:
-    def __init__(self, console="", header="", message=""):
+    def __init__(self, console, header="", message=""):
         self.console = console
         self.width = int(self.console.width / 2)
         self.header = header
@@ -97,3 +106,33 @@ class small_section:
 
     def print(self, *args, **kwargs):
         self.console.print(*args, **kwargs, width=self.width)
+
+
+# Define custom progress bar
+def progress_bar(console):
+    out = Progress(
+        SpinnerColumn(),
+        TextColumn("[i]Working..[/] [progress.percentage]{task.percentage:>3.0f}%"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("-"),
+        TimeElapsedColumn(),
+        TextColumn("-"),
+        TimeRemainingColumn(),
+        console=console,
+        expand=True,
+        transient=True,
+    )
+    return out
+
+
+if __name__ == "__main__":
+    # Use custom progress bar
+    console_ = Console()
+    with small_section(console=console_, header="Example", message="This is a small section") as s:
+        s.print("some text")
+
+    with progress_bar(console_) as p:
+        for i in p.track(range(200)):
+            # Do something here
+            sleep(0.1)
