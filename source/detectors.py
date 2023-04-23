@@ -1,9 +1,8 @@
-# fmt: off
 import numpy as np
-
 
 UNBOND = (-1, -1)
 
+# fmt: off
 dm = {
     'A': ((5, 0), (5, 1), (5, 2), (5, 3), UNBOND, (4, 1), (4, 0), (3, 0),
           (3, 1), (5, 4), (4, 4), (3, 4), (4, 3), (3, 2), (4, 2), (3, 3),
@@ -117,6 +116,21 @@ fm4 = {
           (4, 2), (2, 4), (2, 3), (2, 2), (2, 1), (2, 0), (1, 0), (1, 1),
           (1, 2), (1, 3), (1, 4), (0, 4), (0, 3), (0, 2), (0, 1), (0, 0)),
 }
+# fmt: on
+
+
+_maps = {
+    'dm': dm,
+    'fm1': fm1,
+    "pfm": pfm,
+    "fm2": fm2,
+    "fm3": fm3,
+    "fm4": fm4,
+}
+
+
+def supported_models():
+    return list(_maps.keys())
 
 
 def get_quadrant_map(model: str, quad: str, arr_borders):
@@ -153,20 +167,12 @@ def get_couples(model):
 
 class Detector:
     UNBOND = UNBOND
+
     def __init__(self, model):
         self.label = model
         self.map = get_map(model)
         self.couples = get_couples(model)
 
-
-_maps = {
-    'dm': dm,
-    'fm1': fm1,
-    "pfm": pfm,
-    "fm2": fm2,
-    "fm3": fm3,
-    "fm4": fm4,
-}
 
 # will run some test on detector maps
 if __name__ == '__main__':

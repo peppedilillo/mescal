@@ -14,6 +14,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
+from source.cli.beaupy.beaupy import select
 from source.paths import LOGOPATH
 from source.utils import get_version
 

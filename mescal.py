@@ -15,15 +15,18 @@ from source import paths
 from source.calibrate import PEAKS_PARAMS, Calibrate
 from source.cli import elementsui as ui
 from source.cli.beaupy.beaupy import select_multiple
+from source.cli.beaupy.beaupy import prompt
+from source.cli.beaupy.beaupy import select
+from source.cli.beaupy.beaupy import press_enter
 from source.cli.cmd import Cmd
-from source.detectors import Detector
+from source.detectors import Detector, supported_models
 from source.io import Exporter, pandas_from_LV0d5
 from source.plot import (
     mapcounts,
     mapenres,
     uncalibrated,
 )
-from source.radsources import radsources_dicts
+from source.radsources import radsources_dicts, supported_sources
 from source.utils import get_version
 
 description = (
@@ -31,24 +34,6 @@ description = (
     "acquisitions of known radioactive sources."
 )
 parser = argparse.ArgumentParser(description=description)
-
-parser.add_argument(
-    "model",
-    choices=["dm", "fm1", "pfm", "fm2", "fm3", "fm4"],
-    help="hermes flight model to calibrate. ",
-)
-
-parser.add_argument(
-    "radsources",
-    help="radioactive sources used for calibration. "
-    "separated by comma, e.g. `Fe,Cd,Cs`."
-    "currently supported sources: Fe, Cd, Am, Cs.",
-)
-
-parser.add_argument(
-    "filepath",
-    help="input acquisition file in standard 0.5 fits format.",
-)
 
 parser.add_argument(
     "--adc",
@@ -64,7 +49,6 @@ parser.add_argument(
     help="enables loading and saving from cache.",
 )
 
-
 parser.add_argument(
     "--fmt",
     default="xslx",
@@ -72,33 +56,6 @@ parser.add_argument(
     "supported formats: xslx, csv, fits. "
     "defaults to xslx.",
 )
-
-
-def start_logger(args):
-    """
-    Starts logger in default output folder and logs user command line arguments.
-    """
-    logfile = paths.LOGFILE(args.filepath)
-    with open(logfile, "w") as f:
-        f.write(ui.logo())
-        len_logo = len(ui.logo().split("\n")[0])
-        version_message = "version " + get_version()
-        if len_logo > len(version_message) + 1:
-            f.write(
-                " " * (len_logo - len(version_message) + 1) + version_message + "\n\n"
-            )
-        else:
-            f.write(version_message + "\n\n")
-    logging.basicConfig(
-        filename=logfile,
-        level=logging.INFO,
-        format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
-        "%(levelname)s: %(message)s",
-    )
-
-    message = "parser arguments = " + str(args)[10:-1]
-    logging.info(message)
-    return True
 
 
 @atexit.register
@@ -109,94 +66,12 @@ def end_log():
     logging.shutdown()
 
 
-def check_system():
-    """
-    Perfoms system inspection to choose matplotlib backend
-    and threads number (max 4).
-    """
-    if sys.platform.startswith("win") or sys.platform.startswith("linux"):
-        if "TkAgg" in matplotlib.rcsetup.all_backends:
-            pass  # matplotlib.use("TkAgg")
-    elif sys.platform.startswith("mac"):
-        if "macosx" in matplotlib.rcsetup.all_backends:
-            matplotlib.use("macosx")
-    systhreads = min(4, cpu_count())
-
-    logging.info("detected {} os".format(sys.platform))
-    logging.info("using matplotlib backend {}".format(matplotlib.get_backend()))
-    logging.info("running over {} threads".format(systhreads))
-    return systhreads
-
-
-def parse_args():
-    """
-    user arguments parsing.
-    """
-    args = parser.parse_args()
-    args.filepath = Path(args.filepath)
-    args.radsources = args.radsources.upper().split(",")
-    if (args.model is None) and args.temperature:
-        parser.error(
-            "if a temperature arguments is specified "
-            "a model argument must be specified too "
-        )
-    return args
-
-
-def unpack_configuration(adc):
-    """
-    unpacks ini configuration file into a dict.
-    """
-    config = configparser.ConfigParser()
-    config.read("./source/config.ini")
-    general = config["general"]
-    adcitems = config[adc]
-    out = {
-        "xpeaks_mincounts": general.getint("xpeaks_mincounts"),
-        "filter_retrigger": general.getfloat("filter_retrigger"),
-        "filter_spurious": general.getboolean("filter_spurious"),
-        "binning": adcitems.getint("binning"),
-        "gain_center": adcitems.getfloat("gain_center"),
-        "gain_sigma": adcitems.getfloat("gain_sigma"),
-        "offset_center": adcitems.getfloat("offset_center"),
-        "offset_sigma": adcitems.getfloat("offset_sigma"),
-        "lightout_center": adcitems.getfloat("lightout_center"),
-        "lightout_sigma": adcitems.getfloat("lightout_sigma"),
-    }
-
-    message = "config.ini parameters = " + str(out)[1:-1]
-    logging.info(message)
-    return out
-
-
-# TODO: refactoring. caching should have its own function.
-def get_from(fitspath: Path, console, use_cache=True):
-    """
-    deals with data load and caching.
-    """
-    console.log(":question_mark: Looking for data..")
-    cached = paths.CACHEDIR().joinpath(fitspath.name).with_suffix(".pkl.gz")
-    if cached.is_file() and use_cache:
-        out = pd.read_pickle(cached)
-        console.log("[bold yellow]:yellow_circle: Data were loaded from cache.")
-    elif fitspath.is_file():
-        out = pandas_from_LV0d5(fitspath)
-        console.log(":open_book: Data loaded.")
-        if use_cache:
-            # save data to cache
-            out.to_pickle(cached)
-            console.log(":blue_book: Data saved to cache.")
-    else:
-        raise FileNotFoundError("could not find input datafile.")
-    return out
-
-
 INVALID_ENTRY = 0
 
 
 class Mescal(Cmd):
     """
-    A script implementing calibration workflow and shell loop.
+    A script implementing calibration workflow and a shell loop.
     """
 
     intro = "Type help or ? for a list of commands.\n"
@@ -215,18 +90,23 @@ class Mescal(Cmd):
         "[i]Entries must be two different sorted integers (e.g., 19800 20100).[/i]\n"
     )
 
-    def __init__(self, args, threads):
+    def __init__(self):
         console = ui.hello()
         super().__init__(console)
-        self.args = args
-        self.config = unpack_configuration(args.adc)
-        self.threads = threads
+        press_enter(self.console)
+        self.args = parser.parse_args()
+        self.filepath = self.query_on_file()
+        self.start_logger()
+        self.model = self.query_on_model()
+        self.radsources = self.query_on_radsources()
+        self.config = self.unpack_configuration()
+        self.threads = self.check_system()
 
         ui.sections_rule(console, "[bold italic]Calibration log", style="green")
         with console.status("Initializing.."):
-            data = get_from(self.args.filepath, self.console, self.args.cache)
-            radsources = radsources_dicts(self.args.radsources)
-            detector = Detector(self.args.model)
+            data = self.fetch_data()
+            radsources = radsources_dicts(self.radsources)
+            detector = Detector(self.model)
 
         with console.status("Calibrating.."):
             self.calibration = Calibrate(
@@ -241,12 +121,12 @@ class Mescal(Cmd):
         with console.status("Processing results.."):
             self.exporter = Exporter(
                 self.calibration,
-                self.args.filepath,
+                self.filepath,
                 self.args.fmt,
                 nthreads=self.threads,
             )
             self.print_calibration_status()
-            self.export_essentials(self.args.filepath)
+            self.export_essentials(self.filepath)
 
         if any(self.calibration.flagged):
             ui.sections_rule(console, "[bold italic]Warning", style="red")
@@ -254,6 +134,133 @@ class Mescal(Cmd):
 
         ui.sections_rule(console, "[bold italic]Shell", style="green")
         self.cmdloop()
+
+    def start_logger(self):
+        """
+        Starts logger in default output folder and logs user command line arguments.
+        """
+        logfile = paths.LOGFILE(self.filepath)
+        with open(logfile, "w") as f:
+            f.write(ui.logo())
+            len_logo = len(ui.logo().split("\n")[0])
+            version_message = "version " + get_version()
+            if len_logo > len(version_message) + 1:
+                f.write(
+                    " " * (len_logo - len(version_message) + 1) + version_message + "\n\n"
+                )
+            else:
+                f.write(version_message + "\n\n")
+        logging.basicConfig(
+            filename=logfile,
+            level=logging.INFO,
+            format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
+                   "%(levelname)s: %(message)s",
+        )
+
+        message = "parser arguments = " + str(self.args)[10:-1]
+        logging.info(message)
+        return True
+
+    @staticmethod
+    def check_system():
+        """
+        Perfoms system inspection to choose matplotlib backend
+        and threads number (max 4).
+        """
+        if sys.platform.startswith("win") or sys.platform.startswith("linux"):
+            if "TkAgg" in matplotlib.rcsetup.all_backends:
+                pass  # matplotlib.use("TkAgg")
+        elif sys.platform.startswith("mac"):
+            if "macosx" in matplotlib.rcsetup.all_backends:
+                matplotlib.use("macosx")
+        systhreads = min(4, cpu_count())
+
+        logging.info("detected {} os".format(sys.platform))
+        logging.info("using matplotlib backend {}".format(matplotlib.get_backend()))
+        logging.info("running over {} threads".format(systhreads))
+        return systhreads
+
+    def unpack_configuration(self):
+        """
+        unpacks ini configuration file into a dict.
+        """
+        config = configparser.ConfigParser()
+        config.read("./source/config.ini")
+        general = config["general"]
+        adcitems = config[self.args.adc]
+        out = {
+            "xpeaks_mincounts": general.getint("xpeaks_mincounts"),
+            "filter_retrigger": general.getfloat("filter_retrigger"),
+            "filter_spurious": general.getboolean("filter_spurious"),
+            "binning": adcitems.getint("binning"),
+            "gain_center": adcitems.getfloat("gain_center"),
+            "gain_sigma": adcitems.getfloat("gain_sigma"),
+            "offset_center": adcitems.getfloat("offset_center"),
+            "offset_sigma": adcitems.getfloat("offset_sigma"),
+            "lightout_center": adcitems.getfloat("lightout_center"),
+            "lightout_sigma": adcitems.getfloat("lightout_sigma"),
+        }
+
+        message = "config.ini parameters = " + str(out)[1:-1]
+        logging.info(message)
+        return out
+
+    # TODO: refactoring. caching should have its own function.
+    def fetch_data(self, use_cache=False):
+        """
+        deals with data load and caching.
+        """
+        self.console.log(":question_mark: Looking for data..")
+        cached = paths.CACHEDIR().joinpath(self.filepath.name).with_suffix(".pkl.gz")
+        if cached.is_file() and self.args.cache:
+            out = pd.read_pickle(cached)
+            self.console.log("[bold yellow]:yellow_circle: Data were loaded from cache.")
+        elif self.filepath.is_file():
+            out = pandas_from_LV0d5(self.filepath)
+            self.console.log(":open_book: Data loaded.")
+            if self.args.cache:
+                # save data to cache
+                out.to_pickle(cached)
+                self.console.log(":blue_book: Data saved to cache.")
+        else:
+            raise FileNotFoundError("could not find input datafile.")
+        return out
+
+    def query_on_file(self):
+        file = prompt(
+            '[italic]Which file are you calibrating?\n'
+            'You can drag & drop.[italic]\n',
+            console=self.console,
+            target_type=str,
+        )
+        if not Path(file).exists():
+            raise FileNotFoundError()
+        logging.info("input file = {}".format(file))
+        return Path(file)
+
+    def query_on_model(self):
+        model = None
+        while model is None:
+            model = select(
+                options=supported_models(),
+                cursor=":flying_saucer:",
+                console=self.console,
+                intro="[italic]For which model?[/italic]\n\n"
+            )
+        logging.info("selected model = {}".format(model))
+        return model
+
+    def query_on_radsources(self):
+        radsources = select_multiple(
+            options=supported_sources(),
+            tick_character=":radioactive:",
+            ticked_indices=list(range(len(supported_sources()))),
+            console=self.console,
+            intro="[italic]With which radioactive sources?[/italic]\n\n",
+            transient=True,
+        )
+        logging.info("selected sources = {}".format(", ".join(radsources)))
+        return radsources
 
     def warn_about_flagged(self):
         """Tells user about channels for which calibration
@@ -328,7 +335,7 @@ class Mescal(Cmd):
                 self.console, "[bold italic]Calibration log", style="green"
             )
             self.calibration._calibrate()
-            self.export_essentials(self.args.filepath)
+            self.export_essentials(self.filepath)
             ui.sections_rule(self.console, "[bold italic]Shell", style="green")
         return False
 
@@ -615,7 +622,4 @@ def parse_limits(arg):
 
 
 if __name__ == "__main__":
-    user_arguments = parse_args()
-    start_logger(user_arguments)
-    systhreads = check_system()
-    Mescal(user_arguments, systhreads)
+    Mescal()

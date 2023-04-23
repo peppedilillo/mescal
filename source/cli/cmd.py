@@ -2,7 +2,6 @@ import string
 import sys
 
 from rich.columns import Columns
-from rich.rule import Rule
 
 from source.cli.elementsui import small_section
 

@@ -5,28 +5,23 @@ from source.errors import SourceNotFoundError
 
 Decay = namedtuple('Decay', ['energy', 'low_lim', 'hi_lim'])
 
-Fe = {
+_55fe = {
     'Fe 5.9 keV': Decay(5.90, -2., +1.),
 }
 
-Fe_kbeta = {
-    'Fe 5.9 keV': Decay(5.90, -2., +1.),
-    'Fe 6.4 keV': Decay(6.49, -1., +2.),
-}
-
-Cd = {
+_109cd = {
     'Cd 22.1 keV': Decay(22.16, -1., + 2.),
     'Cd 24.9 keV': Decay(24.94, -2., + 1.),
 }
 
-Am = {
+_241am = {
     'Am 13.9 keV': Decay(13.9, -2., +2.),
     'Am 17.7 keV': Decay(17.7, -2., +2.),
     'Am 20.7 keV': Decay(20.7, -2., +2.),
     'Am 26.3 keV': Decay(26.3, -2., +2.),
 }
 
-Am_x60 = {
+_241am_x60 = {
     'Am 13.9 keV': Decay(13.9, -2., +2.),
     'Am 17.7 keV': Decay(17.7, -2., +2.),
     'Am 20.7 keV': Decay(20.7, -2., +2.),
@@ -34,32 +29,32 @@ Am_x60 = {
     'Am 59.5 keV': Decay(59.5, -2., +2.),
 }
 
-Cs = {
+_137cs = {
     'Cs 662 keV': Decay(661.6, -1., +2.),
 }
 
-X_SOURCES = {
-    "FE": Fe,
-    "FE_KBETA": Fe_kbeta,
-    "CD": Cd,
-    "AM": Am,
-    "AM_X60": Am_x60,
+_xsources = {
+    "55 Fe": _55fe,
+    "109 Cd": _109cd,
+}
+
+_ssources = {
+    "137 Cs": _137cs,
 }
 
 
-GAMMA_SOURCES = {
-    "CS": Cs,
-}
+def supported_sources():
+    return list(_xsources.keys()) + list(_ssources.keys())
 
 
 def radsources_dicts(sources: list):
     xdecays = {}
     sdecays = {}
     for element in sources:
-        if element in X_SOURCES:
-            xdecays.update(X_SOURCES[element])
-        elif element in GAMMA_SOURCES:
-            sdecays.update(GAMMA_SOURCES[element])
+        if element in _xsources:
+            xdecays.update(_xsources[element])
+        elif element in _ssources:
+            sdecays.update(_ssources[element])
         else:
             raise SourceNotFoundError("unknown calibration source source.")
 

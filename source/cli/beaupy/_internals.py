@@ -4,6 +4,7 @@ from typing import Iterator, List, Union
 from rich._emoji_replace import _emoji_replace
 from rich.console import Console, ConsoleRenderable
 from rich.live import Live
+from rich.text import Text
 
 
 class ValidationError(Exception):
@@ -54,14 +55,15 @@ def _render_prompt(
     secure: bool, typed_values: List[str], prompt: str, cursor_position: int, error: str
 ) -> str:
     render_value = (len(typed_values) * "*" if secure else "".join(typed_values)) + " "
+    render_value = Text(render_value)
+    render_value.stylize("black on white", cursor_position, cursor_position + 1)
+    confirm_text = Text("\n\n(Confirm with enter)")
+    confirm_text.stylize("bold", 16, 21)
     render_value = (
-        render_value[:cursor_position]
-        + "[black on white]"  # noqa: W503
-        + render_value[cursor_position]  # noqa: W503
-        + "[/black on white]"  # noqa: W503
-        + render_value[(cursor_position + 1) :]  # noqa: W503,E203
+            Text.from_markup(prompt + "\n")
+            + render_value
+            + confirm_text
     )
-    render_value = f"{prompt}\n> {render_value}\n\n(Confirm with [bold]enter[/bold])"
     if error:
         render_value = f"{render_value}\n[red]Error:[/red] {error}"
     return render_value
