@@ -14,10 +14,7 @@ import pandas as pd
 from source import paths
 from source.calibrate import PEAKS_PARAMS, Calibrate
 from source.cli import elementsui as ui
-from source.cli.beaupy.beaupy import select_multiple
-from source.cli.beaupy.beaupy import prompt
-from source.cli.beaupy.beaupy import select
-from source.cli.beaupy.beaupy import press_enter
+from source.cli.beaupy.beaupy import prompt, press_enter, select, select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import Detector, supported_models
 from source.io import Exporter, pandas_from_LV0d5
@@ -58,8 +55,36 @@ parser.add_argument(
 )
 
 
+def start_logger(filename):
+    """
+    Starts logger in default output folder and logs user command line arguments.
+    """
+    logfile = paths.LOGFILE(filename)
+    with open(logfile, "w") as f:
+        f.write(ui.logo())
+        len_logo = len(ui.logo().split("\n")[0])
+        version_message = "version " + get_version()
+        if len_logo > len(version_message) + 1:
+            f.write(
+                " " * (len_logo - len(version_message) + 1) + version_message + "\n\n"
+            )
+        else:
+            f.write(version_message + "\n\n")
+
+    # checks that logging was not used before creating the logfile.
+    assert len(logging.root.handlers) == 0
+    logging.basicConfig(
+        filename=logfile,
+        level=logging.INFO,
+        format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
+               "%(levelname)s: %(message)s",
+    )
+    logging.info("logging calibration for file {}".format(filename))
+    return True
+
+
 @atexit.register
-def end_log():
+def end_logger():
     """
     Kills loggers on shutdown.
     """
@@ -94,9 +119,9 @@ class Mescal(Cmd):
         console = ui.hello()
         super().__init__(console)
         press_enter(self.console)
-        self.args = parser.parse_args()
         self.filepath = self.query_on_file()
-        self.start_logger()
+        start_logger(self.filepath)
+        self.args = self.parse_args()
         self.model = self.query_on_model()
         self.radsources = self.query_on_radsources()
         self.config = self.unpack_configuration()
@@ -135,31 +160,11 @@ class Mescal(Cmd):
         ui.sections_rule(console, "[bold italic]Shell", style="green")
         self.cmdloop()
 
-    def start_logger(self):
-        """
-        Starts logger in default output folder and logs user command line arguments.
-        """
-        logfile = paths.LOGFILE(self.filepath)
-        with open(logfile, "w") as f:
-            f.write(ui.logo())
-            len_logo = len(ui.logo().split("\n")[0])
-            version_message = "version " + get_version()
-            if len_logo > len(version_message) + 1:
-                f.write(
-                    " " * (len_logo - len(version_message) + 1) + version_message + "\n\n"
-                )
-            else:
-                f.write(version_message + "\n\n")
-        logging.basicConfig(
-            filename=logfile,
-            level=logging.INFO,
-            format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
-                   "%(levelname)s: %(message)s",
-        )
-
-        message = "parser arguments = " + str(self.args)[10:-1]
-        logging.info(message)
-        return True
+    @staticmethod
+    def parse_args():
+        args = parser.parse_args()
+        logging.info("user args = {}".format(args))
+        return args
 
     @staticmethod
     def check_system():
@@ -232,18 +237,19 @@ class Mescal(Cmd):
             'You can drag & drop.[italic]\n',
             console=self.console,
             target_type=str,
-        )
+        ).replace(" ", "")
         if not Path(file).exists():
             raise FileNotFoundError()
-        logging.info("input file = {}".format(file))
         return Path(file)
 
     def query_on_model(self):
+        cursor_index = ([0] + [i for i, d in enumerate(supported_models()) if d in self.filepath.name])[-1]
         model = None
         while model is None:
             model = select(
                 options=supported_models(),
                 cursor=":flying_saucer:",
+                cursor_index=cursor_index,
                 console=self.console,
                 intro="[italic]For which model?[/italic]\n\n"
             )

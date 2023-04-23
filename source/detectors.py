@@ -121,8 +121,8 @@ fm4 = {
 
 _maps = {
     'dm': dm,
-    'fm1': fm1,
     "pfm": pfm,
+    'fm1': fm1,
     "fm2": fm2,
     "fm3": fm3,
     "fm4": fm4,
