@@ -14,23 +14,22 @@ Don't forget to activate the environment afterwards:
 
 `conda activate mescal`
 
-Mescal CLI is best rendered on modern terminal applications. 
-We are redistributing two modules by user petereon@github, [beaupy](https://github.com/petereon/beaupy) and [yakh](https://github.com/petereon/yakh). 
+The command line interface of mescal is best rendered on modern terminal applications. 
+We are redistributing two fantastic modules by petereon@github, [beaupy](https://github.com/petereon/beaupy) and [yakh](https://github.com/petereon/yakh). 
 All rights reserved.
 
 If you are working on windows, we suggest using mescal with the [new Windows terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701)!
 
 
-## calibmake.py
-
-This script goal is to calibrate the SDDs and scintillators of a HERMES detector. 
-We supposes you have an acquisition of supported radioactive sources ready in the standard HERMES 0.5 fits format.
+The main goal of mescal is to calibrate the SDDs and scintillators of the HERMES's detector. 
 
 _Example:_
-
-To launch `calibmake.py` over a calibration acquisition (FM1, radioactive sources 55Fe, 109Cd and 137Cs) located at path  "C:\somepath\sources_m20deg_85_LV0d5.fits":
+We suppose you have an acquisition of supported radioactive sources ready in the standard HERMES 0.5 fits format.
+To launch `mescal.py` over a calibration acquisition (FM1, radioactive sources 55Fe, 109Cd and 137Cs) located at path  "C:\somepath\sources_m20deg_85_LV0d5.fits":
 
 1. Move to the mescal directory.
-2. Launch `python calibmake.py fm1 Fe,Cd,Cs "C:\somepath\sources_m20deg_85_LV0d5.fits""`
+2. Launch `python mescal.py fm1 Fe,Cd,Cs "C:\somepath\sources_m20deg_85_LV0d5.fits""`
 
-For more informations and options regarding `calibmake.py`, try the helper via `python calibmake.py --help`.
+Mescal can also be used to visualize data acquired with the HERMES detector.
+
+For more informations and options regarding `mescal.py`, try our helper via `python mescal.py --help`.
