@@ -4,7 +4,7 @@ dependencies:
   - numpy=1.23.5
   - pandas=1.5.2
   - matplotlib=3.6.2
-  - pyreadline=2.1
+  - pyreadline3=3.4
   - astropy
   - openpyxl
   - joblib
