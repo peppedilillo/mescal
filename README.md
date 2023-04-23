@@ -15,8 +15,8 @@ Don't forget to activate the environment afterwards:
 `conda activate mescal`
 
 The command line interface of mescal is best rendered on modern terminal applications. 
-We are redistributing two fantastic modules by petereon@github, [beaupy](https://github.com/petereon/beaupy) and [yakh](https://github.com/petereon/yakh). 
-All rights reserved.
+We are redistributing two great modules by petereon@github, [beaupy](https://github.com/petereon/beaupy) and [yakh](https://github.com/petereon/yakh). 
+All hail petereon and all rights reserved.
 
 If you are working on windows, we suggest using mescal with the [new Windows terminal](https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701)!
 
