@@ -1,18 +1,17 @@
+import logging
 from math import floor
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from astropy.io import fits as fitsio
 from joblib import Parallel, delayed
-import logging
 
-from source import paths
-from source import plot
-from source.errors import FormatNotSupportedError
+from source import paths, plot
 from source.constants import PHOTOEL_PER_KEV
-from source.errors import warn_nan_in_sdd_calib, warn_nan_in_slo_table
+from source.errors import (FormatNotSupportedError, warn_nan_in_sdd_calib,
+                           warn_nan_in_slo_table)
 
 
 class Exporter:

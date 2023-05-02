@@ -18,14 +18,9 @@ from source.cli.beaupy.beaupy import prompt, select, select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import supported_models
 from source.io import Exporter, pandas_from_LV0d5
-from source.plot import (
-    mapcounts,
-    mapenres,
-    uncalibrated,
-)
+from source.plot import mapcounts, mapenres, uncalibrated
 from source.radsources import supported_sources
 from source.utils import get_version
-
 
 parser = argparse.ArgumentParser()
 
@@ -40,41 +35,38 @@ parser.add_argument(
     "--model",
     default=None,
     choices=supported_models(),
-    help="hermes flight model to calibrate.\n"
-    "prompt user by default.",
+    help="hermes flight model to calibrate.\n" "prompt user by default.",
 )
 
 parser.add_argument(
     "--source",
     default=None,
-    action='append',
+    action="append",
     choices=supported_sources(),
-    help="radioactive sources used for calibration.\n"
-    "prompt user by default.",
+    help="radioactive sources used for calibration.\n" "prompt user by default.",
 )
 
 parser.add_argument(
     "--adc",
     choices=["LYRA-BE", "CAEN-DT5740"],
     default="LYRA-BE",
-    help="select which adc configuration to use.\n" 
-    "defaults to LYRA-BE.",
+    help="select which adc configuration to use.\n" "defaults to LYRA-BE.",
 )
 
 parser.add_argument(
     "--fmt",
     default="xslx",
     choices=["xslx", "csv", "fits"],
-    help="set output format for calibration tables.\n"
-    "defaults to xslx.",
+    help="set output format for calibration tables.\n" "defaults to xslx.",
 )
 
 parser.add_argument(
     "--cache",
     default=False,
     action="store_true",
-    help="enables loading and saving from cache.\n"
+    help="enables loading and saving from cache.\n",
 )
+
 
 @atexit.register
 def end_logger():
@@ -161,7 +153,9 @@ class Mescal(Cmd):
             version_message = "version " + get_version()
             if len_logo > len(version_message) + 1:
                 f.write(
-                    " " * (len_logo - len(version_message) + 1) + version_message + "\n\n"
+                    " " * (len_logo - len(version_message) + 1)
+                    + version_message
+                    + "\n\n"
                 )
             else:
                 f.write(version_message + "\n\n")
@@ -172,7 +166,7 @@ class Mescal(Cmd):
             filename=logfile,
             level=logging.INFO,
             format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
-                   "%(levelname)s: %(message)s",
+            "%(levelname)s: %(message)s",
         )
         logging.info("user args = {}".format(self.args))
         logging.info("logging calibration for file {}".format(self.filepath))
@@ -247,6 +241,7 @@ class Mescal(Cmd):
             if self.args.cache:
                 # save data to cache
                 from pickle import DEFAULT_PROTOCOL
+
                 out.to_pickle(cached, protocol=DEFAULT_PROTOCOL)
                 self.console.log(":blue_book: Data saved to cache.")
         else:
@@ -256,7 +251,7 @@ class Mescal(Cmd):
     def get_filepath(self):
         def prompt_user_on_filepath():
             text_default = (
-                "[italic]Which file are you calibrating?\n" 
+                "[italic]Which file are you calibrating?\n"
                 "You can drag & drop.[italic]\n"
             )
             text_error = (
@@ -290,7 +285,11 @@ class Mescal(Cmd):
         def prompt_user_on_model():
             cursor_index = (
                 [0]
-                + [i for i, d in enumerate(supported_models()) if d in self.filepath.name]
+                + [
+                    i
+                    for i, d in enumerate(supported_models())
+                    if d in self.filepath.name
+                ]
             )[-1]
             model = None
             while model is None:

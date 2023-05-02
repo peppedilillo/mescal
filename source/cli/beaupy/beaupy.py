@@ -17,18 +17,14 @@ from ast import literal_eval
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
 
 from rich.console import Console
-from rich.text import Text
 from rich.live import Live
+from rich.text import Text
 
-from source.cli.beaupy._internals import (
-    ConversionError,
-    ValidationError,
-    _cursor_hidden,
-    _format_option_select,
-    _render_option_select_multiple,
-    _render_prompt,
-    _update_rendered,
-)
+from source.cli.beaupy._internals import (ConversionError, ValidationError,
+                                          _cursor_hidden,
+                                          _format_option_select,
+                                          _render_option_select_multiple,
+                                          _render_prompt, _update_rendered)
 from source.cli.beaupy.yakh.key._key import Keys
 from source.cli.beaupy.yakh.yakh import get_key
 
