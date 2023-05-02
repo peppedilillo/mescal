@@ -376,23 +376,42 @@ class Mescal(Cmd):
             self.exporter.draw_spectrum()
             self.console.log(":chart_increasing: Saved calibrated spectra plots.")
 
-    def can(self, x):
-        """Checks if a command can be executed."""
-        if "can_" + x not in dir(self.__class__):
-            # if a can_ method is not defined we assume the command
-            # to always be executable.
-            return True
-        else:
-            func = getattr(self, "can_" + x)
-            return func()
-
     # shell prompt commands
+    def can_quit(self, arg):
+        return True
+
     def do_quit(self, arg):
         """Quits mescal.
         It's the only do-command to return True.
         """
         self.console.print("Ciao! :wave:\n")
         return True
+
+    def can_plothist(self, arg):
+        return True
+
+    def do_plothist(self, arg):
+        """Plots uncalibrated data from a channel."""
+        parsed_arg = parse_chns(arg)
+        if parsed_arg is INVALID_ENTRY:
+            self.console.print(self.invalid_channel_message)
+            return False
+
+        quad, ch = parsed_arg
+        fig, ax = uncalibrated(
+            self.calibration.xhistograms.bins,
+            self.calibration.xhistograms.counts[quad][ch],
+            self.calibration.shistograms.bins,
+            self.calibration.shistograms.counts[quad][ch],
+        )
+        ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
+        plt.show(block=False)
+        return False
+
+    def can_retry(self, arg):
+        if self.radsources:
+            return True
+        return False
 
     def do_retry(self, arg):
         """Launches calibration again."""
@@ -403,6 +422,11 @@ class Mescal(Cmd):
             self.calibration._calibrate()
             self.export_essentials(self.filepath)
             ui.sections_rule(self.console, "[bold italic]Shell", style="green")
+        return False
+
+    def can_setxlim(self, arg):
+        if self.radsources:
+            return True
         return False
 
     def do_setxlim(self, arg):
@@ -431,6 +455,11 @@ class Mescal(Cmd):
         logging.info(message)
         return False
 
+    def can_setslim(self, arg):
+        if self.radsources:
+            return True
+        return False
+
     def do_setslim(self, arg):
         """Reset channel S peaks position for user selected channels."""
         parsed_arg = parse_chns(arg)
@@ -455,24 +484,6 @@ class Mescal(Cmd):
 
         message = "reset sfit limits for channel {}{}".format(quad, ch)
         logging.info(message)
-        return False
-
-    def do_plothist(self, arg):
-        """Plots uncalibrated data from a channel."""
-        parsed_arg = parse_chns(arg)
-        if parsed_arg is INVALID_ENTRY:
-            self.console.print(self.invalid_channel_message)
-            return False
-
-        quad, ch = parsed_arg
-        fig, ax = uncalibrated(
-            self.calibration.xhistograms.bins,
-            self.calibration.xhistograms.counts[quad][ch],
-            self.calibration.shistograms.bins,
-            self.calibration.shistograms.counts[quad][ch],
-        )
-        ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
-        plt.show(block=False)
         return False
 
     def can_map(self, arg):
@@ -523,7 +534,7 @@ class Mescal(Cmd):
         plt.show(block=False)
         return False
 
-    def can_mapres(self):
+    def can_mapres(self, arg):
         if self.calibration.xradsources().keys() and self.calibration.en_res:
             return True
         return False
@@ -539,6 +550,9 @@ class Mescal(Cmd):
         )
         plt.show(block=False)
         return False
+
+    def can_export(self, arg):
+        return True
 
     def do_export(self, arg):
         """Prompts user on optional data product exports."""

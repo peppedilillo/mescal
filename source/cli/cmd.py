@@ -75,7 +75,6 @@ class Cmd:
         if self.completekey:
             try:
                 import readline
-
                 self.old_completer = readline.get_completer()
                 readline.set_completer(self.complete)
                 readline.parse_and_bind(self.completekey + ": complete")
@@ -172,6 +171,8 @@ class Cmd:
             self.lastcmd = ""
         if cmd == "":
             return self.default(line)
+        if not self.can(cmd):
+            return self.default(line)
         else:
             try:
                 func = getattr(self, "do_" + cmd)
@@ -246,12 +247,15 @@ class Cmd:
     def get_names(self):
         # This method used to pull in base class attributes
         # at a time dir() didn't do it yet.
-        return dir(self.__class__)
+        return [cmd for cmd in dir(self.__class__) if self.can(cmd[3:])]
 
     def complete_help(self, *args):
         commands = set(self.completenames(*args))
         topics = set(a[5:] for a in self.get_names() if a.startswith("help_" + args[0]))
         return list(commands | topics)
+
+    def can_help(self, arg):
+        return True
 
     def do_help(self, arg):
         'List available commands with "help" or detailed help with "help cmd".'
@@ -271,7 +275,7 @@ class Cmd:
                 return
             func()
         else:
-            names = self.get_names()
+            names = [n for n in self.get_names()]
             cmds_doc = []
             cmds_undoc = []
             topics = set()
@@ -303,3 +307,13 @@ class Cmd:
             with small_section(self.console, message=message) as ss:
                 cols = Columns(cmds, expand=True, padding=(0, 2))
                 ss.print(cols)
+
+    def can(self, x):
+        """Checks if a command can be executed."""
+        if "can_" + x not in dir(self.__class__):
+            # if a can_ method is not defined we assume the command
+            # to always be executable.
+            return False
+        else:
+            func = getattr(self, "can_" + x)
+            return func('')
