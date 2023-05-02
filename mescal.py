@@ -26,18 +26,22 @@ from source.plot import (
 from source.radsources import supported_sources
 from source.utils import get_version
 
-description = (
-    "A script to automatically calibrate HERMES-TP/SP "
-    "acquisitions of known radioactive sources."
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument(
+    "--filepath",
+    default=None,
+    help="input acquisition file in standard 0.5 fits format.\n"
+    "prompt user by default.",
 )
-parser = argparse.ArgumentParser(description=description)
 
 parser.add_argument(
     "--model",
     default=None,
     choices=supported_models(),
-    help="hermes flight model to calibrate. "
-    "Default: prompt user.",
+    help="hermes flight model to calibrate.\n"
+    "prompt user by default.",
 )
 
 parser.add_argument(
@@ -45,39 +49,32 @@ parser.add_argument(
     default=None,
     action='append',
     choices=supported_sources(),
-    help="radioactive sources used for calibration. "
-    "Default: prompt user.",
-)
-
-parser.add_argument(
-    "--filepath",
-    default=None,
-    help="input acquisition file in standard 0.5 fits format. "
-    "Default: prompt user.",
+    help="radioactive sources used for calibration.\n"
+    "prompt user by default.",
 )
 
 parser.add_argument(
     "--adc",
     choices=["LYRA-BE", "CAEN-DT5740"],
     default="LYRA-BE",
-    help="select which adc configuration to use." "defaults to LYRA-BE.",
+    help="select which adc configuration to use.\n" 
+    "defaults to LYRA-BE.",
+)
+
+parser.add_argument(
+    "--fmt",
+    default="xslx",
+    choices=["xslx", "csv", "fits"],
+    help="set output format for calibration tables.\n"
+    "defaults to xslx.",
 )
 
 parser.add_argument(
     "--cache",
     default=False,
     action="store_true",
-    help="enables loading and saving from cache.",
+    help="enables loading and saving from cache.\n"
 )
-
-parser.add_argument(
-    "--fmt",
-    default="xslx",
-    help="set output format for calibration tables. "
-    "supported formats: xslx, csv, fits. "
-    "defaults to xslx.",
-)
-
 
 @atexit.register
 def end_logger():
