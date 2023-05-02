@@ -232,15 +232,30 @@ class Mescal(Cmd):
         return out
 
     def query_on_file(self):
-        file = prompt(
+        text_default = (
             '[italic]Which file are you calibrating?\n'
-            'You can drag & drop.[italic]\n',
-            console=self.console,
-            target_type=str,
-        ).replace(" ", "")
-        if not Path(file).exists():
-            raise FileNotFoundError()
-        return Path(file)
+            'You can drag & drop.[italic]\n'
+        )
+        text_error = (
+            '[italic][red]The file you entered does not exists.[/red]\n'
+            'Which file are you calibrating?\n'
+            'You can drag & drop.[italic]\n'
+        )
+        filepath = None
+        text = text_default
+        while filepath is None:
+            answer = prompt(
+                text,
+                console=self.console,
+                target_type=str,
+            )
+            if answer == '' or answer is None:
+                continue
+            elif not Path(answer.replace(" ", "")).exists():
+                text = text_error
+            else:
+                filepath = Path(answer.replace(" ", ""))
+        return filepath
 
     def query_on_model(self):
         cursor_index = ([0] + [i for i, d in enumerate(supported_models()) if d in self.filepath.name])[-1]
