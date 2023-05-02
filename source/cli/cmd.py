@@ -75,6 +75,7 @@ class Cmd:
         if self.completekey:
             try:
                 import readline
+
                 self.old_completer = readline.get_completer()
                 readline.set_completer(self.complete)
                 readline.parse_and_bind(self.completekey + ": complete")
@@ -316,4 +317,4 @@ class Cmd:
             return False
         else:
             func = getattr(self, "can_" + x)
-            return func('')
+            return func("")
