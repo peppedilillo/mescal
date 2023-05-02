@@ -345,6 +345,8 @@ class Mescal(Cmd):
 
     def print_calibration_status(self):
         """Prepares and exports base calibration results."""
+        if not self.radsources:
+            return
         if not self.calibration.sdd_cal and not self.calibration.optical_coupling:
             self.console.log("[bold red]:red_circle: Calibration failed.")
         elif not self.calibration.sdd_cal or not self.calibration.optical_coupling:
