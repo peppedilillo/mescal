@@ -105,23 +105,25 @@ def make_electron_list(
     for quadrant in disorganized_events.keys():
         x_events, gamma_events = disorganized_events[quadrant]
 
-        xtimes, xenergies, xchannels = x_events.T
-        xquadrants = np.array([quadrant] * len(x_events))
-        xevtypes = np.array(["X"] * len(x_events))
+        if np.any(x_events):
+            xtimes, xenergies, xchannels = x_events.T
+            xquadrants = np.array([quadrant] * len(x_events))
+            xevtypes = np.array(["X"] * len(x_events))
+            x_array = np.rec.fromarrays(
+                [xtimes, xenergies, xevtypes, xchannels, xquadrants],
+                dtype=[*dtypes.items()],
+            )
+            container = np.hstack((container, x_array))
 
-        stimes, senergies, schannels = gamma_events.T
-        squadrants = np.array([quadrant] * len(gamma_events))
-        sevtypes = np.array(["S"] * len(gamma_events))
-
-        x_array = np.rec.fromarrays(
-            [xtimes, xenergies, xevtypes, xchannels, xquadrants],
-            dtype=[*dtypes.items()],
-        )
-        s_array = np.rec.fromarrays(
-            [stimes, senergies, sevtypes, schannels, squadrants],
-            dtype=[*dtypes.items()],
-        )
-        container = np.hstack((container, x_array, s_array))
+        if np.any(gamma_events):
+            stimes, senergies, schannels = gamma_events.T
+            squadrants = np.array([quadrant] * len(gamma_events))
+            sevtypes = np.array(["S"] * len(gamma_events))
+            s_array = np.rec.fromarrays(
+                [stimes, senergies, sevtypes, schannels, squadrants],
+                dtype=[*dtypes.items()],
+            )
+            container = np.hstack((container, s_array))
     out = pd.DataFrame(container).sort_values("TIME").reset_index(drop=True)
     return out
 
@@ -175,7 +177,8 @@ def _get_coupled_channels(channels, couples):
 
 
 def _extract_gamma_events(quadrant_data, scintillator_couples):
-    assert np.any(quadrant_data.values)
+    if not np.any(quadrant_data.values):
+        return np.array([])
     gamma_events = quadrant_data[quadrant_data["EVTYPE"] == "S"]
     channels = gamma_events["CHN"]
     companion_to_chn = {k: v for v, k in scintillator_couples.items()}

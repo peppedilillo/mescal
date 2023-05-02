@@ -249,7 +249,8 @@ class Mescal(Cmd):
             self.console.log(":open_book: Data loaded.")
             if self.args.cache:
                 # save data to cache
-                out.to_pickle(cached)
+                from pickle import DEFAULT_PROTOCOL
+                out.to_pickle(cached, protocol=DEFAULT_PROTOCOL)
                 self.console.log(":blue_book: Data saved to cache.")
         else:
             raise FileNotFoundError("could not find input datafile.")
