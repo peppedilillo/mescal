@@ -34,12 +34,12 @@ _137cs = {
 }
 
 _xsources = {
-    "55 Fe": _55fe,
-    "109 Cd": _109cd,
+    "55Fe": _55fe,
+    "109Cd": _109cd,
 }
 
 _ssources = {
-    "137 Cs": _137cs,
+    "137Cs": _137cs,
 }
 
 
@@ -55,8 +55,6 @@ def radsources_dicts(sources: list):
             xdecays.update(_xsources[element])
         elif element in _ssources:
             sdecays.update(_ssources[element])
-        else:
-            raise SourceNotFoundError("unknown calibration source source.")
 
     xdecays = {
         k: v for k, v in sorted(xdecays.items(), key=lambda item: item[1])

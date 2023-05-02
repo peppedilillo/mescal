@@ -33,7 +33,7 @@ Mescal can also be used to visualize data acquired with the HERMES detector.
 
 ## Helper
 
-A few options (e.g., output format, DAC presets..) are activated via flags. 
+A few options (e.g., output format, DAC presets..) can be activated via command line arguments. 
 You can check these through mescal's helper: `python mescal.py --help`.
 
 

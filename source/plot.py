@@ -6,7 +6,6 @@ import numpy as np
 
 import source.fcparams as fcm
 
-
 matplotlib.rcParams = fcm.changeRCParams(
     matplotlib.rcParams,
     color="k",

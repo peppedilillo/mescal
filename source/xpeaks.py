@@ -270,10 +270,7 @@ def peaks_with_enough_stat(counts, mincounts, pars, smoothing=1, maxdepth=20):
         if not enough_statistics(mincounts, counts, peaks, peaks_props):
             break
     if i == maxdepth - 1:
-        raise TimeoutError(
-            "reached max depth looking for peaks."
-            "are you using the right ADC configuration?"
-        )
+        raise err.DetectPeakError("reached max depth looking for peaks.")
     if peaks.any():
         peaks, peaks_props = remove_small_peaks(mincounts, counts, peaks, peaks_props)
     return peaks, peaks_props

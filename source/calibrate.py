@@ -10,15 +10,11 @@ from lmfit.models import GaussianModel, LinearModel
 
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
-from source.eventlist import (
-    add_evtype_tag,
-    electrons_to_energy,
-    filter_delay,
-    filter_spurious,
-    infer_onchannels,
-    make_electron_list,
-    perchannel_counts,
-)
+from source.detectors import Detector
+from source.eventlist import (add_evtype_tag, electrons_to_energy,
+                              filter_delay, filter_spurious, infer_onchannels,
+                              make_electron_list, perchannel_counts)
+from source.radsources import radsources_dicts
 from source.speaks import find_epeaks, find_speaks
 from source.xpeaks import find_xpeaks
 
@@ -196,14 +192,14 @@ def find_adc_bins(data, binning, maxmargin=10, roundto=500, clipquant=0.996):
 class Calibrate:
     def __init__(
         self,
-        detector,
+        model,
         radsources,
         configuration,
         console=None,
         nthreads=1,
     ):
-        self.radsources = radsources
-        self.detector = detector
+        self.radsources = radsources_dicts(radsources)
+        self.detector = Detector(model)
         self.configuration = configuration
         self.console = console
         self.nthreads = nthreads

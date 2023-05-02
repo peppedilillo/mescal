@@ -1,18 +1,12 @@
 from time import sleep
 
 from rich.console import Console
+from rich.progress import (BarColumn, MofNCompleteColumn, Progress,
+                           SpinnerColumn, TextColumn, TimeElapsedColumn,
+                           TimeRemainingColumn)
+from rich.rule import Rule
 from rich.text import Text
 from rich.theme import Theme
-from rich.rule import Rule
-from rich.progress import (
-    SpinnerColumn,
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
 
 from source.cli.beaupy.beaupy import select
 from source.paths import LOGOPATH
