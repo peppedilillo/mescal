@@ -14,16 +14,16 @@ import pandas as pd
 from source import paths
 from source.calibrate import PEAKS_PARAMS, Calibrate
 from source.cli import elementsui as ui
-from source.cli.beaupy.beaupy import prompt, press_enter, select, select_multiple
+from source.cli.beaupy.beaupy import prompt, select, select_multiple
 from source.cli.cmd import Cmd
-from source.detectors import Detector, supported_models
+from source.detectors import supported_models
 from source.io import Exporter, pandas_from_LV0d5
 from source.plot import (
     mapcounts,
     mapenres,
     uncalibrated,
 )
-from source.radsources import radsources_dicts, supported_sources
+from source.radsources import supported_sources
 from source.utils import get_version
 
 description = (
@@ -31,6 +31,30 @@ description = (
     "acquisitions of known radioactive sources."
 )
 parser = argparse.ArgumentParser(description=description)
+
+parser.add_argument(
+    "--model",
+    default=None,
+    choices=supported_models(),
+    help="hermes flight model to calibrate. "
+    "Default: prompt user.",
+)
+
+parser.add_argument(
+    "--source",
+    default=None,
+    action='append',
+    choices=supported_sources(),
+    help="radioactive sources used for calibration. "
+    "Default: prompt user.",
+)
+
+parser.add_argument(
+    "--filepath",
+    default=None,
+    help="input acquisition file in standard 0.5 fits format. "
+    "Default: prompt user.",
+)
 
 parser.add_argument(
     "--adc",
@@ -53,34 +77,6 @@ parser.add_argument(
     "supported formats: xslx, csv, fits. "
     "defaults to xslx.",
 )
-
-
-def start_logger(filename):
-    """
-    Starts logger in default output folder and logs user command line arguments.
-    """
-    logfile = paths.LOGFILE(filename)
-    with open(logfile, "w") as f:
-        f.write(ui.logo())
-        len_logo = len(ui.logo().split("\n")[0])
-        version_message = "version " + get_version()
-        if len_logo > len(version_message) + 1:
-            f.write(
-                " " * (len_logo - len(version_message) + 1) + version_message + "\n\n"
-            )
-        else:
-            f.write(version_message + "\n\n")
-
-    # checks that logging was not used before creating the logfile.
-    assert len(logging.root.handlers) == 0
-    logging.basicConfig(
-        filename=logfile,
-        level=logging.INFO,
-        format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
-        "%(levelname)s: %(message)s",
-    )
-    logging.info("logging calibration for file {}".format(filename))
-    return True
 
 
 @atexit.register
@@ -118,25 +114,22 @@ class Mescal(Cmd):
     def __init__(self):
         console = ui.hello()
         super().__init__(console)
-        press_enter(self.console)
-        self.filepath = self.query_on_file()
-        start_logger(self.filepath)
         self.args = self.parse_args()
-        self.model = self.query_on_model()
-        self.radsources = self.query_on_radsources()
+        self.filepath = self.get_filepath()
+        self.model = self.get_model()
+        self.radsources = self.get_radsources()
+        self.start_logger()
         self.config = self.unpack_configuration()
         self.threads = self.check_system()
 
         ui.sections_rule(console, "[bold italic]Calibration log", style="green")
         with console.status("Initializing.."):
             data = self.fetch_data()
-            radsources = radsources_dicts(self.radsources)
-            detector = Detector(self.model)
 
         with console.status("Calibrating.."):
             self.calibration = Calibrate(
-                detector,
-                radsources,
+                self.model,
+                self.radsources,
                 configuration=self.config,
                 console=self.console,
                 nthreads=self.threads,
@@ -160,10 +153,39 @@ class Mescal(Cmd):
         ui.sections_rule(console, "[bold italic]Shell", style="green")
         self.cmdloop()
 
+    def start_logger(self):
+        """
+        Starts logger in default output folder and logs user command line arguments.
+        """
+        logfile = paths.LOGFILE(self.filepath)
+        with open(logfile, "w") as f:
+            f.write(ui.logo())
+            len_logo = len(ui.logo().split("\n")[0])
+            version_message = "version " + get_version()
+            if len_logo > len(version_message) + 1:
+                f.write(
+                    " " * (len_logo - len(version_message) + 1) + version_message + "\n\n"
+                )
+            else:
+                f.write(version_message + "\n\n")
+
+        # checks that logging was not used before creating the logfile.
+        assert len(logging.root.handlers) == 0
+        logging.basicConfig(
+            filename=logfile,
+            level=logging.INFO,
+            format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
+                   "%(levelname)s: %(message)s",
+        )
+        logging.info("user args = {}".format(self.args))
+        logging.info("logging calibration for file {}".format(self.filepath))
+        logging.info("selected model = {}".format(self.model))
+        logging.info("selected sources = {}".format(", ".join(self.radsources)))
+        return True
+
     @staticmethod
     def parse_args():
         args = parser.parse_args()
-        logging.info("user args = {}".format(args))
         return args
 
     @staticmethod
@@ -233,58 +255,78 @@ class Mescal(Cmd):
             raise FileNotFoundError("could not find input datafile.")
         return out
 
-    def query_on_file(self):
-        text_default = (
-            "[italic]Which file are you calibrating?\n" "You can drag & drop.[italic]\n"
-        )
-        text_error = (
-            "[italic][red]The file you entered does not exists.[/red]\n"
-            "Which file are you calibrating?\n"
-            "You can drag & drop.[italic]\n"
-        )
-        filepath = None
-        text = text_default
-        while filepath is None:
-            answer = prompt(
-                text,
-                console=self.console,
-                target_type=str,
+    def get_filepath(self):
+        def prompt_user_on_filepath():
+            text_default = (
+                "[italic]Which file are you calibrating?\n" 
+                "You can drag & drop.[italic]\n"
             )
-            if answer == "" or answer is None:
-                continue
-            elif not Path(answer.replace(" ", "")).exists():
-                text = text_error
-            else:
-                filepath = Path(answer.replace(" ", ""))
+            text_error = (
+                "[italic][red]The file you entered does not exists.[/red]\n"
+                "Which file are you calibrating?\n"
+                "You can drag & drop.[italic]\n"
+            )
+            filepath = None
+            text = text_default
+            while filepath is None:
+                answer = prompt(
+                    text,
+                    console=self.console,
+                    target_type=str,
+                )
+                if answer == "" or answer is None:
+                    continue
+                elif not Path(answer.replace(" ", "")).exists():
+                    text = text_error
+                else:
+                    filepath = Path(answer.replace(" ", ""))
+            return filepath
+
+        if self.args.filepath is not None:
+            filepath = Path(self.args.filepath)
+        else:
+            filepath = prompt_user_on_filepath()
         return filepath
 
-    def query_on_model(self):
-        cursor_index = (
-            [0]
-            + [i for i, d in enumerate(supported_models()) if d in self.filepath.name]
-        )[-1]
-        model = None
-        while model is None:
-            model = select(
-                options=supported_models(),
-                cursor=":flying_saucer:",
-                cursor_index=cursor_index,
-                console=self.console,
-                intro="[italic]For which model?[/italic]\n\n",
-            )
-        logging.info("selected model = {}".format(model))
+    def get_model(self):
+        def prompt_user_on_model():
+            cursor_index = (
+                [0]
+                + [i for i, d in enumerate(supported_models()) if d in self.filepath.name]
+            )[-1]
+            model = None
+            while model is None:
+                model = select(
+                    options=supported_models(),
+                    cursor=":flying_saucer:",
+                    cursor_index=cursor_index,
+                    console=self.console,
+                    intro="[italic]For which model?[/italic]\n\n",
+                )
+            return model
+
+        if self.args.model is not None:
+            model = self.args.model
+        else:
+            model = prompt_user_on_model()
         return model
 
-    def query_on_radsources(self):
-        radsources = select_multiple(
-            options=supported_sources(),
-            tick_character=":radioactive:",
-            ticked_indices=list(range(len(supported_sources()))),
-            console=self.console,
-            intro="[italic]With which radioactive sources?[/italic]\n\n",
-            transient=True,
-        )
-        logging.info("selected sources = {}".format(", ".join(radsources)))
+    def get_radsources(self):
+        def prompt_user_on_radsources():
+            radsources = select_multiple(
+                options=supported_sources(),
+                tick_character=":radioactive:",
+                ticked_indices=list(range(len(supported_sources()))),
+                console=self.console,
+                intro="[italic]With which radioactive sources?[/italic]\n\n",
+                transient=True,
+            )
+            return radsources
+
+        if self.args.source is not None:
+            radsources = self.args.source
+        else:
+            radsources = prompt_user_on_radsources()
         return radsources
 
     def warn_about_flagged(self):

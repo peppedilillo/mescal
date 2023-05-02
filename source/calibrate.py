@@ -9,6 +9,8 @@ from joblib import Parallel, delayed
 from lmfit.models import GaussianModel, LinearModel
 
 import source.errors as err
+from source.detectors import Detector
+from source.radsources import radsources_dicts
 from source.constants import PHOTOEL_PER_KEV
 from source.eventlist import (
     add_evtype_tag,
@@ -196,14 +198,14 @@ def find_adc_bins(data, binning, maxmargin=10, roundto=500, clipquant=0.996):
 class Calibrate:
     def __init__(
         self,
-        detector,
+        model,
         radsources,
         configuration,
         console=None,
         nthreads=1,
     ):
-        self.radsources = radsources
-        self.detector = detector
+        self.radsources = radsources_dicts(radsources)
+        self.detector = Detector(model)
         self.configuration = configuration
         self.console = console
         self.nthreads = nthreads
