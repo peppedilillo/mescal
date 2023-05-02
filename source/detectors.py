@@ -1,9 +1,8 @@
-# fmt: off
 import numpy as np
-
 
 UNBOND = (-1, -1)
 
+# fmt: off
 dm = {
     'A': ((5, 0), (5, 1), (5, 2), (5, 3), UNBOND, (4, 1), (4, 0), (3, 0),
           (3, 1), (5, 4), (4, 4), (3, 4), (4, 3), (3, 2), (4, 2), (3, 3),
@@ -118,10 +117,45 @@ fm4 = {
           (1, 2), (1, 3), (1, 4), (0, 4), (0, 3), (0, 2), (0, 1), (0, 0)),
 }
 
+fm5 = {
+    'D': ((0, 2), (0, 4), (0, 1), (0, 3), (0, 0), (1, 3), (1, 0), (1, 4),
+          (1, 1), (1, 2), UNBOND, (2, 4), (2, 2), (2, 3), (2, 1), (2, 0),
+          (3, 0), UNBOND, (3, 1), (3, 3), (3, 2), (3, 4), (4, 2), (4, 1),
+          (4, 0), (5, 1), (4, 4), (5, 3), (4, 3), (5, 4), (5, 2), (5, 0)),
+    'B': ((5, 4), (5, 3), (5, 2), (5, 0), (5, 1), (4, 4), (4, 0), (4, 1),
+          (4, 3), (3, 0), (4, 2), (3, 1), (3, 2), (3, 4), (3, 3), (2, 1),
+          (2, 4), UNBOND, (2, 0), (2, 3), (2, 2), (1, 2), (1, 3), (1, 0),
+          (1, 4), (1, 1), UNBOND, (0, 4), (0, 3), (0, 1), (0, 2), (0, 0)),
+    'C': ((0, 0), (0, 1), (0, 4), (0, 3), (0, 2), UNBOND, (1, 0), (1, 3),
+          (1, 1), (1, 4), (1, 2), (2, 2), (2, 4), UNBOND, (2, 1), (2, 3),
+          (2, 0), (3, 0), (3, 3), (3, 1), (3, 4), (3, 2), (4, 4), (4, 2),
+          (4, 1), (4, 0), (4, 3), (5, 0), (5, 3), (5, 1), (5, 4), (5, 2)),
+    'A': ((5, 0), (5, 1), (5, 2), (5, 3), (4, 1), (4, 0), UNBOND, (3, 0),
+          (3, 1), (5, 4), (4, 4), (3, 4), (4, 3), (3, 2), (4, 2), (3, 3),
+          (2, 4), UNBOND, (2, 3), (2, 1), (2, 2), (1, 0), (2, 0), (1, 2),
+          (1, 1), (1, 3), (1, 4), (0, 4), (0, 3), (0, 2), (0, 1), (0, 0)),
+}
+# fmt: on
+
+
+_maps = {
+    "dm": dm,
+    "pfm": pfm,
+    "fm1": fm1,
+    "fm2": fm2,
+    "fm3": fm3,
+    "fm4": fm4,
+    "fm5": fm5,
+}
+
+
+def supported_models():
+    return list(_maps.keys())
+
 
 def get_quadrant_map(model: str, quad: str, arr_borders):
     if model in _maps:
-        detector_map= _maps[model]
+        detector_map = _maps[model]
     else:
         raise ValueError("Model Unknown.")
 
@@ -136,8 +170,10 @@ def get_quadrant_map(model: str, quad: str, arr_borders):
 
 
 def get_map(model):
-    return {quad: get_quadrant_map(model, quad, arr_borders=False)
-            for quad in ['A', 'B', 'C', 'D']}
+    return {
+        quad: get_quadrant_map(model, quad, arr_borders=False)
+        for quad in ["A", "B", "C", "D"]
+    }
 
 
 def get_quad_couples(model, quad):
@@ -153,23 +189,15 @@ def get_couples(model):
 
 class Detector:
     UNBOND = UNBOND
+
     def __init__(self, model):
         self.label = model
         self.map = get_map(model)
         self.couples = get_couples(model)
 
 
-_maps = {
-    'dm': dm,
-    'fm1': fm1,
-    "pfm": pfm,
-    "fm2": fm2,
-    "fm3": fm3,
-    "fm4": fm4,
-}
-
 # will run some test on detector maps
-if __name__ == '__main__':
+if __name__ == "__main__":
     TOT_QUAD = 4
     TOT_CH = 32
     TOT_BONDED = 30
@@ -186,12 +214,15 @@ if __name__ == '__main__':
             # checks for 32 channels
             assert len(channels) == TOT_CH
             # checks for no duplicates in each quadrant
+            if len(bonded) != len(set(bonded)):
+                print("duplicated channels quadrant {} of {}".format(quadrant, model))
+                print(set(ch for ch in bonded if bonded.count(ch) > 1))
             assert len(bonded) == len(set(bonded))
             # check no entry out of grid
             for row, col in bonded:
                 assert row < ROWS
                 assert col < COLS
-            if not ((model=='dm') and quadrant in ['B', 'C', 'D']):
+            if not ((model == "dm") and quadrant in ["B", "C", "D"]):
                 # checks for 2 unbounded channels
                 assert len(set(bonded)) == TOT_BONDED
                 # check for all places to be assigned

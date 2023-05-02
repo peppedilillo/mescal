@@ -19,6 +19,7 @@ class Exporter:
     """
     A class administring what data product can be exported.
     """
+
     def __init__(self, calibration, filepath, table_format, nthreads=1):
         # calibration must have been executed  already to be exported
         assert calibration.data is not None
@@ -158,6 +159,7 @@ class Exporter:
 
     def draw_rawspectra(self):
         assert self.can__draw_rawspectra
+
         def helper(quad):
             for ch in range(32):
                 fig, ax = plot.uncalibrated(
@@ -181,6 +183,7 @@ class Exporter:
 
     def draw_sdiagnostics(self):
         assert self.can__draw_sdiagnostics
+
         def helper(quad):
             for ch in res_fit[quad].index:
                 fig, ax = plot.diagnostics(
@@ -210,6 +213,7 @@ class Exporter:
 
     def draw_xdiagnostic(self):
         assert self.can__draw_xdiagnostic
+
         def helper(quad):
             for ch in res_fit[quad].index:
                 fig, ax = plot.diagnostics(
@@ -239,6 +243,7 @@ class Exporter:
 
     def draw_xspectra(self):
         assert self.can__draw_xspectra
+
         def helper(quad):
             for ch in res_cal[quad].index:
                 offset = res_cal[quad].loc[ch]["offset"]
@@ -265,6 +270,7 @@ class Exporter:
 
     def draw_sspectra(self):
         assert self.can__draw_sspectra
+
         def helper(quad):
             for ch in res_slo[quad].index:
                 offset = res_cal[quad].loc[ch]["offset"]
@@ -340,6 +346,7 @@ class Exporter:
 
     def draw_linearity(self):
         assert self.can__draw_linearity
+
         def helper(quad):
             for ch in res_cal[quad].index:
                 fig, ax = plot.linearity(

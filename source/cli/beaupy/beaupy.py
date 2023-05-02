@@ -17,6 +17,7 @@ from ast import literal_eval
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
 
 from rich.console import Console
+from rich.text import Text
 from rich.live import Live
 
 from source.cli.beaupy._internals import (
@@ -75,7 +76,7 @@ class Config:
         otherwise, they will return some sane alternative to their usual return (e.g.: None, [] ). Defaults to False.
     """
 
-    raise_on_interrupt: bool = False
+    raise_on_interrupt: bool = True
 
 
 TargetType = Any
@@ -174,6 +175,40 @@ def prompt(
                 cursor_index += 1
 
 
+def press_enter(
+    console: Console,
+) -> Union[bool, None]:
+    """Press enter prompt
+
+    Args:
+        console: Rich console where to output
+
+    Raises:
+        KeyboardInterrupt: Raised when keyboard interrupt is encountered and Config.raise_on_interrupt is True
+
+    Returns:
+        Union[int, str, None]: Selected value or the index of a selected option or `None`
+    """
+    rendered = ""
+    with _cursor_hidden(console), Live(
+        rendered, console=console, auto_refresh=False, transient=True
+    ) as live:
+        while True:
+            rendered = Text(
+                "\npress ENTER to start",
+                justify="center",
+            )
+            rendered.stylize("bold blink magenta", 7, 12)
+            _update_rendered(live, rendered)
+            keypress = get_key()
+            if keypress in DefaultKeys.interrupt:
+                if Config.raise_on_interrupt:
+                    raise KeyboardInterrupt()
+                return None
+            elif keypress in DefaultKeys.confirm:
+                return True
+
+
 Selection = Union[int, Any]
 
 
@@ -181,6 +216,7 @@ def select(
     options: List[Union[Tuple[int, ...], str]],
     console: Console,
     preprocessor: Callable[[Any], Any] = lambda val: val,
+    intro: str = "",
     cursor: str = ">",
     cursor_style: str = "pink1",
     cursor_index: int = 0,
@@ -196,6 +232,7 @@ def select(
                                              For example, if you passed a `Person` object with `name` attribute, preprocessor
                                              could be `lambda person: person.name` to just show the content of `name` attribute
                                              in the select dialog. Defaults to `lambda val: val`
+        intro (str, optional): a message to display
         cursor (str, optional): Cursor that is going to appear in front of currently selected option. Defaults to '> '.
         cursor_style (str, optional): Rich friendly style for the cursor. Defaults to 'pink1'.
         cursor_index (int, optional): Option can be preselected based on its list index. Defaults to 0.
@@ -228,7 +265,8 @@ def select(
 
         while True:
             rendered = (
-                "\n".join(
+                intro
+                + "\n".join(
                     [
                         _format_option_select(
                             i=i,
@@ -269,6 +307,7 @@ def select_multiple(
     options: List[Union[Tuple[int, ...], str]],
     console: Console,
     preprocessor: Callable[[Any], Any] = lambda val: val,
+    intro: str = "",
     tick_character: str = "✓",
     tick_style: str = "pink1",
     cursor_style: str = "cyan",
@@ -277,6 +316,7 @@ def select_multiple(
     minimal_count: int = 0,
     maximal_count: Optional[int] = None,
     return_indices: bool = False,
+    transient: bool = False,
     strict: bool = False,
 ) -> Selections:
     """A prompt that allows selecting multiple options from a list of options
@@ -288,6 +328,7 @@ def select_multiple(
                                              For example, if you passed a `Person` object with `name` attribute, preprocessor
                                              could be `lambda person: person.name` to just show the content of `name` attribute
                                              in the select dialog. Defaults to `lambda val: val`
+        intro (str, optional): Displays an intro message. Defaults to "".
         tick_character (str, optional): Character that will be used as a tick in a checkbox. Defaults to 'x'.
         tick_style (str, optional): Rich friendly style for the tick character. Defaults to 'pink1'.
         cursor_style (str, optional): Rich friendly style for the option when the cursor is currently on it. Defaults to 'pink1'.
@@ -295,6 +336,7 @@ def select_multiple(
         cursor_index (int, optional): Index of the option cursor starts at. Defaults to 0.
         minimal_count (int, optional): Minimal count of options that need to be selected. Defaults to 0.
         maximal_count (Optional[int], optional): Maximal count of options that need to be selected. Defaults to None.
+        transient (bool, optional): If `True` prompt will disappear after user reply.
         return_indices (bool, optional): If `True`, `select_multiple` will return the indices
                                          of ticked elements in options. Defaults to `False`.
         strict (bool, optional): If empty `options` is provided and strict is `False`, None will be returned,
@@ -311,7 +353,7 @@ def select_multiple(
         rendered,
         console=console,
         auto_refresh=False,
-        transient=False,
+        transient=transient,
     ) as live:
         if not options:
             if strict:
@@ -333,7 +375,8 @@ def select_multiple(
         error_message = ""
         while True:
             rendered = (
-                "\n".join(
+                intro
+                + "\n".join(
                     [
                         _render_option_select_multiple(
                             option=preprocessor(option),
