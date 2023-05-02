@@ -77,7 +77,7 @@ def start_logger(filename):
         filename=logfile,
         level=logging.INFO,
         format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
-               "%(levelname)s: %(message)s",
+        "%(levelname)s: %(message)s",
     )
     logging.info("logging calibration for file {}".format(filename))
     return True
@@ -219,7 +219,9 @@ class Mescal(Cmd):
         cached = paths.CACHEDIR().joinpath(self.filepath.name).with_suffix(".pkl.gz")
         if cached.is_file() and self.args.cache:
             out = pd.read_pickle(cached)
-            self.console.log("[bold yellow]:yellow_circle: Data were loaded from cache.")
+            self.console.log(
+                "[bold yellow]:yellow_circle: Data were loaded from cache."
+            )
         elif self.filepath.is_file():
             out = pandas_from_LV0d5(self.filepath)
             self.console.log(":open_book: Data loaded.")
@@ -233,13 +235,12 @@ class Mescal(Cmd):
 
     def query_on_file(self):
         text_default = (
-            '[italic]Which file are you calibrating?\n'
-            'You can drag & drop.[italic]\n'
+            "[italic]Which file are you calibrating?\n" "You can drag & drop.[italic]\n"
         )
         text_error = (
-            '[italic][red]The file you entered does not exists.[/red]\n'
-            'Which file are you calibrating?\n'
-            'You can drag & drop.[italic]\n'
+            "[italic][red]The file you entered does not exists.[/red]\n"
+            "Which file are you calibrating?\n"
+            "You can drag & drop.[italic]\n"
         )
         filepath = None
         text = text_default
@@ -249,7 +250,7 @@ class Mescal(Cmd):
                 console=self.console,
                 target_type=str,
             )
-            if answer == '' or answer is None:
+            if answer == "" or answer is None:
                 continue
             elif not Path(answer.replace(" ", "")).exists():
                 text = text_error
@@ -258,7 +259,10 @@ class Mescal(Cmd):
         return filepath
 
     def query_on_model(self):
-        cursor_index = ([0] + [i for i, d in enumerate(supported_models()) if d in self.filepath.name])[-1]
+        cursor_index = (
+            [0]
+            + [i for i, d in enumerate(supported_models()) if d in self.filepath.name]
+        )[-1]
         model = None
         while model is None:
             model = select(
@@ -266,7 +270,7 @@ class Mescal(Cmd):
                 cursor=":flying_saucer:",
                 cursor_index=cursor_index,
                 console=self.console,
-                intro="[italic]For which model?[/italic]\n\n"
+                intro="[italic]For which model?[/italic]\n\n",
             )
         logging.info("selected model = {}".format(model))
         return model
@@ -589,13 +593,10 @@ class Mescal(Cmd):
             indeces = [i for i, _ in enumerate(options)]
 
         selection = [options[i] for i in indeces]
-        commands = [c for o in selection for c in o.commands ]
+        commands = [c for o in selection for c in o.commands]
         conditions = [c for o in selection for c in o.conditions]
         with ui.progress_bar(self.console) as p:
-            for condition, f in p.track(
-                    zip(conditions, commands),
-                    total=len(commands)
-            ):
+            for condition, f in p.track(zip(conditions, commands), total=len(commands)):
                 if condition:
                     f()
         return False

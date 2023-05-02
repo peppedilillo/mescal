@@ -59,11 +59,7 @@ def _render_prompt(
     render_value.stylize("black on white", cursor_position, cursor_position + 1)
     confirm_text = Text("\n\n(Confirm with enter)")
     confirm_text.stylize("bold", 16, 21)
-    render_value = (
-            Text.from_markup(prompt + "\n")
-            + render_value
-            + confirm_text
-    )
+    render_value = Text.from_markup(prompt + "\n") + render_value + confirm_text
     if error:
         render_value = f"{render_value}\n[red]Error:[/red] {error}"
     return render_value

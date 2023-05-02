@@ -130,7 +130,9 @@ def progress_bar(console):
 if __name__ == "__main__":
     # Use custom progress bar
     console_ = Console()
-    with small_section(console=console_, header="Example", message="This is a small section") as s:
+    with small_section(
+        console=console_, header="Example", message="This is a small section"
+    ) as s:
         s.print("some text")
 
     with progress_bar(console_) as p:

@@ -139,9 +139,9 @@ fm5 = {
 
 
 _maps = {
-    'dm': dm,
+    "dm": dm,
     "pfm": pfm,
-    'fm1': fm1,
+    "fm1": fm1,
     "fm2": fm2,
     "fm3": fm3,
     "fm4": fm4,
@@ -155,7 +155,7 @@ def supported_models():
 
 def get_quadrant_map(model: str, quad: str, arr_borders):
     if model in _maps:
-        detector_map= _maps[model]
+        detector_map = _maps[model]
     else:
         raise ValueError("Model Unknown.")
 
@@ -170,8 +170,10 @@ def get_quadrant_map(model: str, quad: str, arr_borders):
 
 
 def get_map(model):
-    return {quad: get_quadrant_map(model, quad, arr_borders=False)
-            for quad in ['A', 'B', 'C', 'D']}
+    return {
+        quad: get_quadrant_map(model, quad, arr_borders=False)
+        for quad in ["A", "B", "C", "D"]
+    }
 
 
 def get_quad_couples(model, quad):
@@ -195,7 +197,7 @@ class Detector:
 
 
 # will run some test on detector maps
-if __name__ == '__main__':
+if __name__ == "__main__":
     TOT_QUAD = 4
     TOT_CH = 32
     TOT_BONDED = 30
@@ -213,17 +215,14 @@ if __name__ == '__main__':
             assert len(channels) == TOT_CH
             # checks for no duplicates in each quadrant
             if len(bonded) != len(set(bonded)):
-                print(
-                    "duplicated channels quadrant {} of {}".format(
-                        quadrant, model)
-                )
+                print("duplicated channels quadrant {} of {}".format(quadrant, model))
                 print(set(ch for ch in bonded if bonded.count(ch) > 1))
             assert len(bonded) == len(set(bonded))
             # check no entry out of grid
             for row, col in bonded:
                 assert row < ROWS
                 assert col < COLS
-            if not ((model=='dm') and quadrant in ['B', 'C', 'D']):
+            if not ((model == "dm") and quadrant in ["B", "C", "D"]):
                 # checks for 2 unbounded channels
                 assert len(set(bonded)) == TOT_BONDED
                 # check for all places to be assigned
