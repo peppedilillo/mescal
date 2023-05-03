@@ -511,7 +511,7 @@ class Mescal(Cmd):
         return False
 
     def can_maps(self, arg):
-        if self.calibration.eventlist is not None:
+        if self.calibration.data is not None:
             return True
         return False
 
