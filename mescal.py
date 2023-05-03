@@ -272,7 +272,7 @@ class Mescal(Cmd):
                 elif not Path(answer.replace(" ", "")).exists():
                     text = text_error
                 else:
-                    filepath = Path(answer.replace(" ", ""))
+                    filepath = Path(answer.strip())
             return filepath
 
         if self.args.filepath is not None:
