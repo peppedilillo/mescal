@@ -95,9 +95,12 @@ class Mescal(Cmd):
         "[red]Invalid channel.[/]\n"
         "[i]Channel ID must be in standard form (e.g., d04, A30, B02).[/i]\n"
     )
+    no_counts_message = (
+        "[red]No photon events were observed for this channel.[/]\n"
+    )
     invalid_limits_message = (
         "[red]Invalid limits.[/]\n"
-        "[i]Entries must be two different sorted integers (e.g., 19800 20100).[/i]\n"
+        "[i]Entries must be two, different, sorted integers (e.g., 19800 20100).[/i]\n"
     )
 
     def __init__(self):
@@ -435,8 +438,11 @@ class Mescal(Cmd):
         if parsed_arg is INVALID_ENTRY:
             self.console.print(self.invalid_channel_message)
             return False
-
         quad, ch = parsed_arg
+        if (quad not in self.calibration.channels) or (ch not in self.calibration.channels[quad]):
+            self.console.print(self.no_counts_message)
+            return False
+
         for source, decay in self.calibration.xradsources().items():
             arg = self.console.input(source + ": ")
             parsed_arg = parse_limits(arg)
@@ -465,6 +471,10 @@ class Mescal(Cmd):
         parsed_arg = parse_chns(arg)
         if parsed_arg is INVALID_ENTRY:
             self.console.print(self.invalid_channel_message)
+            return False
+        quad, ch = parsed_arg
+        if (quad not in self.calibration.channels) or (ch not in self.calibration.channels[quad]):
+            self.console.print(self.no_counts_message)
             return False
 
         quad, ch = parsed_arg
