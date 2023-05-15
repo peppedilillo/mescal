@@ -22,7 +22,7 @@ def _compute_lims_for_x(radsources: dict):
 
 
 def _compute_lims_for_s():
-    return 20.0, 1000.0
+    return 50.0, 1000.0
 
 
 def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
@@ -100,6 +100,56 @@ def spectrum_s(calibrated_events, radsources: dict, **kwargs):
         **kwargs,
     )
     return fig, ax
+
+
+def spectrum_xs(
+    calibrated_events,
+    xradsources: dict,
+    sradsources: dict,
+    xlims=None,
+    slims=None,
+    **kwargs,
+):
+    xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
+    xcounts, xbins = np.histogram(
+        xevs["ENERGY"],
+        bins=np.arange(*_compute_lims_for_x(xradsources), 0.05),
+    )
+    sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
+    scounts, sbins = np.histogram(
+        sevs["ENERGY"],
+        bins=np.arange(*_compute_lims_for_s(), 2),
+    )
+
+    fig, axs = plt.subplots(2, 1, **kwargs)
+    for ax, radsources, (enbins, counts), elims, color in zip(
+            axs,
+            (xradsources, sradsources),
+            ((xbins, xcounts), (sbins, scounts)),
+            (xlims, slims),
+            plt.rcParams['axes.prop_cycle'].by_key()['color'][:2],
+    ):
+        radsources_keys = radsources.keys()
+        radsources_energies = [l.energy for l in radsources.values()]
+        if elims:
+            lo, hi = elims
+            mask = (enbins[:-1] >= lo) & (enbins[:-1] < hi)
+            xs, ys = enbins[:-1][mask], counts[mask]
+        else:
+            lo, hi = enbins[0], enbins[-1]
+            xs, ys = enbins[:-1], counts
+
+        ax.step(xs, ys, where="post", color=color)
+        ax.fill_between(xs, ys, step="post", alpha=0.4, color=color)
+        for key, value in zip(radsources_keys, radsources_energies):
+            ax.axvline(value, linestyle="dashed", label=key)
+            ax.legend(loc="upper right")
+        ax.set_ylim(bottom=0)
+        ax.set_xlim(left=lo, right=hi)
+    fig.supylabel("Counts")
+    fig.supxlabel("Energy [keV]")
+    fig.suptitle("Calibrated spectra")
+    return fig, axs
 
 
 def _spectrum(enbins, counts, radsources: dict, elims=None, **kwargs):

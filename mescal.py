@@ -18,7 +18,7 @@ from source.cli.beaupy.beaupy import prompt, select, select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import supported_models
 from source.io import Exporter, pandas_from_LV0d5
-from source.plot import mapcounts, mapenres, uncalibrated
+from source.plot import mapcounts, mapenres, uncalibrated, spectrum_x, spectrum_s, spectrum_xs
 from source.radsources import supported_sources
 from source.utils import get_version
 
@@ -390,10 +390,23 @@ class Mescal(Cmd):
         self.console.print("Ciao! :wave:\n")
         return True
 
-    def can_plothist(self, arg):
+    def can_plotcal(self, arg):
+        if self.calibration.eventlist is not None:
+            return True
+
+    def do_plotcal(self, arg):
+        fig, axs = spectrum_xs(
+            self.calibration.eventlist,
+            self.calibration.xradsources(),
+            self.calibration.sradsources(),
+        )
+        plt.show(block=False)
+        return False
+
+    def can_plotraw(self, arg):
         return True
 
-    def do_plothist(self, arg):
+    def do_plotraw(self, arg):
         """Plots uncalibrated data from a channel."""
         parsed_arg = parse_chns(arg)
         if parsed_arg is INVALID_ENTRY:

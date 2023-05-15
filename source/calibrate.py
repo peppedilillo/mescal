@@ -316,7 +316,6 @@ class Calibrate:
         self.sdd_calibration = self._calibrate_sdds()
         self.resolution = self._compute_energy_resolution()
         self._print(":white_check_mark: Analyzed X events.")
-
         # S calibration
         if not self.sradsources():
             return None
@@ -342,9 +341,9 @@ class Calibrate:
         self.scintillator_calibration = self._calibrate_scintillators()
         self.lightoutput = self._compute_effective_light_outputs()
         self._print(":white_check_mark: Analyzed S events.")
-
         if not self.scintillator_calibration:
             return None
+
         try:
             eventlist = electrons_to_energy(
                 electron_evlist, self.scintillator_calibration, self.detector.couples
