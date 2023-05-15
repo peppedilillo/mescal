@@ -508,30 +508,6 @@ class Mescal(Cmd):
         plt.show(block=False)
         return False
 
-    def can_mapx(self, arg):
-        if self.calibration.eventlist is not None:
-            return True
-        return False
-
-    def do_mapx(self, arg):
-        """Plots a map of counts per-channel."""
-        counts = self.calibration.count(key="x")
-        fig, ax = mapcounts(counts, self.calibration.detector.map)
-        plt.show(block=False)
-        return False
-
-    def can_maps(self, arg):
-        if self.calibration.eventlist is not None:
-            return True
-        return False
-
-    def do_maps(self, arg):
-        """Plots a map of S counts per-channel."""
-        counts = self.calibration.count(key="s")
-        fig, ax = mapcounts(counts, self.calibration.detector.map)
-        plt.show(block=False)
-        return False
-
     def can_mapbad(self, arg):
         if self.calibration.waste is not None:
             return True

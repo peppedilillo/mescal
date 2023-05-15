@@ -2,6 +2,7 @@ from math import pi, sqrt
 
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as path_effects
 import numpy as np
 
 import source.fcparams as fcm
@@ -301,31 +302,47 @@ def _grid(n, margin, spacing):
     return axis
 
 
-def _mapplot(mat, detmap, colorlabel, maskvalue=None, **kwargs):
+def _mapplot(mat, detmap, colorlabel, cmap="hot_ur", maskvalue=None, **kwargs):
     xs = _grid(5, margin=0.1, spacing=0.5)
     ys = _grid(6, margin=0.1, spacing=0.3)
     chtext = _chtext(detmap)
     zs = _transf(mat)
 
     fig, ax = plt.subplots(**kwargs)
-    pos = ax.pcolormesh(xs, ys, zs[::-1], vmin=zs[zs > 0].min())
+    pos = ax.pcolormesh(
+        xs,
+        ys,
+        zs[::-1],
+        vmin=zs[zs > 0].min(),
+        cmap=cmap,
+    )
     if maskvalue is not None:
         zm = np.ma.masked_not_equal(zs, 0)
-        plt.pcolor(xs, ys, zm[::-1], hatch="///", alpha=0.0)
+        plt.pcolor(
+            xs,
+            ys,
+            zm[::-1],
+            hatch="///",
+            alpha=0.0
+        )
     wx = xs[2] - xs[1]
     wy = ys[2] - ys[1]
     for i in range(10):
         for j in range(12):
             quad = quadtext[::-1][j, i]
-            ax.text(
+            text = ax.text(
                 (xs[2 * i] + xs[2 * i + 1]) / 2 - wx,
                 ys[2 * j] + wy,
                 "{}{:02d}".format(
                     ["A", "B", "C", "D"][quad],
                     chtext[::-1][j, i],
                 ),
-                color="gainsboro",
+                color="white",
             )
+            text.set_path_effects([
+                path_effects.Stroke(linewidth=1, foreground='black'),
+                path_effects.Normal(),
+            ])
     ax.set_axis_off()
     fig.colorbar(
         pos,
@@ -358,6 +375,7 @@ def mapenres(source: str, en_res, detmap):
     fig, ax = _mapplot(
         mat,
         detmap,
+        cmap="cold_ur",
         colorlabel="Energy resolution [keV]",
         maskvalue=0,
         figsize=(8, 8),
@@ -387,6 +405,7 @@ def mapcounts(counts, detmap):
     fig, ax = _mapplot(
         mat,
         detmap,
+        cmap="hot_ur",
         colorlabel="Counts",
         maskvalue=0,
         figsize=(8, 8),

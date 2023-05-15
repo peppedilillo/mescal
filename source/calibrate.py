@@ -700,6 +700,7 @@ class Calibrate:
             rsquared = 1 - rss / tss
         except ZeroDivisionError:
             raise err.FailedFitError("cannot compute r squared")
+
         gain = resultlin.params["slope"].value
         offset = resultlin.params["intercept"].value
         gain_err = resultlin.params["slope"].stderr
