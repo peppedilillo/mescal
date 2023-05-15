@@ -350,9 +350,9 @@ class Mescal(Cmd):
         """Prepares and exports base calibration results."""
         if not self.radsources:
             return
-        if not self.calibration.sdd_cal and not self.calibration.optical_coupling:
+        if not self.calibration.sdd_calibration and not self.calibration.lightoutput:
             self.console.log("[bold red]:red_circle: Calibration failed.")
-        elif not self.calibration.sdd_cal or not self.calibration.optical_coupling:
+        elif not self.calibration.sdd_calibration or not self.calibration.lightoutput:
             self.console.log(
                 "[bold yellow]:yellow_circle: Calibration partially complete. "
             )
@@ -369,9 +369,9 @@ class Mescal(Cmd):
         if self.exporter.can__draw_qlooks_sdd:
             self.exporter.draw_qlooks_sdd()
             self.console.log(":chart_increasing: Saved X fit quicklook plots.")
-        if self.exporter.can__write_scintillator_report:
-            self.exporter.write_scintillator_report()
-            self.console.log(":blue_book: Wrote scintillators calibration results.")
+        if self.exporter.can__write_lightoutput_report:
+            self.exporter.write_lightoutput_report()
+            self.console.log(":blue_book: Wrote light output results.")
         if self.exporter.can__draw_qlook_scint:
             self.exporter.draw_qlook_scint()
             self.console.log(":chart_increasing: Saved light-output plots.")
@@ -521,7 +521,7 @@ class Mescal(Cmd):
         return False
 
     def can_mapres(self, arg):
-        if self.calibration.xradsources().keys() and self.calibration.en_res:
+        if self.calibration.xradsources().keys() and self.calibration.resolution:
             return True
         return False
 
@@ -531,7 +531,7 @@ class Mescal(Cmd):
         source = sorted(decays, key=lambda source: decays[source].energy)[0]
         fig, ax = mapenres(
             source,
-            self.calibration.en_res,
+            self.calibration.resolution,
             self.calibration.detector.map,
         )
         plt.show(block=False)
@@ -611,6 +611,12 @@ class Mescal(Cmd):
                     self.exporter.can__write_sfit_report,
                 ],
                 True,
+            ),
+            Option(
+                "scintillator calibration report",
+                [self.exporter.write_scintillator_calibration_report],
+                [self.exporter.can__write_scintillator_calibration_report],
+                False,
             ),
             Option(
                 "calibrated events fits",

@@ -17,6 +17,7 @@ from source.eventlist import (add_evtype_tag, electrons_to_energy,
 from source.radsources import radsources_dicts
 from source.speaks import find_epeaks, find_speaks
 from source.xpeaks import find_xpeaks
+from source.io import read_report_from_excel
 
 PEAKS_PARAMS = (
     "lim_low",
@@ -221,10 +222,10 @@ class Calibrate:
         self.xfit = None
         self.sfit = None
         self.efit = None
-        self.sdd_cal = None
-        self.en_res = None
-        self.scint_cal = None
-        self.optical_coupling = None
+        self.sdd_calibration = None
+        self.resolution = None
+        self.scintillator_calibration = None
+        self.lightoutput = None
 
     def __call__(self, data):
         self.channels = infer_onchannels(data)
@@ -312,8 +313,8 @@ class Calibrate:
                 message = err.warn_failed_peak_detection(quad, ch)
                 logging.warning(message)
         self.xfit = self._fit_xradsources()
-        self.sdd_cal = self._calibrate_sdds()
-        self.en_res = self._compute_energy_resolution()
+        self.sdd_calibration = self._calibrate_sdds()
+        self.resolution = self._compute_energy_resolution()
         self._print(":white_check_mark: Analyzed X events.")
 
         # S calibration
@@ -329,7 +330,7 @@ class Calibrate:
         self.sfit = self._fit_sradsources()
         electron_evlist = make_electron_list(
             self.data,
-            self.sdd_cal,
+            self.sdd_calibration,
             self.sfit,
             self.detector.couples,
             self.nthreads,
@@ -338,15 +339,15 @@ class Calibrate:
         self.ehistograms = self._make_ehistograms(electron_evlist)
         self.epeaks = self._detect_epeaks()
         self.efit = self._fit_gamma_electrons()
-        self.scint_cal = self._calibrate_scintillators()
-        self.optical_coupling = self._compute_effective_light_outputs()
+        self.scintillator_calibration = self._calibrate_scintillators()
+        self.lightoutput = self._compute_effective_light_outputs()
         self._print(":white_check_mark: Analyzed S events.")
 
-        if not self.scint_cal:
+        if not self.scintillator_calibration:
             return None
         try:
             eventlist = electrons_to_energy(
-                electron_evlist, self.scint_cal, self.detector.couples
+                electron_evlist, self.scintillator_calibration, self.detector.couples
             )
         except err.CalibratedEventlistError:
             logging.warning("Event list creation failed.")
@@ -537,11 +538,11 @@ class Calibrate:
         energies = [s.energy for s in radiation_sources.values()]
 
         results = {}
-        for quad in self.sdd_cal.keys():
-            for ch in self.sdd_cal[quad].index:
+        for quad in self.sdd_calibration.keys():
+            for ch in self.sdd_calibration[quad].index:
                 counts = self.shistograms.counts[quad][ch]
-                gain = self.sdd_cal[quad].loc[ch]["gain"]
-                offset = self.sdd_cal[quad].loc[ch]["offset"]
+                gain = self.sdd_calibration[quad].loc[ch]["gain"]
+                offset = self.sdd_calibration[quad].loc[ch]["offset"]
 
                 try:
                     limits = find_speaks(
@@ -554,7 +555,7 @@ class Calibrate:
                     )
                 except err.DetectPeakError:
                     companion = self._companion(quad, ch)
-                    if companion in self.sdd_cal[quad].index:
+                    if companion in self.sdd_calibration[quad].index:
                         message = err.warn_failed_peak_detection(quad, ch)
                         logging.warning(message)
                     else:
@@ -738,9 +739,9 @@ class Calibrate:
         results = {}
         radiation_sources = self.xradsources()
 
-        for quad in self.sdd_cal.keys():
+        for quad in self.sdd_calibration.keys():
             fit = self.xfit[quad]
-            cal = self.sdd_cal[quad]
+            cal = self.sdd_calibration[quad]
 
             assert np.isin(cal.index, fit.index).all()
             for ch in cal.index:
@@ -800,9 +801,9 @@ class Calibrate:
             "offset",
             "offset_err",
         ]
-        cell_cal = self.sdd_cal[quad].loc[scint][params].to_list()
+        cell_cal = self.sdd_calibration[quad].loc[scint][params].to_list()
         companion = self.detector.couples[quad][cell]
-        comp_cal = self.sdd_cal[quad].loc[companion][params].to_list()
+        comp_cal = self.sdd_calibration[quad].loc[companion][params].to_list()
 
         centers_cell = self.sfit[quad].loc[cell][:, "center"].values
         centers_comp = self.sfit[quad].loc[companion][:, "center"].values
@@ -829,7 +830,7 @@ class Calibrate:
 
                 try:
                     lo, lo_err = (
-                        self.scint_cal[quad]
+                        self.scintillator_calibration[quad]
                         .loc[scint][
                             [
                                 "light_out",
@@ -846,14 +847,14 @@ class Calibrate:
 
                 else:
                     centers = self.sfit[quad].loc[ch][:, "center"].values
-                    gain, offset = self.sdd_cal[quad].loc[ch][["gain", "offset"]].values
+                    gain, offset = self.sdd_calibration[quad].loc[ch][["gain", "offset"]].values
                     centers_electrons = (centers - offset) / gain / PHOTOEL_PER_KEV
 
                     centers_companion = (
                         self.sfit[quad].loc[companion][:, "center"].values
                     )
                     gain_comp, offset_comp = (
-                        self.sdd_cal[quad].loc[companion][["gain", "offset"]].values
+                        self.sdd_calibration[quad].loc[companion][["gain", "offset"]].values
                     )
                     centers_electrons_comp = (
                         (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
@@ -882,7 +883,7 @@ class Calibrate:
         x_stop = bisect_right(x, stop)
         if x_stop - x_start < 5:
             raise err.FailedFitError("too few bins to fit.")
-        x_fit = (x[x_start : x_stop + 1][1:] + x[x_start : x_stop + 1][:-1]) / 2
+        x_fit = (x[x_start: x_stop + 1][1:] + x[x_start: x_stop + 1][:-1]) / 2
         y_fit = y[x_start:x_stop]
         if np.sum(y_fit) < min_counts:
             raise err.FailedFitError("too few counts to fit.")
@@ -939,3 +940,45 @@ class Calibrate:
         intervals = [*zip(centers + sigmas * lower, centers + sigmas * upper)]
         fit_results = self._fit_peaks(x, y, intervals)
         return intervals, fit_results
+
+
+class ImportedCalibration(Calibrate):
+    def __init__(
+            self,
+            model,
+            configuration,
+            *ignore,
+            sdd_calibration_filepath,
+            scintillator_calibration_filepath,
+            lightoutput_filepath,
+            **kwargs,
+    ):
+        if ignore:
+            raise TypeError(
+                "wrong arguments. you are supposed to use keywords for reports."
+            )
+        super().__init__(model, [], configuration, **kwargs)
+        self.sdd_calibration = read_report_from_excel(sdd_calibration_filepath, kind="report")
+        self.scintillator_calibration = read_report_from_excel(scintillator_calibration_filepath, kind="report")
+        self.lightoutput = read_report_from_excel(lightoutput_filepath, kind="report")
+
+    def __call__(self, data):
+        self.channels = infer_onchannels(data)
+        self.data = self._preprocess(data)
+        self._bin()
+        self.eventlist = self._calibrate()
+        return self.eventlist
+
+    def _calibrate(self):
+        electron_evlist = make_electron_list(
+            self.data,
+            self.sdd_calibration,
+            self.lightoutput,
+            self.detector.couples,
+            self.nthreads,
+        )
+        eventlist = electrons_to_energy(
+            electron_evlist, self.scintillator_calibration, self.detector.couples
+        )
+        return eventlist
+    

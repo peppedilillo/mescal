@@ -31,14 +31,17 @@ class Exporter:
         self.can__draw_rawspectra = True
         self.can__draw_map_counts = True
         self.can__write_sdd_calibration_report = False
-        if self.calibration.sdd_cal is not None:
+        if self.calibration.sdd_calibration is not None:
             self.can__write_sdd_calibration_report = True
         self.can__write_energy_res_report = False
-        if self.calibration.sdd_cal is not None:
+        if self.calibration.sdd_calibration is not None:
             self.can__write_energy_res_report = True
-        self.can__write_scintillator_report = False
-        if self.calibration.optical_coupling is not None:
-            self.can__write_scintillator_report = True
+        self.can__write_scintillator_calibration_report = False
+        if self.calibration.scintillator_calibration is not None:
+            self.can__write_scintillator_calibration_report = True
+        self.can__write_lightoutput_report = False
+        if self.calibration.lightoutput is not None:
+            self.can__write_lightoutput_report = True
         self.can__write_xfit_report = False
         if self.calibration.xfit is not None:
             self.can__write_xfit_report = True
@@ -46,10 +49,10 @@ class Exporter:
         if self.calibration.sfit is not None:
             self.can__write_sfit_report = True
         self.can__draw_qlooks_sdd = False
-        if self.calibration.sdd_cal is not None:
+        if self.calibration.sdd_calibration is not None:
             self.can__draw_qlooks_sdd = True
         self.can__draw_qlook_scint = False
-        if self.calibration.scint_cal is not None:
+        if self.calibration.lightoutput is not None:
             self.can__draw_qlook_scint = True
         self.can__draw_sdiagnostics = False
         if self.calibration.speaks is not None:
@@ -58,25 +61,25 @@ class Exporter:
         if self.calibration.xfit is not None:
             self.can__draw_xdiagnostic = True
         self.can__draw_xspectra = False
-        if self.calibration.sdd_cal is not None:
+        if self.calibration.sdd_calibration is not None:
             self.can__draw_xspectra = True
         self.can__draw_sspectra = False
-        if self.calibration.scint_cal is not None:
+        if self.calibration.lightoutput is not None:
             self.can__draw_sspectra = True
         self.can__draw_spectrum = False
         if self.calibration.eventlist is not None:
             self.can__draw_spectrum = True
         self.can__draw_xspectrum = False
-        if self.calibration.sdd_cal is not None:
+        if self.calibration.sdd_calibration is not None:
             self.can__draw_xspectrum = True
         self.can__draw_sspectrum = False
-        if self.calibration.scint_cal is not None:
+        if self.calibration.lightoutput is not None:
             self.can__draw_sspectrum = True
         self.can__draw_linearity = False
-        if self.calibration.sdd_cal is not None:
+        if self.calibration.sdd_calibration is not None:
             self.can__draw_linearity = True
         self.can__draw_map_resolution = False
-        if self.calibration.en_res is not None:
+        if self.calibration.resolution is not None:
             self.can__draw_map_resolution = True
         self.can__write_eventlist = False
         if self.calibration.eventlist is not None:
@@ -85,21 +88,28 @@ class Exporter:
     def write_sdd_calibration_report(self):
         assert self.can__write_sdd_calibration_report
         self.writer(
-            self.calibration.sdd_cal,
+            self.calibration.sdd_calibration,
             path=paths.CALREPORT(self.filepath),
         )
 
     def write_energy_res_report(self):
         assert self.can__write_energy_res_report
         self.writer(
-            self.calibration.en_res,
+            self.calibration.resolution,
             path=paths.RESREPORT(self.filepath),
         )
 
-    def write_scintillator_report(self):
-        assert self.can__write_scintillator_report
+    def write_lightoutput_report(self):
+        assert self.can__write_lightoutput_report
         self.writer(
-            self.calibration.optical_coupling,
+            self.calibration.lightoutput,
+            path=paths.ELOREPORT(self.filepath),
+        )
+
+    def write_scintillator_calibration_report(self):
+        assert self.can__write_scintillator_calibration_report
+        self.writer(
+            self.calibration.scintillator_calibration,
             path=paths.SLOREPORT(self.filepath),
         )
 
@@ -119,7 +129,7 @@ class Exporter:
 
     def draw_qlooks_sdd(self):
         assert self.can__draw_qlooks_sdd
-        res_cal = self.calibration.sdd_cal
+        res_cal = self.calibration.sdd_calibration
         path = paths.QLKPLOT(self.filepath)
 
         for quad in res_cal.keys():
@@ -142,7 +152,7 @@ class Exporter:
 
     def draw_qlook_scint(self):
         assert self.can__draw_qlook_scint
-        res_slo = self.calibration.optical_coupling
+        res_slo = self.calibration.lightoutput
         path = paths.SLOPLOT(self.filepath)
 
         for quad in res_slo.keys():
@@ -260,7 +270,7 @@ class Exporter:
 
         path = paths.XCSPLOT(self.filepath)
         histograms = self.calibration.xhistograms
-        res_cal = self.calibration.sdd_cal
+        res_cal = self.calibration.sdd_calibration
         radsources = self.calibration.xradsources()
         nthreads = self.nthreads
         return Parallel(n_jobs=nthreads)(
@@ -290,8 +300,8 @@ class Exporter:
 
         path = paths.SCSPLOT(self.filepath)
         histograms = self.calibration.shistograms
-        res_cal = self.calibration.sdd_cal
-        res_slo = self.calibration.optical_coupling
+        res_cal = self.calibration.sdd_calibration
+        res_slo = self.calibration.lightoutput
         radsources = self.calibration.sradsources()
         nthreads = self.nthreads
         return Parallel(n_jobs=nthreads)(
@@ -355,7 +365,7 @@ class Exporter:
                 plt.close(fig)
 
         paths.LINPLOT(self.filepath)
-        res_cal = self.calibration.sdd_cal
+        res_cal = self.calibration.sdd_calibration
         res_fit = self.calibration.xfit
         radsources = self.calibration.xradsources()
         nthreads = self.nthreads
@@ -372,7 +382,7 @@ class Exporter:
 
         fig, ax = plot.mapenres(
             source,
-            self.calibration.en_res,
+            self.calibration.resolution,
             self.calibration.detector.map,
         )
         fig.savefig(path)

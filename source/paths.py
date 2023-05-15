@@ -104,11 +104,12 @@ def UNCDIR(filepath: Path) -> Path:
 EVLFITS = (lambda filepath: RESDIR(filepath).joinpath("event_list.fits"))
 LOGFILE = (lambda filepath: RESDIR(filepath).joinpath("log.txt"))
 
-XFTREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_xfit.xlsx"))
-SFTREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_sfit.xlsx"))
-CALREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_cal.xlsx"))
-RESREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_res.xlsx"))
-SLOREPORT = (lambda filepath: RESDIR(filepath).joinpath("report_slo.xlsx"))
+XFTREPORT = (lambda filepath: RESDIR(filepath).joinpath("xfit.xlsx"))
+SFTREPORT = (lambda filepath: RESDIR(filepath).joinpath("gammafit.xlsx"))
+CALREPORT = (lambda filepath: RESDIR(filepath).joinpath("sdds.xlsx"))
+RESREPORT = (lambda filepath: RESDIR(filepath).joinpath("resolution.xlsx"))
+ELOREPORT = (lambda filepath: RESDIR(filepath).joinpath("lightoutput.xlsx"))
+SLOREPORT = (lambda filepath: RESDIR(filepath).joinpath("scintillators.xlsx"))
 
 XSPPLOT = (lambda filepath: PLTDIR(filepath).joinpath("spectrum_x.png"))
 SSPPLOT = (lambda filepath: PLTDIR(filepath).joinpath("spectrum_s.png"))
