@@ -39,7 +39,7 @@ CAL_PARAMS = (
     "gain_err",
     "offset",
     "offset_err",
-    "chi2",
+    "rsquared",
 )
 
 LO_PARAMS = (
@@ -694,12 +694,17 @@ class Calibrate:
         except ValueError:
             raise err.FailedFitError("linear fitter error")
 
-        chi2 = resultlin.redchi
+        rss = np.sum((resultlin.data - resultlin.best_fit) ** 2)
+        tss = np.sum((resultlin.data - resultlin.data.mean()) ** 2)
+        try:
+            rsquared = 1 - rss / tss
+        except ZeroDivisionError:
+            raise err.FailedFitError("cannot compute r squared")
         gain = resultlin.params["slope"].value
         offset = resultlin.params["intercept"].value
         gain_err = resultlin.params["slope"].stderr
         offset_err = resultlin.params["intercept"].stderr
-        return gain, gain_err, offset, offset_err, chi2
+        return gain, gain_err, offset, offset_err, rsquared
 
     @as_cal_dataframe
     def _calibrate_sdds(self):
