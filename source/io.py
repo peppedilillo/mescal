@@ -310,12 +310,8 @@ class Exporter:
         calibrated_events = self.calibration.eventlist
         radsources = self.calibration.xradsources()
 
-        xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
-        xcounts, xbins = np.histogram(xevs["ENERGY"], bins=np.arange(2, 40, 0.05))
-
         fig, ax = plot.spectrum_x(
-            xbins,
-            xcounts,
+            calibrated_events,
             radsources,
             figsize=(8, 4.5),
         )
@@ -330,11 +326,8 @@ class Exporter:
         calibrated_events = self.calibration.eventlist
         radsources = self.calibration.sradsources()
 
-        sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
-        scounts, sbins = np.histogram(sevs["ENERGY"], bins=np.arange(30, 1000, 2))
         fig, ax = plot.spectrum_s(
-            sbins,
-            scounts,
+            calibrated_events,
             radsources,
             figsize=(8, 4.5),
         )

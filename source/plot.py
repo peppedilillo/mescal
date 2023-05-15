@@ -68,10 +68,16 @@ def diagnostics(bins, counts, centers, amps, fwhms, limits, margin=500, **kwargs
     return fig, ax
 
 
-def spectrum_x(enbins, counts, radsources: dict, **kwargs):
+def spectrum_x(calibrated_events, radsources: dict, **kwargs):
+    xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
+    xcounts, xbins = np.histogram(
+        xevs["ENERGY"],
+        bins=np.arange(*_compute_lims_for_x(radsources), 0.05),
+    )
+
     fig, ax = _spectrum(
-        enbins,
-        counts,
+        xbins,
+        xcounts,
         radsources,
         elims=_compute_lims_for_x(radsources),
         **kwargs,
@@ -79,10 +85,16 @@ def spectrum_x(enbins, counts, radsources: dict, **kwargs):
     return fig, ax
 
 
-def spectrum_s(enbins, counts, radsources: dict, **kwargs):
+def spectrum_s(calibrated_events, radsources: dict, **kwargs):
+    sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
+    scounts, sbins = np.histogram(
+        sevs["ENERGY"],
+        bins=np.arange(*_compute_lims_for_s(), 2),
+    )
+
     fig, ax = _spectrum(
-        enbins,
-        counts,
+        sbins,
+        scounts,
         radsources,
         elims=_compute_lims_for_s(),
         **kwargs,
