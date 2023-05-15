@@ -958,9 +958,9 @@ class ImportedCalibration(Calibrate):
                 "wrong arguments. you are supposed to use keywords for reports."
             )
         super().__init__(model, [], configuration, **kwargs)
-        self.sdd_calibration = read_report_from_excel(sdd_calibration_filepath, kind="report")
-        self.scintillator_calibration = read_report_from_excel(scintillator_calibration_filepath, kind="report")
-        self.lightoutput = read_report_from_excel(lightoutput_filepath, kind="report")
+        self.sdd_calibration = read_report_from_excel(sdd_calibration_filepath, kind="calib")
+        self.scintillator_calibration = read_report_from_excel(scintillator_calibration_filepath, kind="calib")
+        self.lightoutput = read_report_from_excel(lightoutput_filepath, kind="calib")
 
     def __call__(self, data):
         self.channels = infer_onchannels(data)
@@ -981,4 +981,3 @@ class ImportedCalibration(Calibrate):
             electron_evlist, self.scintillator_calibration, self.detector.couples
         )
         return eventlist
-    

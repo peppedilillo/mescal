@@ -16,7 +16,7 @@ from source.errors import (FormatNotSupportedError, warn_nan_in_sdd_calib,
 
 class Exporter:
     """
-    A class administring what data product can be exported.
+    A class for managing what data product can be exported.
     """
 
     def __init__(self, calibration, filepath, table_format, nthreads=1):
@@ -34,7 +34,7 @@ class Exporter:
         if self.calibration.sdd_calibration is not None:
             self.can__write_sdd_calibration_report = True
         self.can__write_energy_res_report = False
-        if self.calibration.sdd_calibration is not None:
+        if self.calibration.resolution is not None:
             self.can__write_energy_res_report = True
         self.can__write_scintillator_calibration_report = False
         if self.calibration.scintillator_calibration is not None:
