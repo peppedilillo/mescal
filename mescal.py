@@ -369,6 +369,9 @@ class Mescal(Cmd):
         if self.exporter.can__draw_qlooks_sdd:
             self.exporter.draw_qlooks_sdd()
             self.console.log(":chart_increasing: Saved X fit quicklook plots.")
+        if self.exporter.can__write_scintillator_calibration_report:
+            self.exporter.write_scintillator_calibration_report()
+            self.console.log(":blue_book: Saved scintillator calibration results.")
         if self.exporter.can__write_lightoutput_report:
             self.exporter.write_lightoutput_report()
             self.console.log(":blue_book: Wrote light output results.")
@@ -509,12 +512,12 @@ class Mescal(Cmd):
         logging.info(message)
         return False
 
-    def can_map(self, arg):
+    def can_mapcount(self, arg):
         if self.calibration.data is not None:
             return True
         return False
 
-    def do_map(self, arg):
+    def do_mapcount(self, arg):
         """Plots a map of counts per-channel."""
         counts = self.calibration.count()
         fig, ax = mapcounts(counts, self.calibration.detector.map)
@@ -624,12 +627,6 @@ class Mescal(Cmd):
                     self.exporter.can__write_sfit_report,
                 ],
                 True,
-            ),
-            Option(
-                "scintillator calibration report",
-                [self.exporter.write_scintillator_calibration_report],
-                [self.exporter.can__write_scintillator_calibration_report],
-                False,
             ),
             Option(
                 "calibrated events fits",
