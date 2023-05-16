@@ -977,6 +977,8 @@ class ImportedCalibration(Calibrate):
             self.nthreads,
         )
         eventlist = electrons_to_energy(
-            electron_evlist, self.scintillator_calibration, self.detector.couples
+            electron_evlist,
+            self.scintillator_calibration,
+            self.detector.couples,
         )
         return eventlist
