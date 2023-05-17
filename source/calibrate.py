@@ -205,7 +205,8 @@ class Calibrate:
         self.console = console
         self.nthreads = nthreads
         self.flagged = {}
-        self._counts = {"all": None, "x": None, "s": None}
+        self._counts = {k: None for k in ["all", "x", "s"]}
+        self._times = {q: None for q in 'ABCD'}
         self.eventlist = None
         self.data = None
         self.waste = None
@@ -234,11 +235,23 @@ class Calibrate:
         self.eventlist = self._calibrate()
         return self.eventlist
 
+    def timehist(self, quad, ch, binning):
+        assert len(self.data) > 0
+        key = (quad, ch, binning)
+        if key in self._times:
+            return self._times[key]
+        mask = ((self.data["QUADID"] == quad) & (self.data["CHN"] == ch))
+        times = self.data[mask]["TIME"].values
+        counts, bins = np.histogram(
+            times,
+            bins=np.arange(times[0], times[-1] + binning, binning)
+        )
+        self._times[key] = bins, counts
+        return counts, bins
+
     def count(self, key="all"):
-        assert key in self._counts
-        if self._counts[key] is None:
-            self._counts[key] = perchannel_counts(self.data, self.channels, key=key)
-        return self._counts[key]
+        x = self._counts.setdefault(key, perchannel_counts(self.data, self.channels, key=key))
+        return x
 
     def waste_count(self, key="all"):
         if self.waste is not None:
