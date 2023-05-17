@@ -205,8 +205,8 @@ class Calibrate:
         self.console = console
         self.nthreads = nthreads
         self.flagged = {}
-        self._counts = {k: None for k in ["all", "x", "s"]}
-        self._times = {q: None for q in 'ABCD'}
+        self._counts = {}
+        self._times = {}
         self.eventlist = None
         self.data = None
         self.waste = None
@@ -246,12 +246,14 @@ class Calibrate:
             times,
             bins=np.arange(times[0], times[-1] + binning, binning)
         )
-        self._times[key] = bins, counts
+        self._times[key] = counts, bins
         return counts, bins
 
     def count(self, key="all"):
-        x = self._counts.setdefault(key, perchannel_counts(self.data, self.channels, key=key))
-        return x
+        if key in self._counts:
+            return self._counts[key]
+        self._counts[key] = perchannel_counts(self.data, self.channels, key=key)
+        return self._counts[key]
 
     def waste_count(self, key="all"):
         if self.waste is not None:
