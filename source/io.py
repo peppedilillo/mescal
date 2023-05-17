@@ -29,61 +29,80 @@ class Exporter:
         self.nthreads = nthreads
 
         self.can__draw_rawspectra = True
+
         self.can__draw_map_counts = True
+
         self.can__write_sdd_calibration_report = False
-        if self.calibration.sdd_calibration is not None:
+        if self.calibration.sdd_calibration:
             self.can__write_sdd_calibration_report = True
+
         self.can__write_energy_res_report = False
-        if self.calibration.resolution is not None:
+        if self.calibration.resolution:
             self.can__write_energy_res_report = True
+
         self.can__write_scintillator_calibration_report = False
-        if self.calibration.scintillator_calibration is not None:
+        if self.calibration.scintillator_calibration:
             self.can__write_scintillator_calibration_report = True
+
         self.can__write_lightoutput_report = False
-        if self.calibration.lightoutput is not None:
+        if self.calibration.lightoutput:
             self.can__write_lightoutput_report = True
+
         self.can__write_xfit_report = False
-        if self.calibration.xfit is not None:
+        if self.calibration.xfit:
             self.can__write_xfit_report = True
+
         self.can__write_sfit_report = False
-        if self.calibration.sfit is not None:
+        if self.calibration.sfit:
             self.can__write_sfit_report = True
+
         self.can__draw_qlooks_sdd = False
-        if self.calibration.sdd_calibration is not None:
+        if self.calibration.sdd_calibration:
             self.can__draw_qlooks_sdd = True
+
         self.can__draw_qlook_scint = False
-        if self.calibration.lightoutput is not None:
+        if self.calibration.lightoutput:
             self.can__draw_qlook_scint = True
+
         self.can__draw_sdiagnostics = False
-        if self.calibration.speaks is not None:
+        if self.calibration.speaks:
             self.can__draw_sdiagnostics = True
+
         self.can__draw_xdiagnostic = False
-        if self.calibration.xfit is not None:
+        if self.calibration.xfit:
             self.can__draw_xdiagnostic = True
+
         self.can__draw_xspectra = False
-        if self.calibration.sdd_calibration is not None:
+        if self.calibration.sdd_calibration:
             self.can__draw_xspectra = True
+
         self.can__draw_sspectra = False
-        if self.calibration.lightoutput is not None:
+        if self.calibration.lightoutput:
             self.can__draw_sspectra = True
-        self.can__draw_spectrum = False
-        if self.calibration.eventlist is not None:
-            self.can__draw_spectrum = True
+
         self.can__draw_xspectrum = False
-        if self.calibration.sdd_calibration is not None:
+        if self.calibration.sdd_calibration:
             self.can__draw_xspectrum = True
+
         self.can__draw_sspectrum = False
-        if self.calibration.lightoutput is not None:
+        if self.calibration.lightoutput:
             self.can__draw_sspectrum = True
+
         self.can__draw_linearity = False
-        if self.calibration.sdd_calibration is not None:
+        if self.calibration.sdd_calibration:
             self.can__draw_linearity = True
+
         self.can__draw_map_resolution = False
-        if self.calibration.resolution is not None:
+        if self.calibration.resolution:
             self.can__draw_map_resolution = True
+
         self.can__write_eventlist = False
         if self.calibration.eventlist is not None:
             self.can__write_eventlist = True
+
+        self.can__draw_spectrum = False
+        if self.calibration.eventlist is not None:
+            self.can__draw_spectrum = True
 
     def write_sdd_calibration_report(self):
         assert self.can__write_sdd_calibration_report
@@ -320,8 +339,12 @@ class Exporter:
         calibrated_events = self.calibration.eventlist
         radsources = self.calibration.xradsources()
 
+        xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
+        xcounts, xbins = np.histogram(xevs["ENERGY"], bins=np.arange(2, 40, 0.05))
+
         fig, ax = plot.spectrum_x(
-            calibrated_events,
+            xbins,
+            xcounts,
             radsources,
             figsize=(8, 4.5),
         )
@@ -336,8 +359,11 @@ class Exporter:
         calibrated_events = self.calibration.eventlist
         radsources = self.calibration.sradsources()
 
+        sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
+        scounts, sbins = np.histogram(sevs["ENERGY"], bins=np.arange(30, 1000, 2))
         fig, ax = plot.spectrum_s(
-            calibrated_events,
+            sbins,
+            scounts,
             radsources,
             figsize=(8, 4.5),
         )

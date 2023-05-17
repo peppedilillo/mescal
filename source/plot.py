@@ -68,16 +68,10 @@ def diagnostics(bins, counts, centers, amps, fwhms, limits, margin=500, **kwargs
     return fig, ax
 
 
-def spectrum_x(calibrated_events, radsources: dict, **kwargs):
-    xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
-    xcounts, xbins = np.histogram(
-        xevs["ENERGY"],
-        bins=np.arange(*_compute_lims_for_x(radsources), 0.05),
-    )
-
+def spectrum_x(enbins, counts, radsources: dict, **kwargs):
     fig, ax = _spectrum(
-        xbins,
-        xcounts,
+        enbins,
+        counts,
         radsources,
         elims=_compute_lims_for_x(radsources),
         **kwargs,
@@ -85,20 +79,39 @@ def spectrum_x(calibrated_events, radsources: dict, **kwargs):
     return fig, ax
 
 
-def spectrum_s(calibrated_events, radsources: dict, **kwargs):
-    sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
-    scounts, sbins = np.histogram(
-        sevs["ENERGY"],
-        bins=np.arange(*_compute_lims_for_s(), 2),
-    )
-
+def spectrum_s(enbins, counts, radsources: dict, **kwargs):
     fig, ax = _spectrum(
-        sbins,
-        scounts,
+        enbins,
+        counts,
         radsources,
         elims=_compute_lims_for_s(),
         **kwargs,
     )
+    return fig, ax
+
+
+def _spectrum(enbins, counts, radsources: dict, elims=None, **kwargs):
+    radsources_keys = radsources.keys()
+    radsources_energies = [l.energy for l in radsources.values()]
+    colors = [plt.cm.tab10(i) for i in range(len(radsources))]
+
+    fig, ax = plt.subplots(**kwargs)
+    if elims:
+        lo, hi = elims
+        mask = (enbins[:-1] >= lo) & (enbins[:-1] < hi)
+        xs, ys = enbins[:-1][mask], counts[mask]
+
+        ax.set_xlim((lo, hi))
+    else:
+        xs, ys = enbins[:-1], counts
+    ax.step(xs, ys, where="post")
+    ax.fill_between(xs, ys, step="post", alpha=0.4)
+    for key, value, col in zip(radsources_keys, radsources_energies, colors):
+        ax.axvline(value, linestyle="dashed", color=col, label=key)
+        ax.legend(loc="upper right")
+    ax.set_ylim(bottom=0)
+    ax.set_xlabel("Energy [keV]")
+    ax.set_ylabel("Counts")
     return fig, ax
 
 
@@ -146,35 +159,10 @@ def spectrum_xs(
             ax.legend(loc="upper right")
         ax.set_ylim(bottom=0)
         ax.set_xlim(left=lo, right=hi)
+    axs[0].set_title("Calibrated spectra")
     fig.supylabel("Counts")
     fig.supxlabel("Energy [keV]")
-    fig.suptitle("Calibrated spectra")
     return fig, axs
-
-
-def _spectrum(enbins, counts, radsources: dict, elims=None, **kwargs):
-    radsources_keys = radsources.keys()
-    radsources_energies = [l.energy for l in radsources.values()]
-    colors = [plt.cm.tab10(i) for i in range(len(radsources))]
-
-    fig, ax = plt.subplots(**kwargs)
-    if elims:
-        lo, hi = elims
-        mask = (enbins[:-1] >= lo) & (enbins[:-1] < hi)
-        xs, ys = enbins[:-1][mask], counts[mask]
-
-        ax.set_xlim((lo, hi))
-    else:
-        xs, ys = enbins[:-1], counts
-    ax.step(xs, ys, where="post")
-    ax.fill_between(xs, ys, step="post", alpha=0.4)
-    for key, value, col in zip(radsources_keys, radsources_energies, colors):
-        ax.axvline(value, linestyle="dashed", color=col, label=key)
-        ax.legend(loc="upper right")
-    ax.set_ylim(bottom=0)
-    ax.set_xlabel("Energy [keV]")
-    ax.set_ylabel("Counts")
-    return fig, ax
 
 
 def linearity(
@@ -417,7 +405,7 @@ def _mapplot(mat, detmap, colorlabel, cmap="hot_ur", maskvalue=None, **kwargs):
     return fig, ax
 
 
-def mapenres(source: str, en_res, detmap):
+def mapenres(source: str, en_res, detmap, cmap="cold_ur",):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
@@ -437,7 +425,7 @@ def mapenres(source: str, en_res, detmap):
     fig, ax = _mapplot(
         mat,
         detmap,
-        cmap="cold_ur",
+        cmap=cmap,
         colorlabel="Energy resolution [keV]",
         maskvalue=0,
         figsize=(8, 8),
@@ -446,7 +434,7 @@ def mapenres(source: str, en_res, detmap):
     return fig, ax
 
 
-def mapcounts(counts, detmap):
+def mapcounts(counts, detmap, cmap="hot_ur", title=None):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
@@ -467,10 +455,11 @@ def mapcounts(counts, detmap):
     fig, ax = _mapplot(
         mat,
         detmap,
-        cmap="hot_ur",
+        cmap=cmap,
         colorlabel="Counts",
         maskvalue=0,
         figsize=(8, 8),
     )
-    ax.set_title("Per-channel counts (pixel events)")
+    if title is not None:
+        ax.set_title(title)
     return fig, ax

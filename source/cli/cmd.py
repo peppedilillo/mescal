@@ -3,8 +3,6 @@ import sys
 
 from rich.columns import Columns
 
-from source.cli.elementsui import small_section
-
 
 class Cmd:
     """
@@ -299,15 +297,17 @@ class Cmd:
                         cmds_doc.append(cmd)
                     else:
                         cmds_undoc.append(cmd)
-            self.print_topics(self.doc_header, cmds_doc, message="Type help <topic>.")
+            self.print_topics(self.doc_header, cmds_doc, message="[i]Type help <topic>.[/i]\n")
             self.print_topics(self.misc_header, sorted(topics))
             self.print_topics(self.undoc_header, cmds_undoc)
 
     def print_topics(self, header, cmds, message=""):
+        if message:
+            self.console.print(message)
         if cmds:
-            with small_section(self.console, message=message) as ss:
-                cols = Columns(cmds, expand=True, padding=(0, 2))
-                ss.print(cols)
+            cols = Columns(cmds)
+            self.console.print(cols)
+            self.console.print("")
 
     def can(self, x):
         """Checks if a command can be executed."""

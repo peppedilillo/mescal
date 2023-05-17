@@ -18,7 +18,7 @@ from source.cli.beaupy.beaupy import prompt, select, select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import supported_models
 from source.io import Exporter, pandas_from_LV0d5
-from source.plot import mapcounts, mapenres, uncalibrated, spectrum_x, spectrum_s, spectrum_xs
+from source.plot import mapcounts, mapenres, uncalibrated, spectrum_xs
 from source.radsources import supported_sources
 from source.utils import get_version
 
@@ -369,15 +369,12 @@ class Mescal(Cmd):
         if self.exporter.can__draw_qlooks_sdd:
             self.exporter.draw_qlooks_sdd()
             self.console.log(":chart_increasing: Saved X fit quicklook plots.")
-        if self.exporter.can__write_scintillator_calibration_report:
-            self.exporter.write_scintillator_calibration_report()
-            self.console.log(":blue_book: Saved scintillator calibration results.")
         if self.exporter.can__write_lightoutput_report:
             self.exporter.write_lightoutput_report()
             self.console.log(":blue_book: Wrote light output results.")
         if self.exporter.can__draw_qlook_scint:
             self.exporter.draw_qlook_scint()
-            self.console.log(":chart_increasing: Saved light-output plots.")
+            self.console.log(":chart_increasing: Saved light output plots.")
         if self.exporter.can__draw_spectrum:
             self.exporter.draw_spectrum()
             self.console.log(":chart_increasing: Saved calibrated spectra plots.")
@@ -473,7 +470,7 @@ class Mescal(Cmd):
                 self.calibration.xpeaks[quad].loc[ch, (source, label_lo)] = int(lim_lo)
                 self.calibration.xpeaks[quad].loc[ch, (source, label_hi)] = int(lim_hi)
 
-        message = "reset xfit limits for channel {}{}".format(quad, ch)
+        message = "reset xfit limits for channel {}{:02d}".format(quad, ch)
         logging.info(message)
         return False
 
@@ -508,7 +505,7 @@ class Mescal(Cmd):
                 self.calibration.speaks[quad].loc[ch, (source, label_lo)] = int(lim_lo)
                 self.calibration.speaks[quad].loc[ch, (source, label_hi)] = int(lim_hi)
 
-        message = "reset sfit limits for channel {}{}".format(quad, ch)
+        message = "reset sfit limits for channel {}{:02d}".format(quad, ch)
         logging.info(message)
         return False
 
@@ -520,7 +517,11 @@ class Mescal(Cmd):
     def do_mapcount(self, arg):
         """Plots a map of counts per-channel."""
         counts = self.calibration.count()
-        fig, ax = mapcounts(counts, self.calibration.detector.map)
+        fig, ax = mapcounts(
+            counts,
+            self.calibration.detector.map,
+            title="Per-channel events count map",
+        )
         plt.show(block=False)
         return False
 
@@ -532,7 +533,12 @@ class Mescal(Cmd):
     def do_mapbad(self, arg):
         """Plots a map of counts per-channel from filtered data."""
         counts = self.calibration.waste_count(key="all")
-        fig, ax = mapcounts(counts, self.calibration.detector.map)
+        fig, ax = mapcounts(
+            counts,
+            self.calibration.detector.map,
+            cmap="binary_u",
+            title="Per-channel filtered events count map",
+        )
         plt.show(block=False)
         return False
 
