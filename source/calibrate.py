@@ -238,8 +238,6 @@ class Calibrate:
     def timehist(self, quad, ch, binning):
         assert len(self.data) > 0
         key = (quad, ch, binning)
-        if key in self._times:
-            return self._times[key]
         mask = ((self.data["QUADID"] == quad) & (self.data["CHN"] == ch))
         times = self.data[mask]["TIME"].values
         counts, bins = np.histogram(
