@@ -2,6 +2,7 @@ from math import pi, sqrt
 
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as path_effects
 import numpy as np
 
 import source.fcparams as fcm
@@ -21,7 +22,7 @@ def _compute_lims_for_x(radsources: dict):
 
 
 def _compute_lims_for_s():
-    return 20.0, 1000.0
+    return 50.0, 1000.0
 
 
 def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
@@ -112,6 +113,56 @@ def _spectrum(enbins, counts, radsources: dict, elims=None, **kwargs):
     ax.set_xlabel("Energy [keV]")
     ax.set_ylabel("Counts")
     return fig, ax
+
+
+def spectrum_xs(
+    calibrated_events,
+    xradsources: dict,
+    sradsources: dict,
+    xlims=None,
+    slims=None,
+    **kwargs,
+):
+    xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
+    xcounts, xbins = np.histogram(
+        xevs["ENERGY"],
+        bins=np.arange(*_compute_lims_for_x(xradsources), 0.05),
+    )
+    sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
+    scounts, sbins = np.histogram(
+        sevs["ENERGY"],
+        bins=np.arange(*_compute_lims_for_s(), 2),
+    )
+
+    fig, axs = plt.subplots(2, 1, **kwargs)
+    for ax, radsources, (enbins, counts), elims, color in zip(
+        axs,
+        (xradsources, sradsources),
+        ((xbins, xcounts), (sbins, scounts)),
+        (xlims, slims),
+        plt.rcParams["axes.prop_cycle"].by_key()["color"][:2],
+    ):
+        radsources_keys = radsources.keys()
+        radsources_energies = [l.energy for l in radsources.values()]
+        if elims:
+            lo, hi = elims
+            mask = (enbins[:-1] >= lo) & (enbins[:-1] < hi)
+            xs, ys = enbins[:-1][mask], counts[mask]
+        else:
+            lo, hi = enbins[0], enbins[-1]
+            xs, ys = enbins[:-1], counts
+
+        ax.step(xs, ys, where="post", color=color)
+        ax.fill_between(xs, ys, step="post", alpha=0.4, color=color)
+        for key, value in zip(radsources_keys, radsources_energies):
+            ax.axvline(value, linestyle="dashed", label=key)
+            ax.legend(loc="upper right")
+        ax.set_ylim(bottom=0)
+        ax.set_xlim(left=lo, right=hi)
+    axs[0].set_title("Calibrated spectra")
+    fig.supylabel("Counts")
+    fig.supxlabel("Energy [keV]")
+    return fig, axs
 
 
 def linearity(
@@ -236,6 +287,13 @@ def lightout(res_slo, **kwargs):
     return fig, ax
 
 
+def histogram(counts, bins, **kwargs):
+    fig, ax = plt.subplots(1, 1, **kwargs)
+    ax.step(bins, counts)
+    ax.set_ylim(bottom=0)
+    return fig, ax
+
+
 # mapplot utilities
 
 quadtext = np.array(
@@ -301,14 +359,20 @@ def _grid(n, margin, spacing):
     return axis
 
 
-def _mapplot(mat, detmap, colorlabel, maskvalue=None, **kwargs):
+def _mapplot(mat, detmap, colorlabel, cmap="hot_ur", maskvalue=None, **kwargs):
     xs = _grid(5, margin=0.1, spacing=0.5)
     ys = _grid(6, margin=0.1, spacing=0.3)
     chtext = _chtext(detmap)
     zs = _transf(mat)
 
     fig, ax = plt.subplots(**kwargs)
-    pos = ax.pcolormesh(xs, ys, zs[::-1], vmin=zs[zs > 0].min())
+    pos = ax.pcolormesh(
+        xs,
+        ys,
+        zs[::-1],
+        vmin=zs[zs > 0].min(),
+        cmap=cmap,
+    )
     if maskvalue is not None:
         zm = np.ma.masked_not_equal(zs, 0)
         plt.pcolor(xs, ys, zm[::-1], hatch="///", alpha=0.0)
@@ -317,14 +381,20 @@ def _mapplot(mat, detmap, colorlabel, maskvalue=None, **kwargs):
     for i in range(10):
         for j in range(12):
             quad = quadtext[::-1][j, i]
-            ax.text(
+            text = ax.text(
                 (xs[2 * i] + xs[2 * i + 1]) / 2 - wx,
                 ys[2 * j] + wy,
                 "{}{:02d}".format(
                     ["A", "B", "C", "D"][quad],
                     chtext[::-1][j, i],
                 ),
-                color="gainsboro",
+                color="white",
+            )
+            text.set_path_effects(
+                [
+                    path_effects.Stroke(linewidth=1, foreground="black"),
+                    path_effects.Normal(),
+                ]
             )
     ax.set_axis_off()
     fig.colorbar(
@@ -338,7 +408,12 @@ def _mapplot(mat, detmap, colorlabel, maskvalue=None, **kwargs):
     return fig, ax
 
 
-def mapenres(source: str, en_res, detmap):
+def mapenres(
+    source: str,
+    en_res,
+    detmap,
+    cmap="cold_ur",
+):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
@@ -358,6 +433,7 @@ def mapenres(source: str, en_res, detmap):
     fig, ax = _mapplot(
         mat,
         detmap,
+        cmap=cmap,
         colorlabel="Energy resolution [keV]",
         maskvalue=0,
         figsize=(8, 8),
@@ -366,7 +442,7 @@ def mapenres(source: str, en_res, detmap):
     return fig, ax
 
 
-def mapcounts(counts, detmap):
+def mapcounts(counts, detmap, cmap="hot_ur", title=None):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
@@ -387,9 +463,11 @@ def mapcounts(counts, detmap):
     fig, ax = _mapplot(
         mat,
         detmap,
+        cmap=cmap,
         colorlabel="Counts",
         maskvalue=0,
         figsize=(8, 8),
     )
-    ax.set_title("Per-channel counts (pixel events)")
+    if title is not None:
+        ax.set_title(title)
     return fig, ax

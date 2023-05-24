@@ -1,7 +1,6 @@
 # fmt: off
 from collections import namedtuple
 
-from source.errors import SourceNotFoundError
 
 Decay = namedtuple('Decay', ['energy', 'low_lim', 'hi_lim'])
 
