@@ -287,6 +287,12 @@ def lightout(res_slo, **kwargs):
     return fig, ax
 
 
+def histogram(counts, bins, **kwargs):
+    fig, ax = plt.subplots(1, 1, **kwargs)
+    ax.step(bins, counts)
+    ax.set_ylim(bottom=0)
+    return fig, ax
+
 # mapplot utilities
 
 quadtext = np.array(

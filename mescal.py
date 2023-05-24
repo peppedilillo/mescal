@@ -12,13 +12,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from source import paths
+import source.errors as err
 from source.calibrate import PEAKS_PARAMS, Calibrate
 from source.cli import elementsui as ui
 from source.cli.beaupy.beaupy import prompt, select, select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import supported_models
 from source.io import Exporter, pandas_from_LV0d5
-from source.plot import mapcounts, mapenres, uncalibrated, spectrum_xs
+from source.plot import mapcounts, mapenres, uncalibrated, spectrum_xs, histogram
 from source.radsources import supported_sources
 from source.utils import get_version
 
@@ -83,25 +84,29 @@ class Mescal(Cmd):
     """
     A script implementing calibration workflow and a shell loop.
     """
-
+    #fmt off
     intro = "Type help or ? for a list of commands.\n"
     prompt = "[cyan]\[mescalSH] "
     spinner_message = "Working.."
     unknown_command_message = (
-        "[red]Unknown command.[/]\n" "[i]Type help or ? for a list of commands.[/i]\n"
+        "[red]Unknown command.[/]\n"
+        "[i]Type help or ? for a list of commands.[/i]\n"
     )
     invalid_command_message = "[red]Command unavailable.[/]\n"
     invalid_channel_message = (
         "[red]Invalid channel.[/]\n"
-        "[i]Channel ID must be in standard form (e.g., d04, A30, B02).[/i]\n"
+        "[i]Channel ID must be in standard form "
+        "(e.g., d04, A30, B02).[/i]\n"
     )
     no_counts_message = (
-        "[red]No photon events were observed for this channel.[/]\n"
+        "[red]No events observed for this channel.[/]\n"
     )
     invalid_limits_message = (
         "[red]Invalid limits.[/]\n"
-        "[i]Entries must be two, different, sorted integers (e.g., 19800 20100).[/i]\n"
+        "[i]Entries must be two, different, "
+        "sorted integers (e.g., 19800 20100).[/i]\n"
     )
+    #fmt on
 
     def __init__(self):
         console = ui.hello()
@@ -114,11 +119,11 @@ class Mescal(Cmd):
         self.config = self.unpack_configuration()
         self.threads = self.check_system()
 
-        ui.sections_rule(console, "[bold italic]Calibration log", style="green")
+        ui.sections_rule(console, "[bold italic]Calibration log[/]", style="green")
         with console.status("Initializing.."):
             data = self.fetch_data()
 
-        with console.status("Calibrating.."):
+        with console.status("Analyzing data.."):
             self.calibration = Calibrate(
                 self.model,
                 self.radsources,
@@ -138,11 +143,12 @@ class Mescal(Cmd):
             self.print_calibration_status()
             self.export_essentials(self.filepath)
 
-        if any(self.calibration.flagged):
-            ui.sections_rule(console, "[bold italic]Warning", style="red")
-            self.warn_about_flagged()
+        failed_tests = self.calibration.test_results()
+        if failed_tests:
+            ui.sections_rule(console, ":eyes: [bold italic]Warning[/] :eyes:", style="red")
+            self.display_warning(failed_tests)
 
-        ui.sections_rule(console, "[bold italic]Shell", style="green")
+        ui.sections_rule(console, "[bold italic]Shell[/]", style="green")
         self.cmdloop()
 
     def start_logger(self):
@@ -286,14 +292,12 @@ class Mescal(Cmd):
 
     def get_model(self):
         def prompt_user_on_model():
-            cursor_index = (
-                [0]
-                + [
-                    i
-                    for i, d in enumerate(supported_models())
-                    if d in self.filepath.name
-                ]
-            )[-1]
+            # fmt: off
+            cursor_index = ([0] + [
+                i for i, d in enumerate(supported_models())
+                if d in self.filepath.name
+            ])[-1]
+            # fmt: on
             model = None
             while model is None:
                 model = select(
@@ -329,21 +333,55 @@ class Mescal(Cmd):
             radsources = prompt_user_on_radsources()
         return radsources
 
-    def warn_about_flagged(self):
+    def display_warning(self, failed_tests):
         """Tells user about channels for which calibration
         could not be completed.
         """
-        sublists = self.calibration.flagged.values()
-        num_flagged = len(set([item for sublist in sublists for item in sublist]))
-        num_channels = len(
-            [ch for quad, chs in self.calibration.channels.items() for ch in chs]
-        )
-        message = (
-            "In total, {} channels out of {} were flagged.\n"
-            "For more details, see the log file.".format(num_flagged, num_channels)
-        )
-
-        self.console.print(message)
+        if "flagged_channels" in failed_tests:
+            sublists = self.calibration.flagged.values()
+            num_flagged = len(set([item for sublist in sublists for item in sublist]))
+            num_channels = len(
+                [ch for quad, chs in self.calibration.channels.items() for ch in chs]
+            )
+            message = (
+                "[i][yellow]"
+                "I was unable to complete calibration for {} channels out of {}."
+                "[/yellow]\n"
+                "For more details, see the log file.".format(num_flagged, num_channels)
+            )
+            self.console.print(message)
+        if "too_many_filtered_events" in failed_tests:
+            message = (
+                "[i][yellow]"
+                "A significant fraction was filtered away."
+                "[/yellow]\n"
+                "Check filter parameters in 'config.ini'."
+            )
+            self.console.print(message)
+        if "filter_retrigger_off" in failed_tests:
+            message = (
+                "[i][yellow]"
+                "Retrigger filter is off."
+                "[/yellow]\n"
+                "You can enable it through 'config.ini'."
+            )
+            self.console.print(message)
+        if "filter_spurious_off" not in failed_tests:
+            message = (
+                "[i][yellow]"
+                "Spurious events filter is off."
+                "[/yellow]\n"
+                "You can enable it through 'config.ini'."
+            )
+            self.console.print(message)
+        if "time_outliers" in failed_tests:
+            message = (
+                "[i][yellow]"
+                "Found large outliers in your time data."
+                "[/yellow]\n"
+                "These events will not be displayed through 'timehist' command."
+            )
+            self.console.print(message)
         return True
 
     def print_calibration_status(self):
@@ -420,7 +458,34 @@ class Mescal(Cmd):
             self.calibration.shistograms.bins,
             self.calibration.shistograms.counts[quad][ch],
         )
-        ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
+        ax.set_title("Uncalibrated plot channel {}{:02d}".format(quad, ch))
+        plt.show(block=False)
+        return False
+
+    def can_timehist(self, arg):
+        return True
+
+    def do_timehist(self, arg):
+        """Plots a histogram of counts in time for selected channel."""
+        parsed_arg = parse_chns(arg)
+        if parsed_arg is INVALID_ENTRY:
+            self.console.print(self.invalid_channel_message)
+            return False
+
+        quad, ch = parsed_arg
+        binning = 1.0
+        try:
+            counts, bins = self.calibration.timehist(quad, ch, binning)
+        except err.BadDataError:
+            counts, bins = self.calibration.timehist(quad, ch, binning, neglect_outliers=True)
+
+        fig, ax = histogram(
+            counts,
+            bins[:-1],
+        )
+        ax.set_title("Count in time over channel {}{:02d}, binning {} s".format(quad, ch, binning))
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Counts")
         plt.show(block=False)
         return False
 
@@ -440,12 +505,12 @@ class Mescal(Cmd):
             ui.sections_rule(self.console, "[bold italic]Shell", style="green")
         return False
 
-    def can_setxlim(self, arg):
+    def can_setlim(self, arg):
         if self.radsources:
             return True
         return False
 
-    def do_setxlim(self, arg):
+    def do_setlim(self, arg):
         """Reset channel X peaks position for user selected channels."""
         parsed_arg = parse_chns(arg)
         if parsed_arg is INVALID_ENTRY:
@@ -457,7 +522,7 @@ class Mescal(Cmd):
             return False
 
         for source, decay in self.calibration.xradsources().items():
-            arg = self.console.input(source + ": ")
+            arg = input(source + ": ")
             parsed_arg = parse_limits(arg)
             if parsed_arg is INVALID_ENTRY:
                 self.console.print(self.invalid_limits_message)
@@ -470,29 +535,8 @@ class Mescal(Cmd):
                 self.calibration.xpeaks[quad].loc[ch, (source, label_lo)] = int(lim_lo)
                 self.calibration.xpeaks[quad].loc[ch, (source, label_hi)] = int(lim_hi)
 
-        message = "reset xfit limits for channel {}{:02d}".format(quad, ch)
-        logging.info(message)
-        return False
-
-    def can_setslim(self, arg):
-        if self.radsources:
-            return True
-        return False
-
-    def do_setslim(self, arg):
-        """Reset channel S peaks position for user selected channels."""
-        parsed_arg = parse_chns(arg)
-        if parsed_arg is INVALID_ENTRY:
-            self.console.print(self.invalid_channel_message)
-            return False
-        quad, ch = parsed_arg
-        if (quad not in self.calibration.channels) or (ch not in self.calibration.channels[quad]):
-            self.console.print(self.no_counts_message)
-            return False
-
-        quad, ch = parsed_arg
         for source, decay in self.calibration.sradsources().items():
-            arg = self.console.input(source + ": ")
+            arg = input(source + ": ")
             parsed_arg = parse_limits(arg)
             if parsed_arg is INVALID_ENTRY:
                 self.console.print(self.invalid_limits_message)
@@ -505,7 +549,7 @@ class Mescal(Cmd):
                 self.calibration.speaks[quad].loc[ch, (source, label_lo)] = int(lim_lo)
                 self.calibration.speaks[quad].loc[ch, (source, label_hi)] = int(lim_hi)
 
-        message = "reset sfit limits for channel {}{:02d}".format(quad, ch)
+        message = "reset fit limits for channel {}{:02d}".format(quad, ch)
         logging.info(message)
         return False
 

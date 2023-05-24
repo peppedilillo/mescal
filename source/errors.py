@@ -29,6 +29,9 @@ class FailedFitError(Exception):
 class CalibratedEventlistError(Exception):
     """An error when building calibrated event list."""
 
+class BadDataError(Exception):
+    """This is when trying to deal with unexpectedly bad errors."""
+
 
 def warn_failed_peak_fit(quad, ch):
     return "failed channel {}{:02d} peak fit.".format(quad, ch)

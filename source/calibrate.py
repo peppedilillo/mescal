@@ -13,7 +13,7 @@ from source.constants import PHOTOEL_PER_KEV
 from source.detectors import Detector
 from source.eventlist import (add_evtype_tag, electrons_to_energy,
                               filter_delay, filter_spurious, infer_onchannels,
-                              make_electron_list, perchannel_counts)
+                              make_electron_list, perchannel_counts, time_outliers)
 from source.radsources import radsources_dicts
 from source.speaks import find_epeaks, find_speaks
 from source.xpeaks import find_xpeaks
@@ -205,10 +205,10 @@ class Calibrate:
         self.console = console
         self.nthreads = nthreads
         self.flagged = {}
-        self._counts = {}
-        self._times = {}
+        self._time_outliers = None
         self.eventlist = None
         self.data = None
+        self._counts = {}
         self.waste = None
         self.channels = None
         self.xbins = None
@@ -235,23 +235,60 @@ class Calibrate:
         self.eventlist = self._calibrate()
         return self.eventlist
 
-    def timehist(self, quad, ch, binning):
+    def test_results(self):
+        results = []
+        if ("filter_retrigger" in self.configuration) and (not self.configuration["filter_retrigger"]):
+            results.append("filter_retrigger_off")
+        if ("filter_spurious" in self.configuration) and (not self.configuration["filter_spurious"]):
+            results.append("filter_spurious_off")
+        if self.flagged:
+            results.append("flagged_channels")
+        if self.test_time_outliers():
+            results.append("time_outliers")
+        if self.test_filtered_events():
+            results.append("too_many_filtered_events")
+        return results
+
+    def test_filtered_events(self):
+        if self.waste is None:
+            return False
+        if (self.data is not None) & (len(self.waste) / len(self.data) < 0.5):
+            return False
+        return True
+
+    def test_time_outliers(self):
         assert len(self.data) > 0
-        key = (quad, ch, binning)
-        mask = ((self.data["QUADID"] == quad) & (self.data["CHN"] == ch))
-        times = self.data[mask]["TIME"].values
-        counts, bins = np.histogram(
-            times,
-            bins=np.arange(times[0], times[-1] + binning, binning)
-        )
-        self._times[key] = counts, bins
-        return counts, bins
+
+        if self._time_outliers is not None:
+            return self._time_outliers
+        if time_outliers(self.data).empty:
+            self._time_outliers = False
+        else:
+            self._time_outliers = True
+        return self._time_outliers
 
     def count(self, key="all"):
         if key in self._counts:
             return self._counts[key]
         self._counts[key] = perchannel_counts(self.data, self.channels, key=key)
         return self._counts[key]
+
+    def timehist(self, quad, ch, binning, neglect_outliers=False):
+        assert len(self.data) > 0
+        key = (quad, ch, binning)
+        mask = ((self.data["QUADID"] == quad) & (self.data["CHN"] == ch))
+        if neglect_outliers:
+            min_, max_ = self.data["TIME"].quantile(0.01), self.data["TIME"].quantile(0.99)
+        else:
+            min_, max_ = self.data["TIME"].min(), self.data["TIME"].max()
+            if self.test_time_outliers():
+                raise err.BadDataError("Outliers in time events.")
+        times = self.data[mask]["TIME"].values
+        counts, bins = np.histogram(
+            times,
+            bins=np.arange(min_, max_ + binning, binning)
+        )
+        return counts, bins
 
     def waste_count(self, key="all"):
         if self.waste is not None:
@@ -295,13 +332,9 @@ class Calibrate:
         if retrigger_delay:
             data, waste = filter_delay(data, retrigger_delay)
             self.waste = waste
-        else:
-            self.console.log(":exclamation_mark: Retrigger filter is off.")
         if spurious_bool:
             data, waste = filter_spurious(data)
             self.waste = pd.concat((self.waste, waste))
-        else:
-            self.console.log(":exclamation_mark: Spurious filter is off.")
 
         filtered = 100 * (events_pre_filter - len(data)) / events_pre_filter
         if filtered:
@@ -783,7 +816,6 @@ class Calibrate:
             for scint in self.efit[quad].index:
                 los = self.efit[quad].loc[scint][:, "center"].values / energies
                 lo_errs = self._scintillator_lout_error(quad, scint, energies)
-
                 lo, lo_err = self._deal_with_multiple_gamma_decays(los, lo_errs)
                 results.setdefault(quad, {})[scint] = np.array((lo, lo_err))
         return results
@@ -816,7 +848,6 @@ class Calibrate:
         cell_cal = self.sdd_calibration[quad].loc[scint][params].to_list()
         companion = self.detector.couples[quad][cell]
         comp_cal = self.sdd_calibration[quad].loc[companion][params].to_list()
-
         centers_cell = self.sfit[quad].loc[cell][:, "center"].values
         centers_comp = self.sfit[quad].loc[companion][:, "center"].values
         electron_err_cell = self._electron_error(centers_cell, *cell_cal)
@@ -893,7 +924,7 @@ class Calibrate:
         # select index of the smallest subset of x larger than [start, stop]
         x_start = max(bisect_right(x, start) - 1, 0)
         x_stop = bisect_right(x, stop)
-        if x_stop - x_start < 5:
+        if x_stop - x_start < 4:
             raise err.FailedFitError("too few bins to fit.")
         x_fit = (x[x_start: x_stop + 1][1:] + x[x_start: x_stop + 1][:-1]) / 2
         y_fit = y[x_start:x_stop]
@@ -995,3 +1026,4 @@ class ImportedCalibration(Calibrate):
             self.detector.couples,
         )
         return eventlist
+

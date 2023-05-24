@@ -133,11 +133,12 @@ def _get_calibrated_events(
 ):
     def helper(quadrant):
         couples = scintillator_couples[quadrant]
-        calibrated_channels = sfit_results[quadrant].index
-        coupled_channels = _get_coupled_channels(calibrated_channels, couples)
+        fitted_calibrated_channels = list(set(calibrated_sdds[quadrant].index) & set(sfit_results[quadrant].index))
+        channels = _get_coupled_channels(fitted_calibrated_channels, couples)
 
         quadrant_data = data[
-            (data["QUADID"] == quadrant) & (data["CHN"].isin(coupled_channels))
+            (data["QUADID"] == quadrant)
+          & (data["CHN"].isin(channels))
         ]
         quadrant_data = _insert_electron_column(
             quadrant_data,
@@ -204,6 +205,7 @@ def _extract_x_events(quadrant_data):
 def _insert_electron_column(data, calibrated_sdds):
     adcs = data["ADC"]
     chns = data["CHN"]
+    assert np.all(np.isin(np.unique(chns), calibrated_sdds.index))
     offsets = calibrated_sdds.loc[chns]["offset"].values
     gains = calibrated_sdds.loc[chns]["gain"].values
 
@@ -288,3 +290,11 @@ def infer_onchannels(data):
         if onchs.any():
             out[quad] = onchs.tolist()
     return out
+
+
+def time_outliers(data):
+    mask =  (
+        (data["TIME"] > 3 * data["TIME"].quantile(0.99))
+      | (data["TIME"] < 0)
+    )
+    return data[mask]

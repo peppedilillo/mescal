@@ -31,6 +31,7 @@ class Cmd:
     ruler = "-"
     lastcmd = ""
     intro = None
+    use_rawinput = 1
     doc_leader = ""
     doc_header = "Documented commands"
     misc_header = "Miscellaneous help topics:"
@@ -38,7 +39,7 @@ class Cmd:
     unknown_command_message = "Unknown command."
     nohelp = "*** No help on %s"
 
-    def __init__(self, console, completekey="tab", stdin=None):
+    def __init__(self, console, completekey=None, stdin=None):
         """Instantiate a line-oriented interpreter framework.
 
         The optional argument 'completekey' is the readline name of a
@@ -52,6 +53,7 @@ class Cmd:
             self.stdin = stdin
         else:
             self.stdin = sys.stdin
+        self.stdout = console.file
         self.console = console
         self.cmdqueue = []
         self.completekey = completekey
@@ -66,43 +68,51 @@ class Cmd:
     def cmdloop(self, intro=None):
         """Repeatedly issue a prompt, accept input, parse an initial prefix
         off the received input, and dispatch to action methods, passing them
-        the remainder of the line as argument."""
+        the remainder of the line as argument.
+
+        """
 
         self.preloop()
-
-        if self.completekey:
+        if self.use_rawinput and self.completekey:
             try:
                 import readline
-
                 self.old_completer = readline.get_completer()
                 readline.set_completer(self.complete)
-                readline.parse_and_bind(self.completekey + ": complete")
+                readline.parse_and_bind(self.completekey+": complete")
             except ImportError:
                 pass
         try:
             if intro is not None:
                 self.intro = intro
             if self.intro:
-                self.console.print(self.intro)
+                self.stdout.write(str(self.intro)+"\n")
             stop = None
             while not stop:
                 if self.cmdqueue:
                     line = self.cmdqueue.pop(0)
                 else:
-                    try:
-                        line = input(self.ansi_prompt())
-                    except EOFError:
-                        line = "EOF"
-
+                    if self.use_rawinput:
+                        self.console.print(self.prompt, end="")
+                        try:
+                            line = input()
+                        except EOFError:
+                            line = 'EOF'
+                    else:
+                        self.stdout.write()
+                        self.stdout.flush()
+                        line = self.stdin.readline()
+                        if not len(line):
+                            line = 'EOF'
+                        else:
+                            line = line.rstrip('\r\n')
                 line = self.precmd(line)
                 stop = self.onecmd(line)
                 stop = self.postcmd(stop, line)
             self.postloop()
         finally:
-            if self.completekey:
+            if self.use_rawinput and self.completekey:
                 try:
                     import readline
-
                     readline.set_completer(self.old_completer)
                 except ImportError:
                     pass

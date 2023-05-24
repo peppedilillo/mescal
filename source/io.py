@@ -197,7 +197,7 @@ class Exporter:
                     shistograms.counts[quad][ch],
                     figsize=(8, 4.5),
                 )
-                ax.set_title("Uncalibrated plot - CH{:02d}Q{}".format(ch, quad))
+                ax.set_title("Uncalibrated plot {}{:02d}".format(quad, ch))
                 fig.savefig(path(quad, ch))
                 plt.close(fig)
 
@@ -227,7 +227,7 @@ class Exporter:
                     .T,
                     figsize=(8, 4.5),
                 )
-                ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, quad))
+                ax.set_title("Diagnostic plot {}{:02d}".format(quad, ch))
                 fig.savefig(path(quad, ch))
                 plt.close(fig)
 
@@ -257,7 +257,7 @@ class Exporter:
                     .T,
                     figsize=(8, 4.5),
                 )
-                ax.set_title("Diagnostic plot - CH{:02d}Q{}".format(ch, quad))
+                ax.set_title("Diagnostic plot {}{:02d}".format(quad, ch))
                 fig.savefig(path(quad, ch))
                 plt.close(fig)
 
@@ -283,7 +283,7 @@ class Exporter:
                     radsources,
                     figsize=(8, 4.5),
                 )
-                ax.set_title("Spectra plot X - CH{:02d}Q{}".format(ch, quad))
+                ax.set_title("Spectra plot X {}{:02d}".format(quad, ch))
                 fig.savefig(path(quad, ch))
                 plt.close(fig)
 
@@ -313,7 +313,7 @@ class Exporter:
                     radsources,
                     figsize=(8, 4.5),
                 )
-                ax.set_title("Spectra plot S - CH{:02d}Q{}".format(ch, quad))
+                ax.set_title("Spectra plot S {}{:02d}".format(quad, ch))
                 fig.savefig(path(quad, ch))
                 plt.close(fig)
 
@@ -386,7 +386,7 @@ class Exporter:
                     radsources,
                     figsize=(7, 7),
                 )
-                ax[0].set_title("Linearity plot - CH{:02d}Q{}".format(ch, quad))
+                ax[0].set_title("Linearity plot {}{:02d}".format(quad, ch))
                 fig.savefig(path(quad, ch))
                 plt.close(fig)
 
