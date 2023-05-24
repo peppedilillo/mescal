@@ -11,9 +11,16 @@ from lmfit.models import GaussianModel, LinearModel
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
 from source.detectors import Detector
-from source.eventlist import (add_evtype_tag, electrons_to_energy,
-                              filter_delay, filter_spurious, infer_onchannels,
-                              make_electron_list, perchannel_counts, time_outliers)
+from source.eventlist import (
+    add_evtype_tag,
+    electrons_to_energy,
+    filter_delay,
+    filter_spurious,
+    infer_onchannels,
+    make_electron_list,
+    perchannel_counts,
+    time_outliers,
+)
 from source.radsources import radsources_dicts
 from source.speaks import find_epeaks, find_speaks
 from source.xpeaks import find_xpeaks
@@ -237,9 +244,13 @@ class Calibrate:
 
     def test_results(self):
         results = []
-        if ("filter_retrigger" in self.configuration) and (not self.configuration["filter_retrigger"]):
+        if ("filter_retrigger" in self.configuration) and (
+            not self.configuration["filter_retrigger"]
+        ):
             results.append("filter_retrigger_off")
-        if ("filter_spurious" in self.configuration) and (not self.configuration["filter_spurious"]):
+        if ("filter_spurious" in self.configuration) and (
+            not self.configuration["filter_spurious"]
+        ):
             results.append("filter_spurious_off")
         if self.flagged:
             results.append("flagged_channels")
@@ -276,17 +287,18 @@ class Calibrate:
     def timehist(self, quad, ch, binning, neglect_outliers=False):
         assert len(self.data) > 0
         key = (quad, ch, binning)
-        mask = ((self.data["QUADID"] == quad) & (self.data["CHN"] == ch))
+        mask = (self.data["QUADID"] == quad) & (self.data["CHN"] == ch)
         if neglect_outliers:
-            min_, max_ = self.data["TIME"].quantile(0.01), self.data["TIME"].quantile(0.99)
+            min_, max_ = self.data["TIME"].quantile(0.01), self.data["TIME"].quantile(
+                0.99
+            )
         else:
             min_, max_ = self.data["TIME"].min(), self.data["TIME"].max()
             if self.test_time_outliers():
                 raise err.BadDataError("Outliers in time events.")
         times = self.data[mask]["TIME"].values
         counts, bins = np.histogram(
-            times,
-            bins=np.arange(min_, max_ + binning, binning)
+            times, bins=np.arange(min_, max_ + binning, binning)
         )
         return counts, bins
 
@@ -890,14 +902,18 @@ class Calibrate:
 
                 else:
                     centers = self.sfit[quad].loc[ch][:, "center"].values
-                    gain, offset = self.sdd_calibration[quad].loc[ch][["gain", "offset"]].values
+                    gain, offset = (
+                        self.sdd_calibration[quad].loc[ch][["gain", "offset"]].values
+                    )
                     centers_electrons = (centers - offset) / gain / PHOTOEL_PER_KEV
 
                     centers_companion = (
                         self.sfit[quad].loc[companion][:, "center"].values
                     )
                     gain_comp, offset_comp = (
-                        self.sdd_calibration[quad].loc[companion][["gain", "offset"]].values
+                        self.sdd_calibration[quad]
+                        .loc[companion][["gain", "offset"]]
+                        .values
                     )
                     centers_electrons_comp = (
                         (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
@@ -926,7 +942,7 @@ class Calibrate:
         x_stop = bisect_right(x, stop)
         if x_stop - x_start < 4:
             raise err.FailedFitError("too few bins to fit.")
-        x_fit = (x[x_start: x_stop + 1][1:] + x[x_start: x_stop + 1][:-1]) / 2
+        x_fit = (x[x_start : x_stop + 1][1:] + x[x_start : x_stop + 1][:-1]) / 2
         y_fit = y[x_start:x_stop]
         if np.sum(y_fit) < min_counts:
             raise err.FailedFitError("too few counts to fit.")
@@ -987,22 +1003,26 @@ class Calibrate:
 
 class ImportedCalibration(Calibrate):
     def __init__(
-            self,
-            model,
-            configuration,
-            *ignore,
-            sdd_calibration_filepath,
-            scintillator_calibration_filepath,
-            lightoutput_filepath,
-            **kwargs,
+        self,
+        model,
+        configuration,
+        *ignore,
+        sdd_calibration_filepath,
+        scintillator_calibration_filepath,
+        lightoutput_filepath,
+        **kwargs,
     ):
         if ignore:
             raise TypeError(
                 "wrong arguments. you are supposed to use keywords for reports."
             )
         super().__init__(model, [], configuration, **kwargs)
-        self.sdd_calibration = read_report_from_excel(sdd_calibration_filepath, kind="calib")
-        self.scintillator_calibration = read_report_from_excel(scintillator_calibration_filepath, kind="calib")
+        self.sdd_calibration = read_report_from_excel(
+            sdd_calibration_filepath, kind="calib"
+        )
+        self.scintillator_calibration = read_report_from_excel(
+            scintillator_calibration_filepath, kind="calib"
+        )
         self.lightoutput = read_report_from_excel(lightoutput_filepath, kind="calib")
 
     def __call__(self, data):
@@ -1026,4 +1046,3 @@ class ImportedCalibration(Calibrate):
             self.detector.couples,
         )
         return eventlist
-

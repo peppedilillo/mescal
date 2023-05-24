@@ -76,16 +76,17 @@ class Cmd:
         if self.use_rawinput and self.completekey:
             try:
                 import readline
+
                 self.old_completer = readline.get_completer()
                 readline.set_completer(self.complete)
-                readline.parse_and_bind(self.completekey+": complete")
+                readline.parse_and_bind(self.completekey + ": complete")
             except ImportError:
                 pass
         try:
             if intro is not None:
                 self.intro = intro
             if self.intro:
-                self.stdout.write(str(self.intro)+"\n")
+                self.stdout.write(str(self.intro) + "\n")
             stop = None
             while not stop:
                 if self.cmdqueue:
@@ -96,15 +97,15 @@ class Cmd:
                         try:
                             line = input()
                         except EOFError:
-                            line = 'EOF'
+                            line = "EOF"
                     else:
                         self.stdout.write()
                         self.stdout.flush()
                         line = self.stdin.readline()
                         if not len(line):
-                            line = 'EOF'
+                            line = "EOF"
                         else:
-                            line = line.rstrip('\r\n')
+                            line = line.rstrip("\r\n")
                 line = self.precmd(line)
                 stop = self.onecmd(line)
                 stop = self.postcmd(stop, line)
@@ -113,6 +114,7 @@ class Cmd:
             if self.use_rawinput and self.completekey:
                 try:
                     import readline
+
                     readline.set_completer(self.old_completer)
                 except ImportError:
                     pass
@@ -307,7 +309,9 @@ class Cmd:
                         cmds_doc.append(cmd)
                     else:
                         cmds_undoc.append(cmd)
-            self.print_topics(self.doc_header, cmds_doc, message="[i]Type help <topic>.[/i]\n")
+            self.print_topics(
+                self.doc_header, cmds_doc, message="[i]Type help <topic>.[/i]\n"
+            )
             self.print_topics(self.misc_header, sorted(topics))
             self.print_topics(self.undoc_header, cmds_undoc)
 

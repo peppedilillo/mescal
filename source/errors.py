@@ -29,6 +29,7 @@ class FailedFitError(Exception):
 class CalibratedEventlistError(Exception):
     """An error when building calibrated event list."""
 
+
 class BadDataError(Exception):
     """This is when trying to deal with unexpectedly bad errors."""
 

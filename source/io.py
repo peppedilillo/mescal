@@ -10,8 +10,11 @@ from joblib import Parallel, delayed
 
 from source import paths, plot
 from source.constants import PHOTOEL_PER_KEV
-from source.errors import (FormatNotSupportedError, warn_nan_in_sdd_calib,
-                           warn_nan_in_slo_table)
+from source.errors import (
+    FormatNotSupportedError,
+    warn_nan_in_sdd_calib,
+    warn_nan_in_slo_table,
+)
 
 
 class Exporter:

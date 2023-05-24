@@ -84,13 +84,13 @@ class Mescal(Cmd):
     """
     A script implementing calibration workflow and a shell loop.
     """
-    #fmt off
+
+    # fmt off
     intro = "Type help or ? for a list of commands.\n"
     prompt = "[cyan]\[mescalSH] "
     spinner_message = "Working.."
     unknown_command_message = (
-        "[red]Unknown command.[/]\n"
-        "[i]Type help or ? for a list of commands.[/i]\n"
+        "[red]Unknown command.[/]\n" "[i]Type help or ? for a list of commands.[/i]\n"
     )
     invalid_command_message = "[red]Command unavailable.[/]\n"
     invalid_channel_message = (
@@ -98,15 +98,13 @@ class Mescal(Cmd):
         "[i]Channel ID must be in standard form "
         "(e.g., d04, A30, B02).[/i]\n"
     )
-    no_counts_message = (
-        "[red]No events observed for this channel.[/]\n"
-    )
+    no_counts_message = "[red]No events observed for this channel.[/]\n"
     invalid_limits_message = (
         "[red]Invalid limits.[/]\n"
         "[i]Entries must be two, different, "
         "sorted integers (e.g., 19800 20100).[/i]\n"
     )
-    #fmt on
+    # fmt on
 
     def __init__(self):
         console = ui.hello()
@@ -145,7 +143,9 @@ class Mescal(Cmd):
 
         failed_tests = self.calibration.test_results()
         if failed_tests:
-            ui.sections_rule(console, ":eyes: [bold italic]Warning[/] :eyes:", style="red")
+            ui.sections_rule(
+                console, ":eyes: [bold italic]Warning[/] :eyes:", style="red"
+            )
             self.display_warning(failed_tests)
 
         ui.sections_rule(console, "[bold italic]Shell[/]", style="green")
@@ -477,13 +477,19 @@ class Mescal(Cmd):
         try:
             counts, bins = self.calibration.timehist(quad, ch, binning)
         except err.BadDataError:
-            counts, bins = self.calibration.timehist(quad, ch, binning, neglect_outliers=True)
+            counts, bins = self.calibration.timehist(
+                quad, ch, binning, neglect_outliers=True
+            )
 
         fig, ax = histogram(
             counts,
             bins[:-1],
         )
-        ax.set_title("Count in time over channel {}{:02d}, binning {} s".format(quad, ch, binning))
+        ax.set_title(
+            "Count in time over channel {}{:02d}, binning {} s".format(
+                quad, ch, binning
+            )
+        )
         ax.set_xlabel("Time")
         ax.set_ylabel("Counts")
         plt.show(block=False)
@@ -517,7 +523,9 @@ class Mescal(Cmd):
             self.console.print(self.invalid_channel_message)
             return False
         quad, ch = parsed_arg
-        if (quad not in self.calibration.channels) or (ch not in self.calibration.channels[quad]):
+        if (quad not in self.calibration.channels) or (
+            ch not in self.calibration.channels[quad]
+        ):
             self.console.print(self.no_counts_message)
             return False
 

@@ -136,11 +136,11 @@ def spectrum_xs(
 
     fig, axs = plt.subplots(2, 1, **kwargs)
     for ax, radsources, (enbins, counts), elims, color in zip(
-            axs,
-            (xradsources, sradsources),
-            ((xbins, xcounts), (sbins, scounts)),
-            (xlims, slims),
-            plt.rcParams['axes.prop_cycle'].by_key()['color'][:2],
+        axs,
+        (xradsources, sradsources),
+        ((xbins, xcounts), (sbins, scounts)),
+        (xlims, slims),
+        plt.rcParams["axes.prop_cycle"].by_key()["color"][:2],
     ):
         radsources_keys = radsources.keys()
         radsources_energies = [l.energy for l in radsources.values()]
@@ -293,6 +293,7 @@ def histogram(counts, bins, **kwargs):
     ax.set_ylim(bottom=0)
     return fig, ax
 
+
 # mapplot utilities
 
 quadtext = np.array(
@@ -374,13 +375,7 @@ def _mapplot(mat, detmap, colorlabel, cmap="hot_ur", maskvalue=None, **kwargs):
     )
     if maskvalue is not None:
         zm = np.ma.masked_not_equal(zs, 0)
-        plt.pcolor(
-            xs,
-            ys,
-            zm[::-1],
-            hatch="///",
-            alpha=0.0
-        )
+        plt.pcolor(xs, ys, zm[::-1], hatch="///", alpha=0.0)
     wx = xs[2] - xs[1]
     wy = ys[2] - ys[1]
     for i in range(10):
@@ -395,10 +390,12 @@ def _mapplot(mat, detmap, colorlabel, cmap="hot_ur", maskvalue=None, **kwargs):
                 ),
                 color="white",
             )
-            text.set_path_effects([
-                path_effects.Stroke(linewidth=1, foreground='black'),
-                path_effects.Normal(),
-            ])
+            text.set_path_effects(
+                [
+                    path_effects.Stroke(linewidth=1, foreground="black"),
+                    path_effects.Normal(),
+                ]
+            )
     ax.set_axis_off()
     fig.colorbar(
         pos,
@@ -411,7 +408,12 @@ def _mapplot(mat, detmap, colorlabel, cmap="hot_ur", maskvalue=None, **kwargs):
     return fig, ax
 
 
-def mapenres(source: str, en_res, detmap, cmap="cold_ur",):
+def mapenres(
+    source: str,
+    en_res,
+    detmap,
+    cmap="cold_ur",
+):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
