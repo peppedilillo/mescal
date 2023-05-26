@@ -366,7 +366,7 @@ class Mescal(Cmd):
                 "You can enable it through 'config.ini'."
             )
             self.console.print(message)
-        if "filter_spurious_off" not in failed_tests:
+        if "filter_spurious_off" in failed_tests:
             message = (
                 "[i][yellow]"
                 "Spurious events filter is off."
