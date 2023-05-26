@@ -173,17 +173,9 @@ def supported_models():
     return list(_maps.keys())
 
 
-def get_quadrant_map(model: str, quad: str, arr_borders):
-    if model in _maps:
-        detector_map = _maps[model]
-    else:
-        raise ValueError("Model Unknown.")
-
-    if quad in ["A", "B", "C", "D"]:
-        arr = detector_map[quad]
-    else:
-        raise ValueError("Unknown quadrant key. Allowed keys are A,B,C,D")
-
+def _get_quadrant_map(model: str, quad: str, arr_borders):
+    detector_map = _maps[model]
+    arr = detector_map[quad]
     if arr_borders:
         return tuple(map(lambda x: (x[0] + int(x[0] / 2), x[1]), arr))
     return arr
@@ -191,20 +183,18 @@ def get_quadrant_map(model: str, quad: str, arr_borders):
 
 def get_map(model):
     return {
-        quad: get_quadrant_map(model, quad, arr_borders=False)
+        quad: _get_quadrant_map(model, quad, arr_borders=False)
         for quad in ["A", "B", "C", "D"]
     }
 
 
-def get_quad_couples(model, quad):
-    qmaparr = np.array(get_quadrant_map(model, quad, arr_borders=True))
-    arr = np.lexsort((qmaparr[:, 0], qmaparr[:, 1])).reshape(16, 2)[1:]
-    dic = dict(arr)
-    return dic
-
-
 def get_couples(model):
-    return {q: get_quad_couples(model, q) for q in "ABCD"}
+    couples_dict = {}
+    for quad in "ABCD":
+        qmaparr = np.array(_get_quadrant_map(model, quad, arr_borders=True))
+        arr = np.lexsort((qmaparr[:, 0], qmaparr[:, 1])).reshape(16, 2)[1:]
+        couples_dict[quad] = dict(arr)
+    return couples_dict
 
 
 class Detector:
