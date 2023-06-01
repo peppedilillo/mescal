@@ -1,3 +1,11 @@
+"""
+Code from github's userpetereon's yakh repository (thanks).
+All rights reserved. A copy of the license file has been attached in the parent folder.
+You can find the original repo at https://github.com/petereon/yakh
+
+~Peppe
+"""
+
 from sys import platform
 from typing import Tuple, Union
 
@@ -111,6 +119,7 @@ if platform.startswith(("linux", "darwin", "freebsd")):
         OPTION_ENTER = (27, 13)
         CTRL_ENTER = OPTION_ENTER
 
+
 elif platform in ("win32", "cygwin"):
 
     class Keys(_PlatformIndependentKeys):
@@ -132,6 +141,7 @@ elif platform in ("win32", "cygwin"):
 
         CTRL_ENTER = (10,)
         OPTION_ENTER = CTRL_ENTER
+
 
 else:
     raise NotImplementedError(f"Platform `{platform}` is not supported")

@@ -110,22 +110,19 @@ class Exporter:
     def write_sdd_calibration_report(self):
         assert self.can__write_sdd_calibration_report
         self.writer(
-            self.calibration.sdd_calibration,
-            path=paths.CALREPORT(self.filepath),
+            self.calibration.sdd_calibration, path=paths.CALREPORT(self.filepath),
         )
 
     def write_energy_res_report(self):
         assert self.can__write_energy_res_report
         self.writer(
-            self.calibration.resolution,
-            path=paths.RESREPORT(self.filepath),
+            self.calibration.resolution, path=paths.RESREPORT(self.filepath),
         )
 
     def write_lightoutput_report(self):
         assert self.can__write_lightoutput_report
         self.writer(
-            self.calibration.lightoutput,
-            path=paths.ELOREPORT(self.filepath),
+            self.calibration.lightoutput, path=paths.ELOREPORT(self.filepath),
         )
 
     def write_scintillator_calibration_report(self):
@@ -138,15 +135,13 @@ class Exporter:
     def write_xfit_report(self):
         assert self.can__write_xfit_report
         write_report_to_excel(
-            self.calibration.xfit,
-            paths.XFTREPORT(self.filepath),
+            self.calibration.xfit, paths.XFTREPORT(self.filepath),
         )
 
     def write_sfit_report(self):
         assert self.can__write_sfit_report
         write_report_to_excel(
-            self.calibration.sfit,
-            paths.SFTREPORT(self.filepath),
+            self.calibration.sfit, paths.SFTREPORT(self.filepath),
         )
 
     def draw_qlooks_sdd(self):
@@ -168,8 +163,7 @@ class Exporter:
     def write_eventlist(self):
         assert self.can__write_eventlist
         write_eventlist_to_fits(
-            self.calibration.eventlist,
-            paths.EVLFITS(self.filepath),
+            self.calibration.eventlist, paths.EVLFITS(self.filepath),
         )
 
     def draw_qlook_scint(self):
@@ -281,10 +275,7 @@ class Exporter:
                 gain = res_cal[quad].loc[ch]["gain"]
                 enbins = (histograms.bins - offset) / gain
                 fig, ax = plot.spectrum_x(
-                    enbins,
-                    histograms.counts[quad][ch],
-                    radsources,
-                    figsize=(8, 4.5),
+                    enbins, histograms.counts[quad][ch], radsources, figsize=(8, 4.5),
                 )
                 ax.set_title("Spectra plot X {}{:02d}".format(quad, ch))
                 fig.savefig(path(quad, ch))
@@ -311,10 +302,7 @@ class Exporter:
                 enbins = xenbins / lightout / PHOTOEL_PER_KEV
 
                 fig, ax = plot.spectrum_s(
-                    enbins,
-                    histograms.counts[quad][ch],
-                    radsources,
-                    figsize=(8, 4.5),
+                    enbins, histograms.counts[quad][ch], radsources, figsize=(8, 4.5),
                 )
                 ax.set_title("Spectra plot S {}{:02d}".format(quad, ch))
                 fig.savefig(path(quad, ch))
@@ -345,12 +333,7 @@ class Exporter:
         xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
         xcounts, xbins = np.histogram(xevs["ENERGY"], bins=np.arange(2, 40, 0.05))
 
-        fig, ax = plot.spectrum_x(
-            xbins,
-            xcounts,
-            radsources,
-            figsize=(8, 4.5),
-        )
+        fig, ax = plot.spectrum_x(xbins, xcounts, radsources, figsize=(8, 4.5),)
         ax.set_title("Spectrum X")
         fig.savefig(path)
         plt.close(fig)
@@ -364,12 +347,7 @@ class Exporter:
 
         sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
         scounts, sbins = np.histogram(sevs["ENERGY"], bins=np.arange(30, 1000, 2))
-        fig, ax = plot.spectrum_s(
-            sbins,
-            scounts,
-            radsources,
-            figsize=(8, 4.5),
-        )
+        fig, ax = plot.spectrum_s(sbins, scounts, radsources, figsize=(8, 4.5),)
         ax.set_title("Spectrum S")
         fig.savefig(path)
         plt.close(fig)
@@ -410,9 +388,7 @@ class Exporter:
         source = sorted(decays, key=lambda source: decays[source].energy)[0]
 
         fig, ax = plot.mapenres(
-            source,
-            self.calibration.resolution,
-            self.calibration.detector.map,
+            source, self.calibration.resolution, self.calibration.detector.map,
         )
         fig.savefig(path)
         plt.close(fig)
@@ -445,9 +421,7 @@ def write_report_to_excel(result_df, path):
     with pd.ExcelWriter(path) as output:
         for quad in result_df.keys():
             result_df[quad].to_excel(
-                output,
-                sheet_name=quad,
-                engine="xlsxwriter",
+                output, sheet_name=quad, engine="xlsxwriter",
             )
     return True
 
@@ -496,8 +470,7 @@ def write_eventlist_to_fits(eventlist, path):
     output = fitsio.HDUList([header])
     table_quad = fitsio.BinTableHDU.from_columns(
         eventlist.to_records(
-            index=False,
-            column_dtypes={"EVTYPE": "U1", "CHN": "i8", "QUADID": "U1"},
+            index=False, column_dtypes={"EVTYPE": "U1", "CHN": "i8", "QUADID": "U1"},
         ),
         name="Event list",
     )

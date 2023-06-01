@@ -1,3 +1,15 @@
+"""
+Code from github's userpetereon's Beaupy repository (thanks).
+All rights reserved. A copy of the license file has been attached in this folder.
+You can find the original repo at https://github.com/petereon/beaupy
+
+Introduced small changes to allow passing of console object and redistribution.
+
+~Peppe
+----
+A Python library of interactive CLI elements you have been looking for
+"""
+
 from contextlib import contextmanager
 from typing import Iterator, List, Union
 

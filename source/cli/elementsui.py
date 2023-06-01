@@ -22,25 +22,14 @@ mescal_text = "[magenta]mescal[/]"
 
 header_text = (
     Text()
-    .append(
-        "\nWelcome to ",
-        style="italic",
-    )
-    .append(
-        Text().from_markup(mescal_text),
-    )
-    .append(
-        ", a software to analyze data from the HERMES payloads.\n",
-        style="italic",
-    )
+    .append("\nWelcome to ", style="italic",)
+    .append(Text().from_markup(mescal_text),)
+    .append(", a software to analyze data from the HERMES payloads.\n", style="italic",)
     .append(
         "Made with <3 by the HERMES-TP/SP calibration team. Since 2021.\n",
         style="italic",
     )
-    .append(
-        "Software version: {}".format(get_version()),
-        style="italic",
-    )
+    .append("Software version: {}".format(get_version()), style="italic",)
 )
 
 
@@ -54,9 +43,7 @@ def hello():
     console = Console(theme=Theme({"log.time": "cyan"}))
     for i, line in enumerate(logo().split("\n")):
         console.print(
-            line,
-            style="bold color({})".format(int(i + 160)),
-            justify="center",
+            line, style="bold color({})".format(int(i + 160)), justify="center",
         )
         sleep(0.1)
     console.print(header_text, justify="center")
