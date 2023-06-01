@@ -1,6 +1,7 @@
 timeit.py
 *.fits
 .DS_Store
+scripts/
 output/
 data/
 cache/
