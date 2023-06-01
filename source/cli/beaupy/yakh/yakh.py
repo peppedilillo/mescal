@@ -1,7 +1,6 @@
 """
-Forked from petereon's yakh repository (thanks). All rights reserved.
-Minimal changes to allow passing of console object and redistribution.
-
+Code from github's userpetereon's yakh repository (thanks).
+All rights reserved. A copy of the license file has been attached in this folder.
 You can find the original repo at https://github.com/petereon/yakh
 
 ~Peppe

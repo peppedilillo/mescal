@@ -1,3 +1,13 @@
+"""
+This class belongs to python's standard library.
+A copy of the license file has been attached in this folder.
+For more info, see: https://docs.python.org/3/library/cmd.html.
+The code was adapted to use the rich's console protocol in place of
+stdin and stdout.
+
+~Peppe
+"""
+
 import string
 import sys
 
@@ -6,14 +16,6 @@ from rich.columns import Columns
 
 class Cmd:
     """
-    This class belongs to python's standard library.
-    For more info, see: https://docs.python.org/3/library/cmd.html.
-    The code was adapted to use the rich's console protocol in place of
-    stdin and stdout.
-
-    ~Peppe
-
-    --------------------------
     A simple framework for writing line-oriented command interpreters.
 
     These are often useful for test harnesses, administrative tools, and

@@ -1,9 +1,10 @@
 #! /usr/bin/env python3
 """
-Forked from petereon's Beaupy repository (thanks). All rights reserved.
-Minimal changes to allow passing of console object and redistribution.
-
+Code from github's userpetereon's Beaupy repository (thanks).
+All rights reserved. A copy of the license file has been attached in this folder.
 You can find the original repo at https://github.com/petereon/beaupy
+
+Introduced small changes to allow passing of console object and redistribution.
 
 ~Peppe
 ----
