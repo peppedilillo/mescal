@@ -2,7 +2,7 @@
 
 Hello and welcome to mescal, your favourite software to analyze data from the HERMES-SP payloads.
 
-![mescal's tui](mescal.gif)
+![mescal's tui](assets/mescal.gif)
 
 ## Setup 
 
