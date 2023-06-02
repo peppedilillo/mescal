@@ -1,7 +1,10 @@
 """
-Code from github's userpetereon's yakh repository (thanks).
-All rights reserved. A copy of the license file has been attached in this folder.
-You can find the original repo at https://github.com/petereon/yakh
+Copyright (c) 2022 Peter Vyboch
+
+Code from userpetereon@github's yakh (thanks).
+https://github.com/petereon/yakh
+A copy of the license file has been attached in the `licenses' folder.
+
 
 ~Peppe
 

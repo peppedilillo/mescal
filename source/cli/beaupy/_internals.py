@@ -1,13 +1,19 @@
 """
-Code from github's userpetereon's Beaupy repository (thanks).
-All rights reserved. A copy of the license file has been attached in this folder.
-You can find the original repo at https://github.com/petereon/beaupy
+Copyright (c) 2022 Peter Vyboch
+Copyright (c) 2018 Hans Schülein
+
+Code from userpetereon@github's Beaupy (thanks).
+https://github.com/petereon/beaupy
+A copy of the license file has been attached in the `licenses' folder.
 
 Introduced small changes to allow passing of console object and redistribution.
 
 ~Peppe
+
 ----
+
 A Python library of interactive CLI elements you have been looking for
+
 """
 
 from contextlib import contextmanager

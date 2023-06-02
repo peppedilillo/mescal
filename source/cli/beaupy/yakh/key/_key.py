@@ -1,19 +1,23 @@
 """
-Code from github's userpetereon's yakh repository (thanks).
-All rights reserved. A copy of the license file has been attached in the parent folder.
-You can find the original repo at https://github.com/petereon/yakh
+Copyright (c) 2022 Peter Vyboch
+
+Code from userpetereon@github's yakh (thanks).
+https://github.com/petereon/yakh
+A copy of the license file has been attached in the `licenses' folder.
+
 
 ~Peppe
+
+----
+
+yakh.key` sub-module contains `Key` class which is used to represent keypresses
+and platform dependent representations of certain keys under `Keys` class.
+These are available namely for `CTRL` key combinations and some other common keys.
+
 """
 
 from sys import platform
 from typing import Tuple, Union
-
-"""
-yakh.key` sub-module contains `Key` class which is used to represent keypresses 
-and platform dependent representations of certain keys under `Keys` class. 
-These are available namely for `CTRL` key combinations and some other common keys. 
-"""
 
 
 class Key:
