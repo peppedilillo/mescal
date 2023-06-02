@@ -133,7 +133,10 @@ class Mescal(Cmd):
 
         with console.status("Processing results.."):
             self.exporter = Exporter(
-                self.calibration, self.filepath, self.args.fmt, nthreads=self.threads,
+                self.calibration,
+                self.filepath,
+                self.args.fmt,
+                nthreads=self.threads,
             )
             self.print_calibration_status()
             self.export_essentials(self.filepath)
@@ -268,7 +271,11 @@ class Mescal(Cmd):
             filepath = None
             text = text_default
             while filepath is None:
-                answer = prompt(text, console=self.console, target_type=str,)
+                answer = prompt(
+                    text,
+                    console=self.console,
+                    target_type=str,
+                )
                 if answer == "" or answer is None:
                     continue
                 elif not Path(answer.replace(" ", "")).exists():
@@ -474,7 +481,10 @@ class Mescal(Cmd):
                 quad, ch, binning, neglect_outliers=True
             )
 
-        fig, ax = histogram(counts, bins[:-1],)
+        fig, ax = histogram(
+            counts,
+            bins[:-1],
+        )
         ax.set_title(
             "Count in time over channel {}{:02d}, binning {} s".format(
                 quad, ch, binning
@@ -560,7 +570,9 @@ class Mescal(Cmd):
         """Plots a map of counts per-channel."""
         counts = self.calibration.count()
         fig, ax = mapcounts(
-            counts, self.calibration.detector.map, title="Per-channel events count map",
+            counts,
+            self.calibration.detector.map,
+            title="Per-channel events count map",
         )
         plt.show(block=False)
         return False
@@ -592,7 +604,9 @@ class Mescal(Cmd):
         decays = self.calibration.xradsources()
         source = sorted(decays, key=lambda source: decays[source].energy)[0]
         fig, ax = mapenres(
-            source, self.calibration.resolution, self.calibration.detector.map,
+            source,
+            self.calibration.resolution,
+            self.calibration.detector.map,
         )
         plt.show(block=False)
         return False
@@ -602,7 +616,15 @@ class Mescal(Cmd):
 
     def do_export(self, arg):
         """Prompts user on optional data product exports."""
-        Option = namedtuple("Option", ["label", "commands", "conditions", "ticked",],)
+        Option = namedtuple(
+            "Option",
+            [
+                "label",
+                "commands",
+                "conditions",
+                "ticked",
+            ],
+        )
         all_options = [
             Option(
                 "uncalibrated plots",
@@ -612,7 +634,10 @@ class Mescal(Cmd):
             ),
             Option(
                 "diagnostic plots",
-                [self.exporter.draw_xdiagnostic, self.exporter.draw_sdiagnostics,],
+                [
+                    self.exporter.draw_xdiagnostic,
+                    self.exporter.draw_sdiagnostics,
+                ],
                 [
                     self.exporter.can__draw_xdiagnostic,
                     self.exporter.can__draw_sdiagnostics,
@@ -627,13 +652,22 @@ class Mescal(Cmd):
             ),
             Option(
                 "spectra plots per channel",
-                [self.exporter.draw_sspectra, self.exporter.draw_xspectra,],
-                [self.exporter.can__draw_sspectra, self.exporter.can__draw_xspectra,],
+                [
+                    self.exporter.draw_sspectra,
+                    self.exporter.draw_xspectra,
+                ],
+                [
+                    self.exporter.can__draw_sspectra,
+                    self.exporter.can__draw_xspectra,
+                ],
                 False,
             ),
             Option(
                 "maps",
-                [self.exporter.draw_map_counts, self.exporter.draw_map_resolution,],
+                [
+                    self.exporter.draw_map_counts,
+                    self.exporter.draw_map_resolution,
+                ],
                 [
                     self.exporter.can__draw_map_counts,
                     self.exporter.can__draw_map_resolution,
@@ -642,7 +676,10 @@ class Mescal(Cmd):
             ),
             Option(
                 "fit tables",
-                [self.exporter.write_xfit_report, self.exporter.write_sfit_report,],
+                [
+                    self.exporter.write_xfit_report,
+                    self.exporter.write_sfit_report,
+                ],
                 [
                     self.exporter.can__write_xfit_report,
                     self.exporter.can__write_sfit_report,

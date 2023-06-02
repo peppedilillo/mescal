@@ -8,7 +8,10 @@ import numpy as np
 import source.fcparams as fcm
 
 matplotlib.rcParams = fcm.changeRCParams(
-    matplotlib.rcParams, color="k", tickdir="in", mpl=matplotlib,
+    matplotlib.rcParams,
+    color="k",
+    tickdir="in",
+    mpl=matplotlib,
 )
 
 
@@ -37,7 +40,7 @@ def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
 
 normal = (
     lambda x, amp, sigma, x0: amp
-    * np.exp(-((x - x0) ** 2) / (2 * sigma ** 2))
+    * np.exp(-((x - x0) ** 2) / (2 * sigma**2))
     / (sigma * sqrt(2 * pi))
 )
 
@@ -67,14 +70,22 @@ def diagnostics(bins, counts, centers, amps, fwhms, limits, margin=500, **kwargs
 
 def spectrum_x(enbins, counts, radsources: dict, **kwargs):
     fig, ax = _spectrum(
-        enbins, counts, radsources, elims=_compute_lims_for_x(radsources), **kwargs,
+        enbins,
+        counts,
+        radsources,
+        elims=_compute_lims_for_x(radsources),
+        **kwargs,
     )
     return fig, ax
 
 
 def spectrum_s(enbins, counts, radsources: dict, **kwargs):
     fig, ax = _spectrum(
-        enbins, counts, radsources, elims=_compute_lims_for_s(), **kwargs,
+        enbins,
+        counts,
+        radsources,
+        elims=_compute_lims_for_s(),
+        **kwargs,
     )
     return fig, ax
 
@@ -114,11 +125,13 @@ def spectrum_xs(
 ):
     xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
     xcounts, xbins = np.histogram(
-        xevs["ENERGY"], bins=np.arange(*_compute_lims_for_x(xradsources), 0.05),
+        xevs["ENERGY"],
+        bins=np.arange(*_compute_lims_for_x(xradsources), 0.05),
     )
     sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
     scounts, sbins = np.histogram(
-        sevs["ENERGY"], bins=np.arange(*_compute_lims_for_s(), 2),
+        sevs["ENERGY"],
+        bins=np.arange(*_compute_lims_for_s(), 2),
     )
 
     fig, axs = plt.subplots(2, 1, **kwargs)
@@ -157,13 +170,13 @@ def linearity(
 ):
     radsources_energies = np.array([l.energy for l in radsources.values()])
     measured_energies_err = np.sqrt(
-        (adcs_err ** 2) * (1 / gain) ** 2
-        + (gain_err ** 2) * ((adcs - offset) / gain ** 2) ** 2
-        + (offset_err ** 2) * (1 / gain) ** 2
+        (adcs_err**2) * (1 / gain) ** 2
+        + (gain_err**2) * ((adcs - offset) / gain**2) ** 2
+        + (offset_err**2) * (1 / gain) ** 2
     )
     residual = gain * radsources_energies + offset - adcs
     res_err = np.sqrt(
-        (gain_err ** 2) * (radsources_energies ** 2) + offset_err ** 2 + adcs_err ** 2
+        (gain_err**2) * (radsources_energies**2) + offset_err**2 + adcs_err**2
     )
     perc_residual = 100 * residual / adcs
     perc_residual_err = 100 * res_err / adcs
@@ -183,7 +196,11 @@ def linearity(
     axs[0].errorbar(radsources_energies, adcs, yerr=adcs_err, fmt="o")
     axs[0].plot(xs, gain * xs + offset)
     axs[1].errorbar(
-        radsources_energies, perc_residual, yerr=perc_residual_err, fmt="o", capsize=5,
+        radsources_energies,
+        perc_residual,
+        yerr=perc_residual_err,
+        fmt="o",
+        capsize=5,
     )
     axs[2].errorbar(
         radsources_energies,
@@ -206,7 +223,10 @@ def quicklook(calres, **kwargs):
 
     fig, axs = plt.subplots(2, 1, sharex=True, **kwargs)
     axs[0].errorbar(
-        calres.index, calres["gain"], yerr=calres["gain_err"], fmt="o",
+        calres.index,
+        calres["gain"],
+        yerr=calres["gain_err"],
+        fmt="o",
     )
     axs[0].axhspan(
         *gainpercs,
@@ -221,7 +241,10 @@ def quicklook(calres, **kwargs):
     axs[0].legend()
 
     axs[1].errorbar(
-        calres.index, calres["offset"], yerr=calres["offset_err"], fmt="o",
+        calres.index,
+        calres["offset"],
+        yerr=calres["offset_err"],
+        fmt="o",
     )
     axs[1].axhspan(*offsetpercs, color="red", alpha=0.1)
     for vo in offsetpercs:
@@ -241,7 +264,10 @@ def lightout(res_slo, **kwargs):
 
     fig, ax = plt.subplots(1, 1, **kwargs)
     ax.errorbar(
-        res_slo.index, res_slo["light_out"], yerr=res_slo["light_out_err"], fmt="o",
+        res_slo.index,
+        res_slo["light_out"],
+        yerr=res_slo["light_out_err"],
+        fmt="o",
     )
     ax.axhspan(
         *ypercs,
@@ -340,7 +366,13 @@ def _mapplot(mat, detmap, colorlabel, cmap="hot_ur", maskvalue=None, **kwargs):
     zs = _transf(mat)
 
     fig, ax = plt.subplots(**kwargs)
-    pos = ax.pcolormesh(xs, ys, zs[::-1], vmin=zs[zs > 0].min(), cmap=cmap,)
+    pos = ax.pcolormesh(
+        xs,
+        ys,
+        zs[::-1],
+        vmin=zs[zs > 0].min(),
+        cmap=cmap,
+    )
     if maskvalue is not None:
         zm = np.ma.masked_not_equal(zs, 0)
         plt.pcolor(xs, ys, zm[::-1], hatch="///", alpha=0.0)
@@ -352,7 +384,10 @@ def _mapplot(mat, detmap, colorlabel, cmap="hot_ur", maskvalue=None, **kwargs):
             text = ax.text(
                 (xs[2 * i] + xs[2 * i + 1]) / 2 - wx,
                 ys[2 * j] + wy,
-                "{}{:02d}".format(["A", "B", "C", "D"][quad], chtext[::-1][j, i],),
+                "{}{:02d}".format(
+                    ["A", "B", "C", "D"][quad],
+                    chtext[::-1][j, i],
+                ),
                 color="white",
             )
             text.set_path_effects(
@@ -363,18 +398,28 @@ def _mapplot(mat, detmap, colorlabel, cmap="hot_ur", maskvalue=None, **kwargs):
             )
     ax.set_axis_off()
     fig.colorbar(
-        pos, label=colorlabel, ax=ax, aspect=30, pad=wy / 10, location="bottom",
+        pos,
+        label=colorlabel,
+        ax=ax,
+        aspect=30,
+        pad=wy / 10,
+        location="bottom",
     )
     return fig, ax
 
 
 def mapenres(
-    source: str, en_res, detmap, cmap="cold_ur",
+    source: str,
+    en_res,
+    detmap,
+    cmap="cold_ur",
 ):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
-        [0, 1, 2, 3], ["A", "B", "C", "D"], [(0, 0), (5, 0), (0, 6), (5, 6)],
+        [0, 1, 2, 3],
+        ["A", "B", "C", "D"],
+        [(0, 0), (5, 0), (0, 6), (5, 6)],
     ):
         if quad in en_res.keys():
             quadmap = np.array(detmap[quad])
@@ -401,7 +446,9 @@ def mapcounts(counts, detmap, cmap="hot_ur", title=None):
     mat = np.zeros((12, 10))
 
     for i, quad, (tx, ty) in zip(
-        [0, 1, 2, 3], ["A", "B", "C", "D"], [(0, 0), (5, 0), (0, 6), (5, 6)],
+        [0, 1, 2, 3],
+        ["A", "B", "C", "D"],
+        [(0, 0), (5, 0), (0, 6), (5, 6)],
     ):
         if quad in counts.keys():
             quadmap = np.array(detmap[quad])
@@ -414,7 +461,12 @@ def mapcounts(counts, detmap, cmap="hot_ur", title=None):
             mat[rows + ty, cols + tx] = values[mask]
 
     fig, ax = _mapplot(
-        mat, detmap, cmap=cmap, colorlabel="Counts", maskvalue=0, figsize=(8, 8),
+        mat,
+        detmap,
+        cmap=cmap,
+        colorlabel="Counts",
+        maskvalue=0,
+        figsize=(8, 8),
     )
     if title is not None:
         ax.set_title(title)
