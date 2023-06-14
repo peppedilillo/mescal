@@ -324,6 +324,7 @@ def select_multiple(
     return_indices: bool = False,
     transient: bool = False,
     strict: bool = False,
+    legend: None | str = None,
 ) -> Selections:
     """A prompt that allows selecting multiple options from a list of options
 
@@ -347,6 +348,7 @@ def select_multiple(
                                          of ticked elements in options. Defaults to `False`.
         strict (bool, optional): If empty `options` is provided and strict is `False`, None will be returned,
                                  if it's `True`, `ValueError` will be thrown. Defaults to False.
+        legend (str, None, optional): optional legend message. Default to a generic message.
 
     Raises:
         KeyboardInterrupt: Raised when keyboard interrupt is encountered and Config.raise_on_interrupt is True
@@ -355,6 +357,13 @@ def select_multiple(
         Union[List[str], List[int]]: A list of selected values or indices of selected options
     """
     rendered = ""
+    if legend is None:
+        legend = (
+            "\n\n"
+            "(mark=[bold]space[/bold], "
+            "confirm=[bold]enter[/bold], "
+            "cancel=[bold]esc[/bold])"
+        )  # noqa: W503
     with _cursor_hidden(console), Live(
         rendered,
         console=console,
@@ -381,8 +390,8 @@ def select_multiple(
         error_message = ""
         while True:
             rendered = (
-                intro
-                + "\n".join(
+                    intro
+                    + "\n".join(
                     [
                         _render_option_select_multiple(
                             option=preprocessor(option),
@@ -395,10 +404,7 @@ def select_multiple(
                         for i, option in enumerate(options)
                     ]
                 )
-                + "\n\n"
-                "(mark=[bold]space[/bold], "
-                "confirm=[bold]enter[/bold], "
-                "cancel=[bold]esc[/bold])"  # noqa: W503
+                    + legend
             )
             if error_message:
                 rendered = f"{rendered}\n[red]Error:[/red] {error_message}"

@@ -326,6 +326,12 @@ class Mescal(Cmd):
                 "the calibration process. You will still be able to visualize data.[/yellow]\n"
                 "[/italic]\n"
             )
+            legend = (
+                "\n\n"
+                "(mark=[bold]space[/bold], "
+                "confirm=[bold]enter[/bold], "
+                "cancel=[bold]skip[/bold])"
+            )
             radsources = select_multiple(
                 options=supported_sources(),
                 tick_character=":radioactive:",
@@ -333,6 +339,7 @@ class Mescal(Cmd):
                 console=self.console,
                 intro=message,
                 transient=True,
+                legend=legend
             )
             return radsources
 
