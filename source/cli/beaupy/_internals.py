@@ -75,7 +75,7 @@ def _render_prompt(
     render_value = (len(typed_values) * "*" if secure else "".join(typed_values)) + " "
     render_value = Text(render_value)
     render_value.stylize("black on white", cursor_position, cursor_position + 1)
-    confirm_text = Text("\n\n(Confirm with enter)")
+    confirm_text = Text("\n\n(Confirm with enter, exit with esc)")
     confirm_text.stylize("bold", 16, 21)
     render_value = Text.from_markup(prompt + "\n") + render_value + confirm_text
     if error:

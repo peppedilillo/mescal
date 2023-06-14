@@ -254,39 +254,23 @@ class Mescal(Cmd):
         return out
 
     def get_filepath(self):
-        def prompt_user_on_filepath():
-            text_default = (
-                "[italic]Which file are you calibrating?\n"
-                "[yellow]Hint: You can drag & drop.[/yellow]"
-                "[/italic]\n"
-            )
-            text_error = (
-                "[italic][red]The file you entered does not exists.[/red]\n"
-                "Which file are you calibrating?\n"
-                "[yellow]Hint: You can drag & drop.[/yellow]\n"
-                "[/italic]\n"
-            )
-            filepath = None
-            text = text_default
-            while filepath is None:
-                answer = prompt(
-                    text,
-                    console=self.console,
-                    target_type=str,
-                )
-                if not answer:
-                    continue
-                answer = answer.strip()
-                if not Path(answer).exists():
-                    text = text_error
-                else:
-                    filepath = Path(answer)
-            return filepath
-
+        message = (
+            "[italic]Which file are you calibrating?\n"
+            "[yellow]Hint: You can drag & drop.[/yellow]"
+            "[/italic]\n"
+        )
+        message_error = (
+            "[italic][red]The file you entered does not exists.[/red]\n"
+            "Which file are you calibrating?\n"
+            "[yellow]Hint: You can drag & drop.[/yellow]\n"
+            "[/italic]\n"
+        )
         if self.args.filepath is not None:
-            filepath = Path(self.args.filepath)
-        else:
-            filepath = prompt_user_on_filepath()
+            return Path(self.args.filepath)
+        filepath = prompt_user_on_filepath(message, message_error, self.console)
+        if filepath is None:
+            self.console.print("So soon? Ciao :wave:!\n")
+            exit()
         return filepath
 
     def get_model(self):
@@ -309,9 +293,8 @@ class Mescal(Cmd):
             return model
 
         if self.args.model is not None:
-            model = self.args.model
-        else:
-            model = prompt_user_on_model()
+            return self.args.model
+        model = prompt_user_on_model()
         return model
 
     def get_radsources(self):
@@ -340,9 +323,8 @@ class Mescal(Cmd):
             return radsources
 
         if self.args.source is not None:
-            radsources = self.args.source
-        else:
-            radsources = prompt_user_on_radsources()
+            return self.args.source
+        radsources = prompt_user_on_radsources()
         return radsources
 
     def display_warning(self, failed_tests):
@@ -625,6 +607,40 @@ class Mescal(Cmd):
         plt.show(block=False)
         return False
 
+    def can_loadcal(self,arg):
+        return True
+
+    def do_loadcal(self, arg):
+        def prompt_user_on_calibration():
+            text_default = (
+                "[italic]Enter SDD calibration file.\n"
+                "[yellow]Hint: You can drag & drop.[/yellow]"
+                "[/italic]\n"
+            )
+            text_error = (
+                "[italic][red]The file you entered does not exists.[/red]\n"
+                "Enter SDD calibration file.\n"
+                "[yellow]Hint: You can drag & drop.[/yellow]\n"
+                "[/italic]\n"
+            )
+            filepath = None
+            text = text_default
+            while filepath is None:
+                answer = prompt(
+                    text,
+                    console=self.console,
+                    target_type=str,
+                )
+                if not answer:
+                    continue
+                answer = answer.strip()
+                if not Path(answer).exists():
+                    text = text_error
+                else:
+                    filepath = Path(answer)
+            return filepath
+
+
     def can_export(self, arg):
         return True
 
@@ -731,6 +747,27 @@ class Mescal(Cmd):
                 if condition:
                     f()
         return False
+
+
+def prompt_user_on_filepath(message, message_error, console):
+    filepath = None
+    text = message
+    while filepath is None:
+        answer = prompt(
+            text,
+            console=console,
+            target_type=str,
+        )
+        if answer is None:
+            return None
+        if not answer:
+            continue
+        answer = answer.strip()
+        if not Path(answer).exists():
+            text = message_error
+        else:
+            filepath = Path(answer)
+    return filepath
 
 
 def parse_chns(arg):
