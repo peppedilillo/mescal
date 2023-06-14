@@ -261,12 +261,14 @@ class Mescal(Cmd):
         def prompt_user_on_filepath():
             text_default = (
                 "[italic]Which file are you calibrating?\n"
-                "You can drag & drop.[italic]\n"
+                "[yellow]Hint: You can drag & drop.[/yellow]"
+                "[/italic]\n"
             )
             text_error = (
                 "[italic][red]The file you entered does not exists.[/red]\n"
                 "Which file are you calibrating?\n"
-                "You can drag & drop.[italic]\n"
+                "[yellow]Hint: You can drag & drop.[/yellow]\n"
+                "[/italic]\n"
             )
             filepath = None
             text = text_default
@@ -276,12 +278,13 @@ class Mescal(Cmd):
                     console=self.console,
                     target_type=str,
                 )
+                answer = answer.strip()
                 if answer == "" or answer is None:
                     continue
-                elif not Path(answer.replace(" ", "")).exists():
+                elif not Path(answer).exists():
                     text = text_error
                 else:
-                    filepath = Path(answer.strip())
+                    filepath = Path(answer)
             return filepath
 
         if self.args.filepath is not None:
@@ -317,12 +320,18 @@ class Mescal(Cmd):
 
     def get_radsources(self):
         def prompt_user_on_radsources():
+            message = (
+                "[italic]With which radioactive sources?\n"
+                "[yellow]Hint: Pressing esc or selecting no source will cause mescal to skip "
+                "the calibration process. You will still be able to visualize data.[/yellow]\n"
+                "[/italic]\n"
+            )
             radsources = select_multiple(
                 options=supported_sources(),
                 tick_character=":radioactive:",
                 ticked_indices=list(range(len(supported_sources()))),
                 console=self.console,
-                intro="[italic]With which radioactive sources?[/italic]\n\n",
+                intro=message,
                 transient=True,
             )
             return radsources
