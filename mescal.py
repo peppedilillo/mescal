@@ -278,10 +278,10 @@ class Mescal(Cmd):
                     console=self.console,
                     target_type=str,
                 )
-                answer = answer.strip()
-                if answer == "" or answer is None:
+                if not answer:
                     continue
-                elif not Path(answer).exists():
+                answer = answer.strip()
+                if not Path(answer).exists():
                     text = text_error
                 else:
                     filepath = Path(answer)
