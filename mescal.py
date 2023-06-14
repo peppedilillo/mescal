@@ -18,7 +18,7 @@ from source.cli import elementsui as ui
 from source.cli.beaupy.beaupy import prompt, select, select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import supported_models
-from source.io import Exporter, pandas_from_LV0d5
+from source.io import pandas_from_LV0d5
 from source.plot import mapcounts, mapenres, uncalibrated, spectrum_xs, histogram
 from source.radsources import supported_sources
 from source.utils import get_version
@@ -116,6 +116,8 @@ class Mescal(Cmd):
         self.start_logger()
         self.config = self.unpack_configuration()
         self.threads = self.check_system()
+        self.idle_calibrations = []
+        self.calibration = None
 
         ui.sections_rule(console, "[bold italic]Calibration log[/]", style="green")
         with console.status("Initializing.."):
@@ -132,14 +134,8 @@ class Mescal(Cmd):
             self.calibration(data)
 
         with console.status("Processing results.."):
-            self.exporter = Exporter(
-                self.calibration,
-                self.filepath,
-                self.args.fmt,
-                nthreads=self.threads,
-            )
             self.print_calibration_status()
-            self.export_essentials(self.filepath)
+            self.export_essentials()
 
         failed_tests = self.calibration.test_results()
         if failed_tests:
@@ -413,24 +409,26 @@ class Mescal(Cmd):
         else:
             self.console.log(":green_circle: Calibration complete.")
 
-    def export_essentials(self, filepath):
-        if self.exporter.can__write_sdd_calibration_report:
-            self.exporter.write_sdd_calibration_report()
+    def export_essentials(self):
+        exporter = self.calibration.get_exporter(self.filepath, self.args.fmt)
+
+        if exporter.can__write_sdd_calibration_report:
+            exporter.write_sdd_calibration_report()
             self.console.log(":blue_book: Wrote SDD calibration results.")
-        if self.exporter.can__write_energy_res_report:
-            self.exporter.write_energy_res_report()
+        if exporter.can__write_energy_res_report:
+            exporter.write_energy_res_report()
             self.console.log(":blue_book: Wrote energy resolution results.")
-        if self.exporter.can__draw_qlooks_sdd:
-            self.exporter.draw_qlooks_sdd()
+        if exporter.can__draw_qlooks_sdd:
+            exporter.draw_qlooks_sdd()
             self.console.log(":chart_increasing: Saved X fit quicklook plots.")
-        if self.exporter.can__write_lightoutput_report:
-            self.exporter.write_lightoutput_report()
+        if exporter.can__write_lightoutput_report:
+            exporter.write_lightoutput_report()
             self.console.log(":blue_book: Wrote light output results.")
-        if self.exporter.can__draw_qlook_scint:
-            self.exporter.draw_qlook_scint()
+        if exporter.can__draw_qlook_scint:
+            exporter.draw_qlook_scint()
             self.console.log(":chart_increasing: Saved light output plots.")
-        if self.exporter.can__draw_spectrum:
-            self.exporter.draw_spectrum()
+        if exporter.can__draw_spectrum:
+            exporter.draw_spectrum()
             self.console.log(":chart_increasing: Saved calibrated spectra plots.")
 
     # shell prompt commands
@@ -523,7 +521,7 @@ class Mescal(Cmd):
                 self.console, "[bold italic]Calibration log", style="green"
             )
             self.calibration._calibrate()
-            self.export_essentials(self.filepath)
+            self.export_essentials()
             ui.sections_rule(self.console, "[bold italic]Shell", style="green")
         return False
 
@@ -632,6 +630,8 @@ class Mescal(Cmd):
 
     def do_export(self, arg):
         """Prompts user on optional data product exports."""
+        exporter = self.calibration.get_exporter(self.filepath, self.args.fmt)
+
         Option = namedtuple(
             "Option",
             [
@@ -644,68 +644,68 @@ class Mescal(Cmd):
         all_options = [
             Option(
                 "uncalibrated plots",
-                [self.exporter.draw_rawspectra],
-                [self.exporter.can__draw_rawspectra],
+                [exporter.draw_rawspectra],
+                [exporter.can__draw_rawspectra],
                 True,
             ),
             Option(
                 "diagnostic plots",
                 [
-                    self.exporter.draw_xdiagnostic,
-                    self.exporter.draw_sdiagnostics,
+                    exporter.draw_xdiagnostic,
+                    exporter.draw_sdiagnostics,
                 ],
                 [
-                    self.exporter.can__draw_xdiagnostic,
-                    self.exporter.can__draw_sdiagnostics,
+                    exporter.can__draw_xdiagnostic,
+                    exporter.can__draw_sdiagnostics,
                 ],
                 True,
             ),
             Option(
                 "linearity plots",
-                [self.exporter.draw_linearity],
-                [self.exporter.can__draw_linearity],
+                [exporter.draw_linearity],
+                [exporter.can__draw_linearity],
                 False,
             ),
             Option(
                 "spectra plots per channel",
                 [
-                    self.exporter.draw_sspectra,
-                    self.exporter.draw_xspectra,
+                    exporter.draw_sspectra,
+                    exporter.draw_xspectra,
                 ],
                 [
-                    self.exporter.can__draw_sspectra,
-                    self.exporter.can__draw_xspectra,
+                    exporter.can__draw_sspectra,
+                    exporter.can__draw_xspectra,
                 ],
                 False,
             ),
             Option(
                 "maps",
                 [
-                    self.exporter.draw_map_counts,
-                    self.exporter.draw_map_resolution,
+                    exporter.draw_map_counts,
+                    exporter.draw_map_resolution,
                 ],
                 [
-                    self.exporter.can__draw_map_counts,
-                    self.exporter.can__draw_map_resolution,
+                    exporter.can__draw_map_counts,
+                    exporter.can__draw_map_resolution,
                 ],
                 True,
             ),
             Option(
                 "fit tables",
                 [
-                    self.exporter.write_xfit_report,
-                    self.exporter.write_sfit_report,
+                    exporter.write_xfit_report,
+                    exporter.write_sfit_report,
                 ],
                 [
-                    self.exporter.can__write_xfit_report,
-                    self.exporter.can__write_sfit_report,
+                    exporter.can__write_xfit_report,
+                    exporter.can__write_sfit_report,
                 ],
                 True,
             ),
             Option(
                 "calibrated events fits",
-                [self.exporter.write_eventlist],
-                [self.exporter.can__write_eventlist],
+                [exporter.write_eventlist],
+                [exporter.can__write_eventlist],
                 False,
             ),
         ]

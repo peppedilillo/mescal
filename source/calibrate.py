@@ -11,6 +11,7 @@ from lmfit.models import GaussianModel, LinearModel
 import source.errors as err
 from source.constants import PHOTOEL_PER_KEV
 from source.detectors import Detector
+from source.io import Exporter
 from source.eventlist import (
     add_evtype_tag,
     electrons_to_energy,
@@ -283,6 +284,15 @@ class Calibrate:
             return self._counts[key]
         self._counts[key] = perchannel_counts(self.data, self.channels, key=key)
         return self._counts[key]
+
+    def get_exporter(self, filename, tabformat):
+        exporter = Exporter(
+            self,
+            filename,
+            tabformat,
+            nthreads=self.nthreads,
+        )
+        return exporter
 
     def timehist(self, quad, ch, binning, neglect_outliers=False):
         assert len(self.data) > 0
