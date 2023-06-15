@@ -203,6 +203,16 @@ class Detector:
         self.map = get_map(model)
         self.couples = get_couples(model)
 
+    def scintids(self):
+        """
+        Returns a dict with list values and string keys.
+        Keys represents quadrant, values are scintillators ids.
+        """
+        out = {}
+        for quad in self.couples.keys():
+            out[quad] = sorted(list(self.couples[quad].keys()))
+        return out
+
     def scintid(self, quad, ch):
         """
         given a channel's quadrant and index,
@@ -217,7 +227,7 @@ class Detector:
         """
         if ch in self.couples[quad].keys():
             return ch
-        return self._companion(quad, ch)
+        return self.companion(quad, ch)
 
     def companion(self, quad, ch):
         """

@@ -327,6 +327,10 @@ def _transf(mat, val=-1):
 
 
 def _chtext(detmap):
+    """
+    TODO: this is absolutely obscure and sucks. also its importing UNBOND which
+          should be made private to detectors.py.
+    """
     from source.detectors import UNBOND
 
     chtext = np.zeros((12, 10)).astype(int)

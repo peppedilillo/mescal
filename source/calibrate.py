@@ -856,18 +856,9 @@ class Calibrate:
             for ch in self.sfit[quad].index:
                 companion = self.detector.companion(quad, ch)
                 scint = self.detector.scintid(quad, ch)
-
                 try:
-                    lo, lo_err = (
-                        self.scintillator_calibration[quad]
-                        .loc[scint][
-                            [
-                                "light_out",
-                                "light_out_err",
-                            ]
-                        ]
-                        .to_list()
-                    )
+                    s_ = self.scintillator_calibration[quad].loc[scint]
+                    lo, lo_err = s_[["light_out","light_out_err"]].to_list()
                 except KeyError:
                     message = err.warn_missing_lout(quad, ch)
                     logging.warning(message)
@@ -876,33 +867,17 @@ class Calibrate:
 
                 else:
                     centers = self.sfit[quad].loc[ch][:, "center"].values
-                    gain, offset = (
-                        self.sdd_calibration[quad].loc[ch][["gain", "offset"]].values
-                    )
+                    ch_ = self.sdd_calibration[quad].loc[ch]
+                    gain, offset = ch_[["gain", "offset"]].values
                     centers_electrons = (centers - offset) / gain / PHOTOEL_PER_KEV
+                    compfit_ = self.sfit[quad].loc[companion]
+                    centers_companion = compfit_[:, "center"].values
+                    comp_ = self.sdd_calibration[quad].loc[companion]
+                    gain_comp, offset_comp = comp_[["gain", "offset"]].values
 
-                    centers_companion = (
-                        self.sfit[quad].loc[companion][:, "center"].values
-                    )
-                    gain_comp, offset_comp = (
-                        self.sdd_calibration[quad]
-                        .loc[companion][["gain", "offset"]]
-                        .values
-                    )
-                    centers_electrons_comp = (
-                        (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
-                    )
-
-                    effs = (
-                        lo
-                        * centers_electrons
-                        / (centers_electrons + centers_electrons_comp)
-                    )
-                    eff_errs = (
-                        lo_err
-                        * centers_electrons
-                        / (centers_electrons + centers_electrons_comp)
-                    )
+                    centers_electrons_comp = ((centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV)
+                    effs = lo * centers_electrons / (centers_electrons + centers_electrons_comp)
+                    eff_errs = lo_err * centers_electrons / (centers_electrons + centers_electrons_comp)
 
                     eff, eff_err = self._deal_with_multiple_gamma_decays(effs, eff_errs)
                     results.setdefault(quad, {})[ch] = np.array((eff, eff_err))
@@ -975,6 +950,26 @@ class Calibrate:
         return intervals, fit_results
 
 
+@as_slo_dataframe
+def _effectivelo_to_scintillatorslo(lightoutput, detector):
+    results = {}
+    scintillator_ids = detector.scintids()
+    for quad in scintillator_ids.keys():
+        for ch in scintillator_ids[quad]:
+            if ch not in lightoutput[quad].index:
+                continue
+            companion = detector.companion(quad, ch)
+            assert companion in lightoutput[quad].index
+            ch_lo = lightoutput[quad].loc[ch].light_out
+            ch_lo_err = lightoutput[quad].loc[ch].light_out_err
+            companion_lo = lightoutput[quad].loc[companion].light_out
+            companion_lo_err = lightoutput[quad].loc[companion].light_out_err
+            lo = ch_lo + companion_lo
+            lo_err = ch_lo_err + companion_lo_err
+            results.setdefault(quad, {})[ch] = np.array((lo, lo_err))
+    return results
+
+
 class ImportedCalibration(Calibrate):
     def __init__(
         self,
@@ -982,7 +977,6 @@ class ImportedCalibration(Calibrate):
         configuration,
         *ignore,
         sdd_calibration_filepath,
-        scintillator_calibration_filepath,
         lightoutput_filepath,
         **kwargs,
     ):
@@ -991,13 +985,11 @@ class ImportedCalibration(Calibrate):
                 "wrong arguments. you are supposed to use keywords for reports."
             )
         super().__init__(model, [], configuration, **kwargs)
-        self.sdd_calibration = read_report_from_excel(
-            sdd_calibration_filepath, kind="calib"
-        )
-        self.scintillator_calibration = read_report_from_excel(
-            scintillator_calibration_filepath, kind="calib"
-        )
+        # fmt: off
+        self.sdd_calibration = read_report_from_excel(sdd_calibration_filepath, kind="calib")
         self.lightoutput = read_report_from_excel(lightoutput_filepath, kind="calib")
+        self.scintillator_calibration = _effectivelo_to_scintillatorslo(self.detector, self.lightoutput)
+        #fmt: on
 
     def __call__(self, data):
         self.channels = infer_onchannels(data)
