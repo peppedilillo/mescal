@@ -198,12 +198,43 @@ def get_couples(model):
 
 
 class Detector:
-    UNBOND = UNBOND
-
     def __init__(self, model):
         self.label = model
         self.map = get_map(model)
         self.couples = get_couples(model)
+
+    def scintid(self, quad, ch):
+        """
+        given a channel's quadrant and index,
+        returns the scintillator id.
+
+        Args:
+            quad: string, quadrant id
+            ch: int, channel id
+
+        Returns: int, scintillator id
+
+        """
+        if ch in self.couples[quad].keys():
+            return ch
+        return self._companion(quad, ch)
+
+    def companion(self, quad, ch):
+        """
+        given a channel's quadrant and index,
+        returns the id of the companion cell
+
+        Args:
+            quad: string, quadrant id
+            ch: int, channel id
+
+        Returns: int, companion channel id
+
+        """
+        if ch in self.couples[quad].keys():
+            return self.couples[quad][ch]
+        companions = {k: v for v, k in self.couples[quad].items()}
+        return companions[ch]
 
 
 # will run some test on detector maps

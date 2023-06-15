@@ -428,43 +428,6 @@ class Calibrate:
         else:
             print(message)
 
-    # TODO: to be later moved to a dedicated assembly model object
-    def _companion(self, quad, ch):
-        """
-        given a channel's quadrant and index,
-        returns the id of the companion cell
-
-        Args:
-            quad: string, quadrant id
-            ch: int, channel id
-
-        Returns: int, companion channel id
-
-        """
-        if ch in self.detector.couples[quad].keys():
-            return self.detector.couples[quad][ch]
-        else:
-            companions = {k: v for v, k in self.detector.couples[quad].items()}
-            return companions[ch]
-
-    # TODO: to be later moved to a dedicated assembly model object
-    def _scintid(self, quad, ch):
-        """
-        given a channel's quadrant and index,
-        returns the scintillator id.
-
-        Args:
-            quad: string, quadrant id
-            ch: int, channel id
-
-        Returns: int, scintillator id
-
-        """
-        if ch in self.detector.couples[quad].keys():
-            return ch
-        else:
-            return self._companion(quad, ch)
-
     def _flag(self, quad, chn, flag):
         self.flagged.setdefault(flag, []).append((quad, chn))
 
@@ -622,7 +585,7 @@ class Calibrate:
                         lightout_guess,
                     )
                 except err.DetectPeakError:
-                    companion = self._companion(quad, ch)
+                    companion = self.detector.companion(quad, ch)
                     if companion in self.sdd_calibration[quad].index:
                         message = err.warn_failed_peak_detection(quad, ch)
                         logging.warning(message)
@@ -686,7 +649,7 @@ class Calibrate:
         for quad in self.sfit.keys():
             for ch in self.sfit[quad].index:
                 if ch not in self.detector.couples[quad].keys():
-                    assert self._scintid(quad, ch) == self._companion(quad, ch)
+                    assert self.detector.scintid(quad, ch) == self.detector.companion(quad, ch)
                     continue
                 scint = ch
                 counts = self.ehistograms.counts[quad][scint]
@@ -720,7 +683,7 @@ class Calibrate:
         for quad in self.epeaks.keys():
             for ch in self.epeaks[quad].index:
                 if ch not in self.detector.couples[quad].keys():
-                    assert self._scintid(quad, ch) == self._companion(quad, ch)
+                    assert self.detector.scintid(quad, ch) == self.detector.companion(quad, ch)
                     continue
                 scint = ch
                 counts = self.ehistograms.counts[quad][scint]
@@ -891,8 +854,8 @@ class Calibrate:
         results = {}
         for quad in self.sfit.keys():
             for ch in self.sfit[quad].index:
-                companion = self._companion(quad, ch)
-                scint = self._scintid(quad, ch)
+                companion = self.detector.companion(quad, ch)
+                scint = self.detector.scintid(quad, ch)
 
                 try:
                     lo, lo_err = (
