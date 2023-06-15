@@ -13,7 +13,7 @@ import pandas as pd
 
 from source import paths
 import source.errors as err
-from source.calibrate import PEAKS_PARAMS, Calibrate
+from source.calibrate import PEAKS_PARAMS, Calibrate, ImportedCalibration
 from source.cli import elementsui as ui
 from source.cli.beaupy.beaupy import prompt, select, select_multiple
 from source.cli.cmd import Cmd
@@ -413,6 +413,11 @@ class Mescal(Cmd):
             exporter.draw_spectrum()
             self.console.log(":chart_increasing: Saved calibrated spectra plots.")
 
+    def push_calibration(self, cal):
+        self.idle_calibrations.append(self.calibration)
+        self.calibration = cal
+        return
+
     # shell prompt commands
     def can_quit(self, arg):
         return True
@@ -611,35 +616,39 @@ class Mescal(Cmd):
         return True
 
     def do_loadcal(self, arg):
-        def prompt_user_on_calibration():
-            text_default = (
-                "[italic]Enter SDD calibration file.\n"
-                "[yellow]Hint: You can drag & drop.[/yellow]"
-                "[/italic]\n"
-            )
-            text_error = (
-                "[italic][red]The file you entered does not exists.[/red]\n"
-                "Enter SDD calibration file.\n"
-                "[yellow]Hint: You can drag & drop.[/yellow]\n"
-                "[/italic]\n"
-            )
-            filepath = None
-            text = text_default
-            while filepath is None:
-                answer = prompt(
-                    text,
-                    console=self.console,
-                    target_type=str,
-                )
-                if not answer:
-                    continue
-                answer = answer.strip()
-                if not Path(answer).exists():
-                    text = text_error
-                else:
-                    filepath = Path(answer)
-            return filepath
-
+        message_sdd = (
+            "[italic]Enter path for sdd calibration file.\n"
+            "[yellow]Hint: You can drag & drop.[/yellow]"
+            "[/italic]\n"
+        )
+        message_lout = (
+            "[italic]Enter path for light output calibration file.\n"
+            "[yellow]Hint: You can drag & drop.[/yellow]"
+            "[/italic]\n"
+        )
+        message_error = (
+            "[italic][red]The file you entered does not exists.[/red]\n"
+            "Which file are you calibrating?\n"
+            "[yellow]Hint: You can drag & drop.[/yellow]\n"
+            "[/italic]\n"
+        )
+        answer = prompt_user_on_filepath(message_sdd, message_error, self.console)
+        if answer is None:
+            return False
+        sddcal_path = answer
+        answer = prompt_user_on_filepath(message_lout, message_error, self.console)
+        if answer is None:
+            return False
+        lout_path = answer
+        newcal = ImportedCalibration(
+            self.model,
+            self.config,
+            sdd_calibration_filepath=sddcal_path,
+            lightoutput_filepath=lout_path,
+        )
+        self.push_calibration(newcal)
+        self.calibration()
+        return False
 
     def can_export(self, arg):
         return True

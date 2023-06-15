@@ -981,15 +981,11 @@ class ImportedCalibration(Calibrate):
         **kwargs,
     ):
         if ignore:
-            raise TypeError(
-                "wrong arguments. you are supposed to use keywords for reports."
-            )
+            raise TypeError("wrong arguments. use keywords for reports.")
         super().__init__(model, [], configuration, **kwargs)
-        # fmt: off
         self.sdd_calibration = read_report_from_excel(sdd_calibration_filepath, kind="calib")
         self.lightoutput = read_report_from_excel(lightoutput_filepath, kind="calib")
-        self.scintillator_calibration = _effectivelo_to_scintillatorslo(self.detector, self.lightoutput)
-        #fmt: on
+        self.scintillator_calibration = _effectivelo_to_scintillatorslo(self.lightoutput, self.detector)
 
     def __call__(self, data):
         self.channels = infer_onchannels(data)
