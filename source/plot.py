@@ -315,6 +315,7 @@ _quadtext = np.array(
 
 _quadcorners = [(0, 0), (0, 6), (5, 0), (5, 6)]
 
+
 def _transf(mat, val=-1):
     """
     transform a 12x10 matrix of values into a 24x20 matrix, filling
