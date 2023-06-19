@@ -13,10 +13,7 @@ from source.constants import PHOTOEL_PER_KEV
 from source.detectors import Detector
 from source.io import Exporter
 from source.eventlist import (
-    add_evtype_tag,
     electrons_to_energy,
-    delay_filter,
-    spurious_filter,
     infer_onchannels,
     make_electron_list,
     perchannel_counts,
@@ -25,7 +22,7 @@ from source.checks import check_time_outliers
 from source.radsources import radsources_dicts
 from source.speaks import find_epeaks, find_speaks
 from source.xpeaks import find_xpeaks
-from source.io import read_report_from_excel
+
 
 PEAKS_PARAMS = (
     "lim_low",
@@ -909,16 +906,16 @@ class ImportedCalibration(Calibrate):
         model,
         configuration,
         *ignore,
-        sdd_calibration_filepath,
-        lightoutput_filepath,
+        sdd_calibration,
+        lightoutput,
         **kwargs,
     ):
         if ignore:
             raise TypeError("wrong arguments. use keywords for reports.")
         super().__init__(model, [], configuration, **kwargs)
-        self.sdd_calibration = read_report_from_excel(sdd_calibration_filepath, kind="calib")
+        self.sdd_calibration = sdd_calibration
         self._print(":open_book: Loaded SDD calibration.")
-        self.lightoutput = read_report_from_excel(lightoutput_filepath, kind="calib")
+        self.lightoutput = lightoutput
         self._print(":open_book: Loaded scintillators calibration.")
         self.scintillator_calibration = _effectivelo_to_scintillatorslo(self.lightoutput, self.detector)
 

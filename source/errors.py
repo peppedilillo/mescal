@@ -34,6 +34,10 @@ class BadDataError(Exception):
     """This is when trying to deal with unexpectedly bad errors."""
 
 
+class WrongTableError(Exception):
+    """This error is given when attempting to load a wrong calibration report."""
+
+
 def warn_failed_peak_fit(quad, ch):
     return "failed channel {}{:02d} peak fit.".format(quad, ch)
 

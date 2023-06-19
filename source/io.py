@@ -9,12 +9,8 @@ from astropy.io import fits as fitsio
 from joblib import Parallel, delayed
 
 from source import paths, plot
+from source import errors as err
 from source.constants import PHOTOEL_PER_KEV
-from source.errors import (
-    FormatNotSupportedError,
-    warn_nan_in_sdd_calib,
-    warn_nan_in_slo_table,
-)
 
 
 class Exporter:
@@ -157,7 +153,7 @@ class Exporter:
         for quad in res_cal.keys():
             quad_res_cal = res_cal[quad]
             if quad_res_cal.isnull().values.any():
-                message = warn_nan_in_sdd_calib(quad)
+                message = err.warn_nan_in_sdd_calib(quad)
                 logging.warning(message)
                 quad_res_cal = quad_res_cal.fillna(0)
             fig, axs = plot.quicklook(quad_res_cal)
@@ -180,7 +176,7 @@ class Exporter:
         for quad in res_slo.keys():
             quad_res_slo = res_slo[quad]
             if quad_res_slo.isnull().values.any():
-                message = warn_nan_in_slo_table(quad)
+                message = err.warn_nan_in_slo_table(quad)
                 logging.warning(message)
                 quad_res_slo = quad_res_slo.fillna(0)
             fig, ax = plot.lightout(quad_res_slo)
@@ -438,7 +434,49 @@ def get_writer(fmt):
     elif fmt == "csv":
         return write_report_to_csv
     else:
-        raise FormatNotSupportedError("write format not supported")
+        raise err.FormatNotSupportedError("write format not supported")
+
+
+def validate_sdd_calib(func):
+    def wrapper(*args):
+        from source.calibrate import CAL_PARAMS
+
+        dic = func(*args)
+        for df in dic.values():
+            if not df.columns.isin(CAL_PARAMS).all():
+                raise err.WrongTableError()
+        return dic
+
+    return wrapper
+
+
+@validate_sdd_calib
+def read_sdd_calibration_report(from_path: Path):
+    if from_path.suffix == ".xlsx":
+        return read_report_from_excel(from_path, kind="calib")
+    else:
+        raise err.FormatNotSupportedError("format not supported")
+
+
+def validate_lightout_report(func):
+    def wrapper(*args):
+        from source.calibrate import LO_PARAMS
+
+        dic = func(*args)
+        for df in dic.values():
+            if not df.columns.isin(LO_PARAMS).all():
+                raise err.WrongTableError()
+        return dic
+
+    return wrapper
+
+
+@validate_lightout_report
+def read_lightout_report(from_path: Path):
+    if from_path.suffix == ".xlsx":
+        return read_report_from_excel(from_path, kind="calib")
+    else:
+        raise err.FormatNotSupportedError("format not supported")
 
 
 def write_report_to_excel(result_df, path):

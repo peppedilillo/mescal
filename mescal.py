@@ -20,7 +20,7 @@ from source.cli.beaupy.beaupy import prompt, select, select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import supported_models
 from source.eventlist import preprocess, perchannel_counts
-from source.io import pandas_from_LV0d5
+from source.io import pandas_from_LV0d5, read_sdd_calibration_report, read_lightout_report
 from source.plot import mapcounts, mapenres, uncalibrated, spectrum_xs, histogram
 from source.radsources import supported_sources
 from source.utils import get_version
@@ -106,6 +106,14 @@ class Mescal(Cmd):
         "[i]Entries must be two, different, "
         "sorted integers (e.g., 19800 20100).[/i]\n"
     )
+    invalid_table_message = (
+        "[red]Invalid table.[/]\n"
+        "[i]Make sure the table you are providing has the right columns.[/i]"
+    )
+    invalid_format_message = (
+        "[red]The file appears to be in wrong format.[/]\n"
+        "[i]The command `loadcal` expects .xslx table format.[/i]"
+    )
     # fmt on
 
     def __init__(self):
@@ -120,7 +128,7 @@ class Mescal(Cmd):
         self.threads = self.check_system()
         self.data = None
         self.waste = None
-        self.idle_calibrations = []
+        self.calibrations = {}
         self.calibration = None
 
         ui.logcal_rule(self.console)
@@ -135,13 +143,15 @@ class Mescal(Cmd):
             )
 
         with console.status("Analyzing data.."):
-            self.calibration = Calibrate(
+            calibration = Calibrate(
                 self.model,
                 self.radsources,
                 configuration=self.config,
                 console=self.console,
                 nthreads=self.threads,
             )
+            self.register(calibration)
+            self.calibration = calibration
             self.calibration(self.data)
 
         with console.status("Processing results.."):
@@ -160,6 +170,12 @@ class Mescal(Cmd):
 
         ui.shell_rule(self.console)
         self.cmdloop()
+
+    def register(self, calibration):
+        label = "calib-{}".format(len(self.calibrations))
+        self.calibrations[label] = calibration
+        logging.info("added calibration {} to register.".format(label))
+        return calibration
 
     def start_logger(self):
         """
@@ -501,7 +517,7 @@ class Mescal(Cmd):
         return False
 
     def can_retry(self, arg):
-        if self.radsources:
+        if self.radsources and isinstance(self.calibration, ImportedCalibration):
             return True
         return False
 
@@ -515,7 +531,7 @@ class Mescal(Cmd):
         return False
 
     def can_setlim(self, arg):
-        if self.radsources:
+        if self.radsources and isinstance(self.calibration, ImportedCalibration):
             return True
         return False
 
@@ -618,6 +634,7 @@ class Mescal(Cmd):
         return True
 
     def do_loadcal(self, arg):
+        """Loads and existing calibration."""
         message_sdd = (
             "[italic]Enter path for sdd calibration file.\n"
             "[yellow]Hint: You can drag & drop.[/yellow]"
@@ -637,27 +654,65 @@ class Mescal(Cmd):
         answer = prompt_user_on_filepath(message_sdd, message_error, self.console)
         if answer is None:
             return False
-        sddcal_path = answer
+        try:
+            sddcal = read_sdd_calibration_report(answer)
+        except err.WrongTableError:
+            self.console.print(self.invalid_table_message)
+            return False
+        except err.FormatNotSupportedError:
+            self.console.print(self.invalid_format_message)
+            return False
+
         answer = prompt_user_on_filepath(message_lout, message_error, self.console)
         if answer is None:
             return False
-        lout_path = answer
+        try:
+            local = read_lightout_report(answer)
+        except err.WrongTableError:
+            self.console.print(self.invalid_table_message)
+            return False
+        except err.FormatNotSupportedError:
+            self.console.print(self.invalid_format_message)
+            return False
 
         with self.console.status(self.spinner_message):
             ui.logcal_rule(self.console)
-            newcal = ImportedCalibration(
-                self.model,
-                self.config,
-                sdd_calibration_filepath=sddcal_path,
-                lightoutput_filepath=lout_path,
-                console=self.console,
-                nthreads=self.threads,
-            )
-            data = self.calibration.data
-            self.idle_calibrations.append(self.calibration)
+            try:
+                newcal = ImportedCalibration(
+                    self.model,
+                    self.config,
+                    sdd_calibration=sddcal,
+                    lightoutput=local,
+                    console=self.console,
+                    nthreads=self.threads,
+                )
+            except ValueError:
+                self.console.print(
+                    "The file doesn't appear to be in a valid format.\n"
+                    "Presently we only support .xlsx table."
+                )
+                return False
+            self.register(newcal)
             self.calibration = newcal
             self.calibration(self.data)
             ui.shell_rule(self.console)
+        return False
+
+    def can_swapcal(self, arg):
+        if self.calibrations:
+            return True
+        return False
+
+    def do_swapcal(self, arg):
+        calib_label = select(
+            options=list(self.calibrations.keys()),
+            cursor=":flying_saucer:",
+            console=self.console,
+            intro="[italic]Select one calibration.[/italic]\n\n",
+        )
+        if calib_label is None:
+            return False
+        self.calibration = self.calibrations[calib_label]
         return False
 
     def can_export(self, arg):
