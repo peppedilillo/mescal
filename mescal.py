@@ -116,12 +116,13 @@ class Mescal(Cmd):
         self.start_logger()
         self.config = self.unpack_configuration()
         self.threads = self.check_system()
+        self.data = None
         self.idle_calibrations = []
         self.calibration = None
 
         ui.sections_rule(console, "[bold italic]Calibration log[/]", style="green")
         with console.status("Initializing.."):
-            data = self.fetch_data()
+            self.data = self.fetch_data()
 
         with console.status("Analyzing data.."):
             self.calibration = Calibrate(
@@ -131,7 +132,7 @@ class Mescal(Cmd):
                 console=self.console,
                 nthreads=self.threads,
             )
-            self.calibration(data)
+            self.calibration(self.data[:])
 
         with console.status("Processing results.."):
             self.print_calibration_status()
@@ -327,6 +328,7 @@ class Mescal(Cmd):
         radsources = prompt_user_on_radsources()
         return radsources
 
+
     def display_warning(self, failed_tests):
         """Tells user about channels for which calibration
         could not be completed.
@@ -412,11 +414,6 @@ class Mescal(Cmd):
         if exporter.can__draw_spectrum:
             exporter.draw_spectrum()
             self.console.log(":chart_increasing: Saved calibrated spectra plots.")
-
-    def push_calibration(self, cal):
-        self.idle_calibrations.append(self.calibration)
-        self.calibration = cal
-        return
 
     # shell prompt commands
     def can_quit(self, arg):
@@ -645,9 +642,12 @@ class Mescal(Cmd):
             self.config,
             sdd_calibration_filepath=sddcal_path,
             lightoutput_filepath=lout_path,
+            console=self.console,
         )
-        self.push_calibration(newcal)
-        self.calibration()
+        data = self.calibration.data
+        self.idle_calibrations.append(self.calibration)
+        self.calibration = newcal
+        self.calibration(self.data[:])
         return False
 
     def can_export(self, arg):
