@@ -296,22 +296,24 @@ def histogram(counts, bins, **kwargs):
 
 # mapplot utilities
 
-quadtext = np.array(
+_quadtext = np.array(
     [
-        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-        [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
-        [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
-        [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
-        [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
-        [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
-        [2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+        [0, 0, 0, 0, 0, 2, 2, 2, 2, 2],
+        [0, 0, 0, 0, 0, 2, 2, 2, 2, 2],
+        [0, 0, 0, 0, 0, 2, 2, 2, 2, 2],
+        [0, 0, 0, 0, 0, 2, 2, 2, 2, 2],
+        [0, 0, 0, 0, 0, 2, 2, 2, 2, 2],
+        [0, 0, 0, 0, 0, 2, 2, 2, 2, 2],
+        [1, 1, 1, 1, 1, 3, 3, 3, 3, 3],
+        [1, 1, 1, 1, 1, 3, 3, 3, 3, 3],
+        [1, 1, 1, 1, 1, 3, 3, 3, 3, 3],
+        [1, 1, 1, 1, 1, 3, 3, 3, 3, 3],
+        [1, 1, 1, 1, 1, 3, 3, 3, 3, 3],
+        [1, 1, 1, 1, 1, 3, 3, 3, 3, 3],
     ]
 ).astype(int)
+
+_quadcorners = [(0, 0), (0, 6), (5, 0), (5, 6)]
 
 
 def _transf(mat, val=-1):
@@ -335,7 +337,9 @@ def _chtext(detmap):
 
     chtext = np.zeros((12, 10)).astype(int)
     for i, quad, (tx, ty) in zip(
-        [0, 1, 2, 3], ["A", "B", "C", "D"], [(0, 0), (5, 0), (0, 6), (5, 6)]
+        [0, 1, 2, 3],
+        ["A", "B", "C", "D"],
+        _quadcorners,
     ):
         quadmap = np.array(detmap[quad])
         rows, cols = quadmap[(quadmap != UNBOND)[:, 0] & (quadmap != UNBOND)[:, 1]].T
@@ -384,7 +388,7 @@ def _mapplot(mat, detmap, colorlabel, cmap="hot_ur", maskvalue=None, **kwargs):
     wy = ys[2] - ys[1]
     for i in range(10):
         for j in range(12):
-            quad = quadtext[::-1][j, i]
+            quad = _quadtext[::-1][j, i]
             text = ax.text(
                 (xs[2 * i] + xs[2 * i + 1]) / 2 - wx,
                 ys[2 * j] + wy,
@@ -423,7 +427,7 @@ def mapenres(
     for i, quad, (tx, ty) in zip(
         [0, 1, 2, 3],
         ["A", "B", "C", "D"],
-        [(0, 0), (5, 0), (0, 6), (5, 6)],
+        _quadcorners,
     ):
         if quad in en_res.keys():
             quadmap = np.array(detmap[quad])
@@ -452,7 +456,7 @@ def mapcounts(counts, detmap, cmap="hot_ur", title=None):
     for i, quad, (tx, ty) in zip(
         [0, 1, 2, 3],
         ["A", "B", "C", "D"],
-        [(0, 0), (5, 0), (0, 6), (5, 6)],
+        _quadcorners,
     ):
         if quad in counts.keys():
             quadmap = np.array(detmap[quad])
