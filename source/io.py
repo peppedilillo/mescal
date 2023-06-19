@@ -441,9 +441,10 @@ def validate_sdd_calib(func):
     def wrapper(*args):
         from source.calibrate import CAL_PARAMS
 
+        _calparams = list(CAL_PARAMS) + ["chi2"]
         dic = func(*args)
         for df in dic.values():
-            if not df.columns.isin(CAL_PARAMS).all():
+            if not df.columns.isin(_calparams).all():
                 raise err.WrongTableError()
         return dic
 
