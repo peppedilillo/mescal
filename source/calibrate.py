@@ -15,13 +15,13 @@ from source.io import Exporter
 from source.eventlist import (
     add_evtype_tag,
     electrons_to_energy,
-    filter_delay,
-    filter_spurious,
+    delay_filter,
+    spurious_filter,
     infer_onchannels,
     make_electron_list,
     perchannel_counts,
-    time_outliers,
 )
+from source.checks import check_time_outliers
 from source.radsources import radsources_dicts
 from source.speaks import find_epeaks, find_speaks
 from source.xpeaks import find_xpeaks
@@ -213,11 +213,9 @@ class Calibrate:
         self.console = console
         self.nthreads = nthreads
         self.flagged = {}
-        self._time_outliers = None
         self.eventlist = None
         self.data = None
         self._counts = {}
-        self.waste = None
         self.channels = None
         self.xbins = None
         self.sbins = None
@@ -237,47 +235,11 @@ class Calibrate:
         self.lightoutput = None
 
     def __call__(self, data):
+        self.data = data
         self.channels = infer_onchannels(data)
-        self.data = self._preprocess(data)
         self._bin()
         self.eventlist = self._calibrate()
         return self.eventlist
-
-    def test_results(self):
-        results = []
-        if ("filter_retrigger" in self.configuration) and (
-            not self.configuration["filter_retrigger"]
-        ):
-            results.append("filter_retrigger_off")
-        if ("filter_spurious" in self.configuration) and (
-            not self.configuration["filter_spurious"]
-        ):
-            results.append("filter_spurious_off")
-        if self.flagged:
-            results.append("flagged_channels")
-        if self.test_time_outliers():
-            results.append("time_outliers")
-        if self.test_filtered_events():
-            results.append("too_many_filtered_events")
-        return results
-
-    def test_filtered_events(self):
-        if self.waste is None:
-            return False
-        if (self.data is not None) & (len(self.waste) / len(self.data) < 0.5):
-            return False
-        return True
-
-    def test_time_outliers(self):
-        assert len(self.data) > 0
-
-        if self._time_outliers is not None:
-            return self._time_outliers
-        if time_outliers(self.data).empty:
-            self._time_outliers = False
-        else:
-            self._time_outliers = True
-        return self._time_outliers
 
     def count(self, key="all"):
         if key in self._counts:
@@ -304,9 +266,9 @@ class Calibrate:
                 self.data["TIME"].quantile(0.99),
             )
         else:
-            min_, max_ = self.data["TIME"].min(), self.data["TIME"].max()
-            if self.test_time_outliers():
+            if check_time_outliers(self.data):
                 raise err.BadDataError("Outliers in time events.")
+            min_, max_ = self.data["TIME"].min(), self.data["TIME"].max()
         times = self.data[mask]["TIME"].values
         counts, bins = np.histogram(
             times, bins=np.arange(min_, max_ + binning, binning)
@@ -341,30 +303,6 @@ class Calibrate:
                 lost_fraction
             )
         )
-
-    def _preprocess(
-        self,
-        data,
-    ):
-        spurious_bool = self.configuration["filter_spurious"]
-        retrigger_delay = self.configuration["filter_retrigger"]
-
-        data = add_evtype_tag(data, self.detector.couples)
-        events_pre_filter = len(data)
-        self.console.log(":white_check_mark: Tagged X and S events.")
-        if retrigger_delay:
-            data, waste = filter_delay(data, retrigger_delay)
-            self.waste = waste
-        if spurious_bool:
-            data, waste = filter_spurious(data)
-            self.waste = pd.concat((self.waste, waste))
-
-        filtered = 100 * (events_pre_filter - len(data)) / events_pre_filter
-        if filtered:
-            self.console.log(
-                ":white_check_mark: Filtered {:.1f}% of the events.".format(filtered)
-            )
-        return data
 
     def _calibrate(self):
         message = "attempting new calibration."
@@ -989,7 +927,6 @@ class ImportedCalibration(Calibrate):
 
     def __call__(self, data):
         self.channels = infer_onchannels(data)
-        self.data = self._preprocess(data)
         self._bin()
         self.eventlist = self._calibrate()
         return self.eventlist

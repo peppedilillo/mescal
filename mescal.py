@@ -14,10 +14,12 @@ import pandas as pd
 from source import paths
 import source.errors as err
 from source.calibrate import PEAKS_PARAMS, Calibrate, ImportedCalibration
+from source.checks import check_results
 from source.cli import elementsui as ui
 from source.cli.beaupy.beaupy import prompt, select, select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import supported_models
+from source.eventlist import preprocess
 from source.io import pandas_from_LV0d5
 from source.plot import mapcounts, mapenres, uncalibrated, spectrum_xs, histogram
 from source.radsources import supported_sources
@@ -117,12 +119,20 @@ class Mescal(Cmd):
         self.config = self.unpack_configuration()
         self.threads = self.check_system()
         self.data = None
+        self.waste = None
         self.idle_calibrations = []
         self.calibration = None
 
         ui.sections_rule(console, "[bold italic]Calibration log[/]", style="green")
         with console.status("Initializing.."):
-            self.data = self.fetch_data()
+            raw_data = self.fetch_data()
+            self.data, self.waste = preprocess(
+                raw_data,
+                model=self.model,
+                filter_spurious=self.config["filter_spurious"],
+                filter_retrigger=self.config["filter_retrigger"],
+                console=self.console,
+            )
 
         with console.status("Analyzing data.."):
             self.calibration = Calibrate(
@@ -138,7 +148,12 @@ class Mescal(Cmd):
             self.print_calibration_status()
             self.export_essentials()
 
-        failed_tests = self.calibration.test_results()
+        failed_tests = check_results(
+            self.calibration,
+            self.data,
+            self.waste,
+            self.config,
+        )
         if failed_tests:
             ui.sections_rule(
                 console, ":eyes: [bold italic]Warning[/] :eyes:", style="red"

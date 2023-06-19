@@ -5,6 +5,7 @@ import pandas as pd
 from joblib import Parallel, delayed
 
 import source.errors as err
+from source.detectors import get_couples
 from source.constants import PHOTOEL_PER_KEV
 
 s2i = lambda quad: "ABCD".find(str.upper(quad))
@@ -23,6 +24,31 @@ def _as_ucid_dataframe(dict_of_df):
         ]
     )
     return out
+
+
+def preprocess(
+        data,
+        model,
+        filter_retrigger=20*10**-6,
+        filter_spurious=True,
+        console=None,
+):
+    couples = get_couples(model)
+    data = add_evtype_tag(data, couples)
+    waste = pd.DataFrame(index=data.index)
+
+    events_pre_filter = len(data)
+    if console:
+        console.log(":white_check_mark: Tagged X and S events.")
+    if filter_retrigger:
+        data, waste = delay_filter(data, filter_retrigger)
+    if filter_spurious:
+        data, waste = spurious_filter(data)
+        waste = pd.concat((waste, waste))
+    filtered = 100 * (events_pre_filter - len(data)) / events_pre_filter
+    if filtered and console:
+        console.log(":white_check_mark: Filtered {:.1f}% of the events.".format(filtered))
+    return data, waste
 
 
 def _convert_x_events(data):
@@ -268,14 +294,14 @@ def perchannel_counts(data, channels, key="all"):
     return out
 
 
-def filter_spurious(data):
+def spurious_filter(data):
     mask = (data["NMULT"] < 2) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))
     spirit = data[mask]
     waste = data[~mask]
     return spirit, waste
 
 
-def filter_delay(data, hold_time):
+def delay_filter(data, hold_time):
     unique_times = data.TIME.unique()
     bad_events = unique_times[np.where(np.diff(unique_times) < hold_time)[0] + 1]
     mask = ~(data["TIME"].isin(bad_events))
@@ -293,6 +319,3 @@ def infer_onchannels(data):
     return out
 
 
-def time_outliers(data):
-    mask = (data["TIME"] > 3 * data["TIME"].quantile(0.99)) | (data["TIME"] < 0)
-    return data[mask]
