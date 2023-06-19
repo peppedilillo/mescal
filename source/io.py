@@ -92,7 +92,7 @@ class Exporter:
             self.can__draw_sspectrum = True
 
         self.can__draw_linearity = False
-        if self.calibration.sdd_calibration:
+        if self.calibration.sdd_calibration and self.calibration.xfit:
             self.can__draw_linearity = True
 
         self.can__draw_map_resolution = False

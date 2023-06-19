@@ -19,7 +19,7 @@ from source.cli import elementsui as ui
 from source.cli.beaupy.beaupy import prompt, select, select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import supported_models
-from source.eventlist import preprocess
+from source.eventlist import preprocess, perchannel_counts
 from source.io import pandas_from_LV0d5
 from source.plot import mapcounts, mapenres, uncalibrated, spectrum_xs, histogram
 from source.radsources import supported_sources
@@ -111,7 +111,7 @@ class Mescal(Cmd):
     def __init__(self):
         console = ui.hello()
         super().__init__(console)
-        self.args = self.parse_args()
+        self.args = parser.parse_args()
         self.filepath = self.get_filepath()
         self.model = self.get_model()
         self.radsources = self.get_radsources()
@@ -123,7 +123,7 @@ class Mescal(Cmd):
         self.idle_calibrations = []
         self.calibration = None
 
-        ui.sections_rule(console, "[bold italic]Calibration log[/]", style="green")
+        ui.logcal_rule(self.console)
         with console.status("Initializing.."):
             raw_data = self.fetch_data()
             self.data, self.waste = preprocess(
@@ -142,7 +142,7 @@ class Mescal(Cmd):
                 console=self.console,
                 nthreads=self.threads,
             )
-            self.calibration(self.data[:])
+            self.calibration(self.data)
 
         with console.status("Processing results.."):
             self.print_calibration_status()
@@ -155,12 +155,10 @@ class Mescal(Cmd):
             self.config,
         )
         if failed_tests:
-            ui.sections_rule(
-                console, ":eyes: [bold italic]Warning[/] :eyes:", style="red"
-            )
+            ui.warning_rule(self.console)
             self.display_warning(failed_tests)
 
-        ui.sections_rule(console, "[bold italic]Shell[/]", style="green")
+        ui.shell_rule(self.console)
         self.cmdloop()
 
     def start_logger(self):
@@ -194,11 +192,6 @@ class Mescal(Cmd):
         logging.info("selected model = {}".format(self.model))
         logging.info("selected sources = {}".format(", ".join(self.radsources)))
         return True
-
-    @staticmethod
-    def parse_args():
-        args = parser.parse_args()
-        return args
 
     @staticmethod
     def check_system():
@@ -342,7 +335,6 @@ class Mescal(Cmd):
             return self.args.source
         radsources = prompt_user_on_radsources()
         return radsources
-
 
     def display_warning(self, failed_tests):
         """Tells user about channels for which calibration
@@ -516,12 +508,10 @@ class Mescal(Cmd):
     def do_retry(self, arg):
         """Launches calibration again."""
         with self.console.status(self.spinner_message):
-            ui.sections_rule(
-                self.console, "[bold italic]Calibration log", style="green"
-            )
+            ui.logcal_rule(self.console)
             self.calibration._calibrate()
             self.export_essentials()
-            ui.sections_rule(self.console, "[bold italic]Shell", style="green")
+            ui.shell_rule(self.console)
         return False
 
     def can_setlim(self, arg):
@@ -591,13 +581,13 @@ class Mescal(Cmd):
         return False
 
     def can_mapbad(self, arg):
-        if self.calibration.waste is not None:
+        if self.waste is not None:
             return True
         return False
 
     def do_mapbad(self, arg):
         """Plots a map of counts per-channel from filtered data."""
-        counts = self.calibration.waste_count(key="all")
+        counts = perchannel_counts(self.waste, self.calibration.channels, key="all")
         fig, ax = mapcounts(
             counts,
             self.calibration.detector.map,
@@ -624,7 +614,7 @@ class Mescal(Cmd):
         plt.show(block=False)
         return False
 
-    def can_loadcal(self,arg):
+    def can_loadcal(self, arg):
         return True
 
     def do_loadcal(self, arg):
@@ -652,17 +642,22 @@ class Mescal(Cmd):
         if answer is None:
             return False
         lout_path = answer
-        newcal = ImportedCalibration(
-            self.model,
-            self.config,
-            sdd_calibration_filepath=sddcal_path,
-            lightoutput_filepath=lout_path,
-            console=self.console,
-        )
-        data = self.calibration.data
-        self.idle_calibrations.append(self.calibration)
-        self.calibration = newcal
-        self.calibration(self.data[:])
+
+        with self.console.status(self.spinner_message):
+            ui.logcal_rule(self.console)
+            newcal = ImportedCalibration(
+                self.model,
+                self.config,
+                sdd_calibration_filepath=sddcal_path,
+                lightoutput_filepath=lout_path,
+                console=self.console,
+                nthreads=self.threads,
+            )
+            data = self.calibration.data
+            self.idle_calibrations.append(self.calibration)
+            self.calibration = newcal
+            self.calibration(self.data)
+            ui.shell_rule(self.console)
         return False
 
     def can_export(self, arg):

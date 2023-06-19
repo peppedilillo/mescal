@@ -33,6 +33,9 @@ def preprocess(
         filter_spurious=True,
         console=None,
 ):
+    """
+    This is in-place, meaning that will add a column to data.
+    """
     couples = get_couples(model)
     data = add_evtype_tag(data, couples)
     waste = pd.DataFrame(index=data.index)

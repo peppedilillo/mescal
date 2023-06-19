@@ -70,6 +70,18 @@ def sections_rule(console, *args, **kwargs):
     console.print()
 
 
+def logcal_rule(console):
+    sections_rule(console, "[bold italic]Calibration log[/]", style="green")
+
+
+def warning_rule(console):
+    sections_rule(console, ":eyes: [bold italic]Warning[/] :eyes:", style="red")
+
+
+def shell_rule(console):
+    sections_rule(console, "[bold italic]Shell[/]", style="green")
+
+
 def shell_section_header(console, header):
     width = int(console.width / 2)
     space = " " * max(int((width - len(header)) / 2), 0)

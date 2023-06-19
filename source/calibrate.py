@@ -275,11 +275,6 @@ class Calibrate:
         )
         return counts, bins
 
-    def waste_count(self, key="all"):
-        if self.waste is not None:
-            return perchannel_counts(self.waste, self.channels, key=key)
-        return {}
-
     def xradsources(self):
         xradsources, _ = self.radsources
         return xradsources
@@ -922,10 +917,13 @@ class ImportedCalibration(Calibrate):
             raise TypeError("wrong arguments. use keywords for reports.")
         super().__init__(model, [], configuration, **kwargs)
         self.sdd_calibration = read_report_from_excel(sdd_calibration_filepath, kind="calib")
+        self._print(":open_book: Loaded SDD calibration.")
         self.lightoutput = read_report_from_excel(lightoutput_filepath, kind="calib")
+        self._print(":open_book: Loaded scintillators calibration.")
         self.scintillator_calibration = _effectivelo_to_scintillatorslo(self.lightoutput, self.detector)
 
     def __call__(self, data):
+        self.data = data
         self.channels = infer_onchannels(data)
         self._bin()
         self.eventlist = self._calibrate()
@@ -944,4 +942,5 @@ class ImportedCalibration(Calibrate):
             self.scintillator_calibration,
             self.detector.couples,
         )
+        self._print(":green_circle: Calibration complete.")
         return eventlist
