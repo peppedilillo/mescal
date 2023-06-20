@@ -195,6 +195,83 @@ def find_adc_bins(data, binning, maxmargin=10, roundto=500, clipquant=0.996):
     return bins
 
 
+def _histogram(value, data, bins, nthreads=1):
+    def helper(quad):
+        hist_quads = {}
+        quad_df = data[data["QUADID"] == quad]
+        for ch in range(32):
+            adcs = quad_df[(quad_df["CHN"] == ch)][value]
+            ys, _ = np.histogram(adcs, bins=bins)
+            hist_quads[ch] = ys
+        return quad, hist_quads
+
+    results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in "ABCD")
+    counts = {key: value for key, value in results}
+    return histogram(bins, counts)
+
+
+def cached_xhist():
+    memory = []
+
+    def xhistogram(data, bins, nthreads=1):
+        value = "ADC"
+        data = data[data["EVTYPE"] == "X"]
+        histograms = _histogram(
+            value,
+            data,
+            bins,
+            nthreads=nthreads,
+        )
+        return histograms
+
+    def helper(*args, **kwargs):
+        if memory:
+            return memory[0]
+        memory.append(xhistogram(*args, **kwargs))
+        return memory[0]
+    return helper
+
+
+xhistogram = cached_xhist()
+
+
+def cached_shist():
+    memory = []
+
+    def shistogram(data, bins, nthreads=1):
+        value = "ADC"
+        data = data[data["EVTYPE"] == "S"]
+        histograms = _histogram(
+            value,
+            data,
+            bins,
+            nthreads=nthreads,
+        )
+        return histograms
+
+    def helper(*args, **kwargs):
+        if memory:
+            return memory[0]
+        memory.append(shistogram(*args, **kwargs))
+        return memory[0]
+    return helper
+
+
+shistogram = cached_shist()
+
+
+def ehistogram(data, bins, nthreads=1):
+    value = "ELECTRONS"
+    data = data[data["EVTYPE"] == "S"]
+    histograms = _histogram(
+        value,
+        data,
+        bins,
+        nthreads=nthreads,
+    )
+    return histograms
+
+
 class Calibrate:
     def __init__(
         self,
@@ -286,8 +363,8 @@ class Calibrate:
         bins = find_adc_bins(self.data["ADC"], binning)
         self.xbins = bins
         self.sbins = bins
-        self.xhistograms = self._make_xhistograms(self.data)
-        self.shistograms = self._make_shistograms(self.data)
+        self.xhistograms = xhistogram(self.data, self.xbins, self.nthreads)
+        self.shistograms = shistogram(self.data, self.sbins, self.nthreads)
         lost = (self.data["ADC"] >= bins[-1]) | (self.data["ADC"] < bins[0])
         lost_fraction = 100 * len(self.data[lost]) / len(self.data["ADC"])
         self._print(
@@ -334,7 +411,7 @@ class Calibrate:
             self.nthreads,
         )
         self.ebins = linrange(1000, 25000, 50)
-        self.ehistograms = self._make_ehistograms(electron_evlist)
+        self.ehistograms = ehistogram(electron_evlist, self.ebins, self.nthreads)
         self.epeaks = self._detect_epeaks()
         self.efit = self._fit_gamma_electrons()
         self.scintillator_calibration = self._calibrate_scintillators()
@@ -360,57 +437,6 @@ class Calibrate:
 
     def _flag(self, quad, chn, flag):
         self.flagged.setdefault(flag, []).append((quad, chn))
-
-    @staticmethod
-    def _histogram(value, data, bins, nthreads=1):
-        def helper(quad):
-            hist_quads = {}
-            quad_df = data[data["QUADID"] == quad]
-            for ch in range(32):
-                adcs = quad_df[(quad_df["CHN"] == ch)][value]
-                ys, _ = np.histogram(adcs, bins=bins)
-                hist_quads[ch] = ys
-            return quad, hist_quads
-
-        results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in "ABCD")
-        counts = {key: value for key, value in results}
-        return histogram(bins, counts)
-
-    def _make_xhistograms(self, data):
-        value = "ADC"
-        bins = self.xbins
-        data = data[data["EVTYPE"] == "X"]
-        histograms = self._histogram(
-            value,
-            data,
-            bins,
-            nthreads=self.nthreads,
-        )
-        return histograms
-
-    def _make_shistograms(self, data):
-        value = "ADC"
-        bins = self.sbins
-        data = data[data["EVTYPE"] == "S"]
-        histograms = self._histogram(
-            value,
-            data,
-            bins,
-            nthreads=self.nthreads,
-        )
-        return histograms
-
-    def _make_ehistograms(self, electron_evlist):
-        value = "ELECTRONS"
-        data = electron_evlist[electron_evlist["EVTYPE"] == "S"]
-        bins = self.ebins
-        histograms = self._histogram(
-            value,
-            data,
-            bins,
-            nthreads=self.nthreads,
-        )
-        return histograms
 
     @as_peaks_dataframe
     def _detect_xpeaks(self):
