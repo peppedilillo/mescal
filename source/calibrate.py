@@ -313,6 +313,7 @@ class Calibrate:
         self.channels = infer_onchannels(data)
         self._bin()
         self.eventlist = self._calibrate()
+        self._print_calibstatus()
         return self.eventlist
 
     def count(self, key="all"):
@@ -422,12 +423,26 @@ class Calibrate:
 
         try:
             eventlist = electrons_to_energy(
-                electron_evlist, self.scintillator_calibration, self.detector.couples
+                electron_evlist,
+                self.scintillator_calibration,
+                self.detector.couples,
             )
         except err.CalibratedEventlistError:
             logging.warning("Event list creation failed.")
             return None
         return eventlist
+
+    def _print_calibstatus(self):
+        """Prepares and exports base calibration results."""
+        if not self.radsources:
+            return
+        if not self.sdd_calibration and not self.lightoutput:
+            msg = "[bold red]:red_circle: Calibration failed."
+        elif not self.sdd_calibration or not self.lightoutput:
+            msg = "[bold yellow]:yellow_circle: Calibration partially complete."
+        else:
+            msg = ":green_circle: Calibration complete."
+        self._print(msg)
 
     def _print(self, message):
         if self.console:
@@ -965,5 +980,5 @@ class ImportedCalibration(Calibrate):
             self.scintillator_calibration,
             self.detector.couples,
         )
-        self._print(":green_circle: Calibration complete.")
+        self._print_calibstatus()
         return eventlist

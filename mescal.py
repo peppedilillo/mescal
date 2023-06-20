@@ -155,7 +155,6 @@ class Mescal(Cmd):
             self.calibration(self.data)
 
         with console.status("Processing results.."):
-            self.print_calibration_status()
             self.export_essentials()
 
         failed_tests = check_results(
@@ -402,19 +401,6 @@ class Mescal(Cmd):
             )
             self.console.print(message)
         return True
-
-    def print_calibration_status(self):
-        """Prepares and exports base calibration results."""
-        if not self.radsources:
-            return
-        if not self.calibration.sdd_calibration and not self.calibration.lightoutput:
-            self.console.log("[bold red]:red_circle: Calibration failed.")
-        elif not self.calibration.sdd_calibration or not self.calibration.lightoutput:
-            self.console.log(
-                "[bold yellow]:yellow_circle: Calibration partially complete. "
-            )
-        else:
-            self.console.log(":green_circle: Calibration complete.")
 
     def export_essentials(self):
         exporter = self.calibration.get_exporter(self.filepath, self.args.fmt)
