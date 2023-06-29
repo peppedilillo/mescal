@@ -925,7 +925,7 @@ class Calibrate:
 def _effectivelo_to_scintillatorslo(lightoutput, detector):
     results = {}
     scintillator_ids = detector.scintids()
-    for quad in scintillator_ids.keys():
+    for quad in lightoutput.keys():
         for ch in scintillator_ids[quad]:
             if ch not in lightoutput[quad].index:
                 continue
