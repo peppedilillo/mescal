@@ -18,19 +18,21 @@ A Python library of interactive CLI elements you have been looking for
 
 __license__ = "MIT"
 
-import warnings
 from ast import literal_eval
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
+import warnings
 
 from rich.console import Console
 from rich.live import Live
 from rich.text import Text
 
-from source.cli.beaupy._internals import (ConversionError, ValidationError,
-                                          _cursor_hidden,
-                                          _format_option_select,
-                                          _render_option_select_multiple,
-                                          _render_prompt, _update_rendered)
+from source.cli.beaupy._internals import _cursor_hidden
+from source.cli.beaupy._internals import _format_option_select
+from source.cli.beaupy._internals import _render_option_select_multiple
+from source.cli.beaupy._internals import _render_prompt
+from source.cli.beaupy._internals import _update_rendered
+from source.cli.beaupy._internals import ConversionError
+from source.cli.beaupy._internals import ValidationError
 from source.cli.beaupy.yakh.key._key import Keys
 from source.cli.beaupy.yakh.yakh import get_key
 

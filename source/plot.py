@@ -1,4 +1,5 @@
-from math import pi, sqrt
+from math import pi
+from math import sqrt
 
 import matplotlib
 import matplotlib.patheffects as path_effects

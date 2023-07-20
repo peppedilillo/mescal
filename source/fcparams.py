@@ -5,8 +5,8 @@ Credits: Francesco Ceraudo, all rights reserved. (Thanks Francesco!)
 
 import itertools
 
-import numpy as np
 from cycler import cycler
+import numpy as np
 
 
 def changeLineCycle(rcParams, style=True, color="k", mpl=None):

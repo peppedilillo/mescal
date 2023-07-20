@@ -1,9 +1,13 @@
 from time import sleep
 
 from rich.console import Console
-from rich.progress import (BarColumn, MofNCompleteColumn, Progress,
-                           SpinnerColumn, TextColumn, TimeElapsedColumn,
-                           TimeRemainingColumn)
+from rich.progress import BarColumn
+from rich.progress import MofNCompleteColumn
+from rich.progress import Progress
+from rich.progress import SpinnerColumn
+from rich.progress import TextColumn
+from rich.progress import TimeElapsedColumn
+from rich.progress import TimeRemainingColumn
 from rich.rule import Rule
 from rich.text import Text
 from rich.theme import Theme

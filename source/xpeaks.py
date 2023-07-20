@@ -1,12 +1,13 @@
 from itertools import combinations
-from math import ceil, floor
+from math import ceil
+from math import floor
 
+from lmfit.models import LinearModel
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.signal
 import scipy.stats
-from lmfit.models import LinearModel
 
 import source.errors as err
 

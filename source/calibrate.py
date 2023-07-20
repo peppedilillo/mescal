@@ -1,22 +1,28 @@
-import logging
 from bisect import bisect_right
 from collections import namedtuple
-from math import ceil, floor
+import logging
+from math import ceil
+from math import floor
 
+from joblib import delayed
+from joblib import Parallel
+from lmfit.models import GaussianModel
+from lmfit.models import LinearModel
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
-from lmfit.models import GaussianModel, LinearModel
 
-import source.errors as err
 from source.checks import check_time_outliers
 from source.constants import PHOTOEL_PER_KEV
 from source.detectors import Detector
-from source.eventlist import (electrons_to_energy, infer_onchannels,
-                              make_electron_list, perchannel_counts)
+import source.errors as err
+from source.eventlist import electrons_to_energy
+from source.eventlist import infer_onchannels
+from source.eventlist import make_electron_list
+from source.eventlist import perchannel_counts
 from source.io import Exporter
 from source.radsources import radsources_dicts
-from source.speaks import find_epeaks, find_speaks
+from source.speaks import find_epeaks
+from source.speaks import find_speaks
 from source.xpeaks import find_xpeaks
 
 PEAKS_PARAMS = (

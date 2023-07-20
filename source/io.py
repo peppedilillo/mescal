@@ -2,14 +2,16 @@ import logging
 from math import floor
 from pathlib import Path
 
+from astropy.io import fits as fitsio
+from joblib import delayed
+from joblib import Parallel
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from astropy.io import fits as fitsio
-from joblib import Parallel, delayed
 
 from source import errors as err
-from source import paths, plot
+from source import paths
+from source import plot
 from source.constants import PHOTOEL_PER_KEV
 
 

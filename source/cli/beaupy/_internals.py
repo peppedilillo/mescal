@@ -20,7 +20,8 @@ from contextlib import contextmanager
 from typing import Iterator, List, Union
 
 from rich._emoji_replace import _emoji_replace
-from rich.console import Console, ConsoleRenderable
+from rich.console import Console
+from rich.console import ConsoleRenderable
 from rich.live import Live
 from rich.text import Text
 

@@ -1,29 +1,38 @@
 import argparse
 import atexit
+from collections import namedtuple
 import configparser
 import logging
-import sys
-from collections import namedtuple
 from os import cpu_count
 from pathlib import Path
+import sys
 
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 
-import source.errors as err
 from source import paths
-from source.calibrate import PEAKS_PARAMS, Calibrate, ImportedCalibration
+from source.calibrate import Calibrate
+from source.calibrate import ImportedCalibration
+from source.calibrate import PEAKS_PARAMS
 from source.checks import check_results
 from source.cli import elementsui as ui
-from source.cli.beaupy.beaupy import prompt, select, select_multiple
+from source.cli.beaupy.beaupy import prompt
+from source.cli.beaupy.beaupy import select
+from source.cli.beaupy.beaupy import select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import supported_models
-from source.eventlist import perchannel_counts, preprocess
-from source.io import (pandas_from_LV0d5, read_lightout_report,
-                       read_sdd_calibration_report)
-from source.plot import (histogram, mapcounts, mapenres, spectrum_xs,
-                         uncalibrated)
+import source.errors as err
+from source.eventlist import perchannel_counts
+from source.eventlist import preprocess
+from source.io import pandas_from_LV0d5
+from source.io import read_lightout_report
+from source.io import read_sdd_calibration_report
+from source.plot import histogram
+from source.plot import mapcounts
+from source.plot import mapenres
+from source.plot import spectrum_xs
+from source.plot import uncalibrated
 from source.radsources import supported_sources
 from source.utils import get_version
 
