@@ -1,7 +1,6 @@
 # fmt: off
 from collections import namedtuple
 
-
 Decay = namedtuple('Decay', ['energy', 'low_lim', 'hi_lim'])
 
 _55fe = {

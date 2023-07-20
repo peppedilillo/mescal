@@ -8,8 +8,8 @@ import pandas as pd
 from astropy.io import fits as fitsio
 from joblib import Parallel, delayed
 
-from source import paths, plot
 from source import errors as err
+from source import paths, plot
 from source.constants import PHOTOEL_PER_KEV
 
 

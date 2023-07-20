@@ -11,21 +11,19 @@ import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from source import paths
 import source.errors as err
+from source import paths
 from source.calibrate import PEAKS_PARAMS, Calibrate, ImportedCalibration
 from source.checks import check_results
 from source.cli import elementsui as ui
 from source.cli.beaupy.beaupy import prompt, select, select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import supported_models
-from source.eventlist import preprocess, perchannel_counts
-from source.io import (
-    pandas_from_LV0d5,
-    read_sdd_calibration_report,
-    read_lightout_report,
-)
-from source.plot import mapcounts, mapenres, uncalibrated, spectrum_xs, histogram
+from source.eventlist import perchannel_counts, preprocess
+from source.io import (pandas_from_LV0d5, read_lightout_report,
+                       read_sdd_calibration_report)
+from source.plot import (histogram, mapcounts, mapenres, spectrum_xs,
+                         uncalibrated)
 from source.radsources import supported_sources
 from source.utils import get_version
 

@@ -1,8 +1,8 @@
 from math import pi, sqrt
 
 import matplotlib
-import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
+import matplotlib.pyplot as plt
 import numpy as np
 
 import source.fcparams as fcm
