@@ -55,7 +55,7 @@ def preprocess(
 
 
 def _convert_x_events(data):
-    out = data[:]
+    out = data[data["EVTYPE"] == "X"]
     energies = out["ELECTRONS"] * PHOTOEL_PER_KEV
     out.insert(0, "ENERGY", energies)
     out.drop(columns=["ELECTRONS"])
@@ -63,7 +63,7 @@ def _convert_x_events(data):
 
 
 def _convert_gamma_events(data, scint_calibrations, couples):
-    out = data[:]
+    out = data[data["EVTYPE"] == "S"]
     qm = out["QUADID"].map({key: 100 * s2i(key) for key in "ABCD"})
     inverted_couples = {key: {v: k for k, v in d.items()} for key, d in couples.items()}
     companion_to_channel = dict(
