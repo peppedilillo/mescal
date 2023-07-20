@@ -20,7 +20,11 @@ from source.cli.beaupy.beaupy import prompt, select, select_multiple
 from source.cli.cmd import Cmd
 from source.detectors import supported_models
 from source.eventlist import preprocess, perchannel_counts
-from source.io import pandas_from_LV0d5, read_sdd_calibration_report, read_lightout_report
+from source.io import (
+    pandas_from_LV0d5,
+    read_sdd_calibration_report,
+    read_lightout_report,
+)
 from source.plot import mapcounts, mapenres, uncalibrated, spectrum_xs, histogram
 from source.radsources import supported_sources
 from source.utils import get_version
@@ -342,7 +346,7 @@ class Mescal(Cmd):
                 console=self.console,
                 intro=message,
                 transient=True,
-                legend=legend
+                legend=legend,
             )
             return radsources
 

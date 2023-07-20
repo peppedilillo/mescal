@@ -27,11 +27,11 @@ def _as_ucid_dataframe(dict_of_df):
 
 
 def preprocess(
-        data,
-        model,
-        filter_retrigger=20*10**-6,
-        filter_spurious=True,
-        console=None,
+    data,
+    model,
+    filter_retrigger=20 * 10**-6,
+    filter_spurious=True,
+    console=None,
 ):
     """
     This is in-place, meaning that will add a column to data.
@@ -50,7 +50,9 @@ def preprocess(
         waste = pd.concat((waste, waste))
     filtered = 100 * (events_pre_filter - len(data)) / events_pre_filter
     if filtered and console:
-        console.log(":white_check_mark: Filtered {:.1f}% of the events.".format(filtered))
+        console.log(
+            ":white_check_mark: Filtered {:.1f}% of the events.".format(filtered)
+        )
     return data, waste
 
 
@@ -320,5 +322,3 @@ def infer_onchannels(data):
         if onchs.any():
             out[quad] = onchs.tolist()
     return out
-
-

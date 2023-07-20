@@ -229,6 +229,7 @@ def cached_xhist():
             return memory[0]
         memory.append(xhistogram(*args, **kwargs))
         return memory[0]
+
     return helper
 
 
@@ -254,6 +255,7 @@ def cached_shist():
             return memory[0]
         memory.append(shistogram(*args, **kwargs))
         return memory[0]
+
     return helper
 
 
@@ -620,7 +622,9 @@ class Calibrate:
         for quad in self.sfit.keys():
             for ch in self.sfit[quad].index:
                 if ch not in self.detector.couples[quad].keys():
-                    assert self.detector.scintid(quad, ch) == self.detector.companion(quad, ch)
+                    assert self.detector.scintid(quad, ch) == self.detector.companion(
+                        quad, ch
+                    )
                     continue
                 scint = ch
                 counts = self.ehistograms.counts[quad][scint]
@@ -654,7 +658,9 @@ class Calibrate:
         for quad in self.epeaks.keys():
             for ch in self.epeaks[quad].index:
                 if ch not in self.detector.couples[quad].keys():
-                    assert self.detector.scintid(quad, ch) == self.detector.companion(quad, ch)
+                    assert self.detector.scintid(quad, ch) == self.detector.companion(
+                        quad, ch
+                    )
                     continue
                 scint = ch
                 counts = self.ehistograms.counts[quad][scint]
@@ -829,7 +835,7 @@ class Calibrate:
                 scint = self.detector.scintid(quad, ch)
                 try:
                     s_ = self.scintillator_calibration[quad].loc[scint]
-                    lo, lo_err = s_[["light_out","light_out_err"]].to_list()
+                    lo, lo_err = s_[["light_out", "light_out_err"]].to_list()
                 except KeyError:
                     message = err.warn_missing_lout(quad, ch)
                     logging.warning(message)
@@ -846,9 +852,19 @@ class Calibrate:
                     comp_ = self.sdd_calibration[quad].loc[companion]
                     gain_comp, offset_comp = comp_[["gain", "offset"]].values
 
-                    centers_electrons_comp = ((centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV)
-                    effs = lo * centers_electrons / (centers_electrons + centers_electrons_comp)
-                    eff_errs = lo_err * centers_electrons / (centers_electrons + centers_electrons_comp)
+                    centers_electrons_comp = (
+                        (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
+                    )
+                    effs = (
+                        lo
+                        * centers_electrons
+                        / (centers_electrons + centers_electrons_comp)
+                    )
+                    eff_errs = (
+                        lo_err
+                        * centers_electrons
+                        / (centers_electrons + centers_electrons_comp)
+                    )
 
                     eff, eff_err = self._deal_with_multiple_gamma_decays(effs, eff_errs)
                     results.setdefault(quad, {})[ch] = np.array((eff, eff_err))
@@ -958,7 +974,9 @@ class ImportedCalibration(Calibrate):
         self._print(":open_book: Loaded SDD calibration.")
         self.lightoutput = lightoutput
         self._print(":open_book: Loaded scintillators calibration.")
-        self.scintillator_calibration = _effectivelo_to_scintillatorslo(self.lightoutput, self.detector)
+        self.scintillator_calibration = _effectivelo_to_scintillatorslo(
+            self.lightoutput, self.detector
+        )
 
     def __call__(self, data):
         self.data = data

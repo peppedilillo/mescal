@@ -390,8 +390,8 @@ def select_multiple(
         error_message = ""
         while True:
             rendered = (
-                    intro
-                    + "\n".join(
+                intro
+                + "\n".join(
                     [
                         _render_option_select_multiple(
                             option=preprocessor(option),
@@ -404,7 +404,7 @@ def select_multiple(
                         for i, option in enumerate(options)
                     ]
                 )
-                    + legend
+                + legend
             )
             if error_message:
                 rendered = f"{rendered}\n[red]Error:[/red] {error_message}"
