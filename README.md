@@ -31,9 +31,17 @@ To launch `mescal`:
 
 Mescal can also be used to visualize data acquired with the HERMES detector.
 
-## Helper
+## Want to try it?
+
+[Here](https://drive.google.com/file/d/1hchGmT8vw9N0IA1r66srqNPQkF5TAjs6/view?usp=share_link)'s a sample acquisition!
+
+## Need help?
 
 A few options (e.g., output format, DAC presets..) can be activated via command line arguments. 
 You can check these through mescal's helper: `python mescal.py --help`.
 
+## Uninstalling
 
+`conda remove -n sensordashboard --all`
+
+It should do, if you followed the steps above.
