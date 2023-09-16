@@ -42,6 +42,6 @@ You can check these through mescal's helper: `python mescal.py --help`.
 
 ## Uninstalling
 
-`conda remove -n sensordashboard --all`
+`conda remove -n mescal --all`
 
 It should do, if you followed the steps above.
