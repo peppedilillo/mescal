@@ -10,4 +10,4 @@ dependencies:
   - rich=12.5
   - pip=23.0.1
   - pip:
-      - lmfit=4.9.2
+      - lmfit==1.2.2
