@@ -514,7 +514,7 @@ class Mescal(Cmd):
         return False
 
     def can_retry(self, arg):
-        if self.radsources and isinstance(self.calibration, ImportedCalibration):
+        if self.radsources and not isinstance(self.calibration, ImportedCalibration):
             return True
         return False
 
@@ -528,7 +528,7 @@ class Mescal(Cmd):
         return False
 
     def can_setlim(self, arg):
-        if self.radsources and isinstance(self.calibration, ImportedCalibration):
+        if self.radsources and not isinstance(self.calibration, ImportedCalibration):
             return True
         return False
 
