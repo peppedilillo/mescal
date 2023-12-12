@@ -389,7 +389,7 @@ class Mescal(Cmd):
         if "too_many_filtered_events" in failed_tests:
             message = (
                 "[i][yellow]"
-                "A significant fraction was filtered away."
+                "A significant fraction of the dataset was filtered away."
                 "[/yellow]\n"
                 "Check filter parameters in 'config.ini'."
             )
@@ -501,12 +501,7 @@ class Mescal(Cmd):
 
         quad, ch = parsed_arg
         binning = 1.0
-        try:
-            counts, bins = self.calibration.timehist(quad, ch, binning)
-        except err.BadDataError:
-            counts, bins = self.calibration.timehist(
-                quad, ch, binning, neglect_outliers=True
-            )
+        counts, bins = self.calibration.timehist(quad, ch, binning, neglect_outliers=False)
 
         fig, ax = histogram(counts, bins[:-1],)
         ax.set_title(

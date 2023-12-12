@@ -11,7 +11,6 @@ from lmfit.models import LinearModel
 import numpy as np
 import pandas as pd
 
-from source.checks import check_time_outliers
 from source.constants import PHOTOEL_PER_KEV
 from source.detectors import Detector
 import source.errors as err
@@ -292,17 +291,13 @@ class Calibrate:
         return exporter
 
     def timehist(self, quad, ch, binning, neglect_outliers=False):
-        assert len(self.data) > 0
-        key = (quad, ch, binning)
+        if len(self.data) <= 0:
+            raise err.BadDataError("Empty data.")
+
         mask = (self.data["QUADID"] == quad) & (self.data["CHN"] == ch)
         if neglect_outliers:
-            min_, max_ = (
-                self.data["TIME"].quantile(0.01),
-                self.data["TIME"].quantile(0.99),
-            )
+            min_, max_ = np.quantile(self.data["TIME"], [0.01, 0.99])
         else:
-            if check_time_outliers(self.data):
-                raise err.BadDataError("Outliers in time events.")
             min_, max_ = self.data["TIME"].min(), self.data["TIME"].max()
         times = self.data[mask]["TIME"].values
         counts, bins = np.histogram(
@@ -392,9 +387,9 @@ class Calibrate:
 
     def _print_calibstatus(self):
         """Prepares and exports base calibration results."""
-        if not self.radsources:
-            return
-        if not self.sdd_calibration and not self.lightoutput:
+        if not self.xradsources() and not self.sradsources():
+            msg = "[bold yellow]:yellow_circle: Skipped calibration."
+        elif not self.sdd_calibration and not self.lightoutput:
             msg = "[bold red]:red_circle: Calibration failed."
         elif not self.sdd_calibration or not self.lightoutput:
             msg = "[bold yellow]:yellow_circle: Calibration partially complete."
