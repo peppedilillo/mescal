@@ -501,7 +501,9 @@ class Mescal(Cmd):
 
         quad, ch = parsed_arg
         binning = 1.0
-        counts, bins = self.calibration.timehist(quad, ch, binning, neglect_outliers=False)
+        counts, bins = self.calibration.timehist(
+            quad, ch, binning, neglect_outliers=False
+        )
 
         fig, ax = histogram(counts, bins[:-1],)
         ax.set_title(
