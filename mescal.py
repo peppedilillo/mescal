@@ -75,10 +75,7 @@ commandline_args_parser.add_argument(
 )
 
 commandline_args_parser.add_argument(
-    "--filtersoff",
-    default=False,
-    action="store_true",
-    help="disables all filters.",
+    "--filtersoff", default=False, action="store_true", help="disables all filters.",
 )
 
 commandline_args_parser.add_argument(
@@ -176,10 +173,7 @@ class Mescal(Cmd):
             self.export_essentials()
 
         failed_tests = check_results(
-            self.calibration,
-            self.data,
-            self.waste,
-            self.config,
+            self.calibration, self.data, self.waste, self.config,
         )
         if failed_tests:
             ui.warning_rule(self.console)
@@ -255,8 +249,12 @@ class Mescal(Cmd):
         adcitems = config[self.commandline_args.adc]
 
         out = {
-            "filter_retrigger": 0. if self.commandline_args.filtersoff else general.getfloat("filter_retrigger"),
-            "filter_spurious": False if self.commandline_args.filtersoff else general.getboolean("filter_spurious"),
+            "filter_retrigger": 0.0
+            if self.commandline_args.filtersoff
+            else general.getfloat("filter_retrigger"),
+            "filter_spurious": False
+            if self.commandline_args.filtersoff
+            else general.getboolean("filter_spurious"),
             "binning": adcitems.getint("binning"),
             "xpeaks_mincounts": general.getint("xpeaks_mincounts"),
             "gain_center": adcitems.getfloat("gain_center"),
@@ -330,7 +328,7 @@ class Mescal(Cmd):
                 cursor_index=cursor_index,
                 console=self.console,
                 intro="[italic]For which model?[/italic]\n\n",
-                legend="(Confirm with [bold]enter[/bold], exit with esc)"
+                legend="(Confirm with [bold]enter[/bold], exit with esc)",
             )
             return answer
 
@@ -423,7 +421,9 @@ class Mescal(Cmd):
         return True
 
     def export_essentials(self):
-        exporter = self.calibration.get_exporter(self.filepath, self.commandline_args.fmt)
+        exporter = self.calibration.get_exporter(
+            self.filepath, self.commandline_args.fmt
+        )
 
         if exporter.can__write_sdd_calibration_report:
             exporter.write_sdd_calibration_report()
@@ -508,10 +508,7 @@ class Mescal(Cmd):
                 quad, ch, binning, neglect_outliers=True
             )
 
-        fig, ax = histogram(
-            counts,
-            bins[:-1],
-        )
+        fig, ax = histogram(counts, bins[:-1],)
         ax.set_title(
             "Count in time over channel {}{:02d}, binning {} s".format(
                 quad, ch, binning
@@ -595,9 +592,7 @@ class Mescal(Cmd):
         """Plots a map of counts per-channel."""
         counts = self.calibration.count()
         fig, ax = mapcounts(
-            counts,
-            self.calibration.detector.map,
-            title="Per-channel events count map",
+            counts, self.calibration.detector.map, title="Per-channel events count map",
         )
         plt.show(block=False)
         return False
@@ -629,9 +624,7 @@ class Mescal(Cmd):
         decays = self.calibration.xradsources()
         source = sorted(decays, key=lambda source: decays[source].energy)[0]
         fig, ax = mapenres(
-            source,
-            self.calibration.resolution,
-            self.calibration.detector.map,
+            source, self.calibration.resolution, self.calibration.detector.map,
         )
         plt.show(block=False)
         return False
@@ -726,17 +719,11 @@ class Mescal(Cmd):
 
     def do_export(self, arg):
         """Prompts user on optional data product exports."""
-        exporter = self.calibration.get_exporter(self.filepath, self.commandline_args.fmt)
-
-        Option = namedtuple(
-            "Option",
-            [
-                "label",
-                "commands",
-                "conditions",
-                "ticked",
-            ],
+        exporter = self.calibration.get_exporter(
+            self.filepath, self.commandline_args.fmt
         )
+
+        Option = namedtuple("Option", ["label", "commands", "conditions", "ticked",],)
         all_options = [
             Option(
                 "uncalibrated plots",
@@ -746,14 +733,8 @@ class Mescal(Cmd):
             ),
             Option(
                 "diagnostic plots",
-                [
-                    exporter.draw_xdiagnostic,
-                    exporter.draw_sdiagnostics,
-                ],
-                [
-                    exporter.can__draw_xdiagnostic,
-                    exporter.can__draw_sdiagnostics,
-                ],
+                [exporter.draw_xdiagnostic, exporter.draw_sdiagnostics,],
+                [exporter.can__draw_xdiagnostic, exporter.can__draw_sdiagnostics,],
                 True,
             ),
             Option(
@@ -764,38 +745,20 @@ class Mescal(Cmd):
             ),
             Option(
                 "spectra plots per channel",
-                [
-                    exporter.draw_sspectra,
-                    exporter.draw_xspectra,
-                ],
-                [
-                    exporter.can__draw_sspectra,
-                    exporter.can__draw_xspectra,
-                ],
+                [exporter.draw_sspectra, exporter.draw_xspectra,],
+                [exporter.can__draw_sspectra, exporter.can__draw_xspectra,],
                 False,
             ),
             Option(
                 "maps",
-                [
-                    exporter.draw_map_counts,
-                    exporter.draw_map_resolution,
-                ],
-                [
-                    exporter.can__draw_map_counts,
-                    exporter.can__draw_map_resolution,
-                ],
+                [exporter.draw_map_counts, exporter.draw_map_resolution,],
+                [exporter.can__draw_map_counts, exporter.can__draw_map_resolution,],
                 True,
             ),
             Option(
                 "fit tables",
-                [
-                    exporter.write_xfit_report,
-                    exporter.write_sfit_report,
-                ],
-                [
-                    exporter.can__write_xfit_report,
-                    exporter.can__write_sfit_report,
-                ],
+                [exporter.write_xfit_report, exporter.write_sfit_report,],
+                [exporter.can__write_xfit_report, exporter.can__write_sfit_report,],
                 True,
             ),
             Option(
@@ -833,11 +796,7 @@ def prompt_user_on_filepath(message, message_error, console):
     filepath = None
     text = message
     while filepath is None:
-        answer = prompt(
-            text,
-            console=console,
-            target_type=str,
-        )
+        answer = prompt(text, console=console, target_type=str,)
         if answer is None:
             return None
         if not answer:

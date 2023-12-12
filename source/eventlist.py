@@ -28,11 +28,7 @@ def _as_ucid_dataframe(dict_of_df):
 
 
 def preprocess(
-    data,
-    model,
-    filter_retrigger=20 * 10**-6,
-    filter_spurious=True,
-    console=None,
+    data, model, filter_retrigger=20 * 10 ** -6, filter_spurious=True, console=None,
 ):
     """
     This is in-place, meaning that will add a column to data.
@@ -115,11 +111,7 @@ def electrons_to_energy(data, scint_calibrations, couples):
 
 
 def make_electron_list(
-    data,
-    calibrated_sdds,
-    sfit_results,
-    scintillator_couples,
-    nthreads=1,
+    data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=1,
 ):
     columns = ["TIME", "ELECTRONS", "EVTYPE", "CHN", "QUADID"]
     types = ["float64", "float32", "U1", "int8", "U1"]
@@ -127,11 +119,7 @@ def make_electron_list(
     container = np.recarray(shape=0, dtype=[*dtypes.items()])
 
     disorganized_events = _get_calibrated_events(
-        data,
-        calibrated_sdds,
-        sfit_results,
-        scintillator_couples,
-        nthreads=nthreads,
+        data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=nthreads,
     )
 
     for quadrant in disorganized_events.keys():
@@ -174,14 +162,12 @@ def _get_calibrated_events(
             (data["QUADID"] == quadrant) & (data["CHN"].isin(channels))
         ]
         quadrant_data = _insert_electron_column(
-            quadrant_data,
-            calibrated_sdds[quadrant],
+            quadrant_data, calibrated_sdds[quadrant],
         )
 
         x_events = _extract_x_events(quadrant_data)
         gamma_events = _extract_gamma_events(
-            quadrant_data,
-            scintillator_couples[quadrant],
+            quadrant_data, scintillator_couples[quadrant],
         )
 
         return quadrant, (x_events, gamma_events)
@@ -291,10 +277,7 @@ def perchannel_counts(data, channels, key="all"):
             dict_.setdefault(quad, {})[ch] = counts
 
     out = {
-        k: pd.DataFrame(
-            dict_[k],
-            index=["counts"],
-        ).T.rename_axis("channel")
+        k: pd.DataFrame(dict_[k], index=["counts"],).T.rename_axis("channel")
         for k in dict_
     }
     return out

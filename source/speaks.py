@@ -22,13 +22,7 @@ PROMINENCE_WEIGHTING = False
 
 
 def find_epeaks(
-    bins,
-    counts,
-    energies,
-    lightout_guess,
-    smoothing=20,
-    prominence=30,
-    width=10,
+    bins, counts, energies, lightout_guess, smoothing=20, prominence=30, width=10,
 ):
     search_pars = {
         "prominence": prominence,
@@ -115,7 +109,7 @@ def _closest_peaks(guess, bins, peaks, peaks_infos):
     if PROMINENCE_WEIGHTING:
         assert "prominences" in peaks_infos.keys()
         weights = peaks_infos["prominences"]
-        argmin = np.argmin(peaks_dist_from_guess**2 / weights, axis=1)
+        argmin = np.argmin(peaks_dist_from_guess ** 2 / weights, axis=1)
     else:
         argmin = np.argmin(peaks_dist_from_guess, axis=1)
     best_peaks = peaks[argmin]
@@ -131,7 +125,7 @@ def _compute_louts(
         np.sqrt(
             (center_errs / gain) ** 2
             + (offset_err / gain) ** 2
-            + ((centers - offset) / gain**2) * (gain_err**2)
+            + ((centers - offset) / gain ** 2) * (gain_err ** 2)
         )
         / PHOTOEL_PER_KEV
         / radsources
