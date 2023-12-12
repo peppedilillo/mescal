@@ -226,6 +226,7 @@ def select(
     cursor_index: int = 0,
     return_index: bool = False,
     strict: bool = False,
+    legend: str = "(Confirm with enter, exit with esc)",
 ) -> Union[Selection, None]:
     """A prompt that allows selecting one option from a list of options
 
@@ -243,6 +244,7 @@ def select(
         return_index (bool, optional): If `True`, `select` will return the index of selected element in options. Defaults to `False`.
         strict (bool, optional): If empty `options` is provided and strict is `False`, None will be returned,
         if it's `True`, `ValueError` will be thrown. Defaults to False.
+        legend (str, optional): a legend for command choice.
 
     Raises:
         ValueError: Thrown if no `options` are povided and strict is `True`
@@ -282,7 +284,7 @@ def select(
                         for i, option in enumerate(options)
                     ]
                 )
-                + "\n\n(Confirm with [bold]enter[/bold])"  # noqa: W503
+                + f"\n\n{legend}"
             )
             _update_rendered(live, rendered)
             keypress = get_key()
@@ -322,7 +324,10 @@ def select_multiple(
     return_indices: bool = False,
     transient: bool = False,
     strict: bool = False,
-    legend: None | str = None,
+    legend: str =
+        "(mark=space,"
+        "confirm=enter," 
+        "cancel=esc)",
 ) -> Selections:
     """A prompt that allows selecting multiple options from a list of options
 
@@ -346,7 +351,7 @@ def select_multiple(
                                          of ticked elements in options. Defaults to `False`.
         strict (bool, optional): If empty `options` is provided and strict is `False`, None will be returned,
                                  if it's `True`, `ValueError` will be thrown. Defaults to False.
-        legend (str, None, optional): optional legend message. Default to a generic message.
+        legend (str, optional): optional legend message. Default to a generic message.
 
     Raises:
         KeyboardInterrupt: Raised when keyboard interrupt is encountered and Config.raise_on_interrupt is True
@@ -355,13 +360,6 @@ def select_multiple(
         Union[List[str], List[int]]: A list of selected values or indices of selected options
     """
     rendered = ""
-    if legend is None:
-        legend = (
-            "\n\n"
-            "(mark=[bold]space[/bold], "
-            "confirm=[bold]enter[/bold], "
-            "cancel=[bold]esc[/bold])"
-        )  # noqa: W503
     with _cursor_hidden(console), Live(
         rendered,
         console=console,
@@ -402,7 +400,7 @@ def select_multiple(
                         for i, option in enumerate(options)
                     ]
                 )
-                + legend
+                + f"\n\n{legend}"
             )
             if error_message:
                 rendered = f"{rendered}\n[red]Error:[/red] {error_message}"

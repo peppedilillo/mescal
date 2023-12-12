@@ -36,23 +36,23 @@ from source.plot import uncalibrated
 from source.radsources import supported_sources
 from source.utils import get_version
 
-parser = argparse.ArgumentParser()
+commandline_args_parser = argparse.ArgumentParser()
 
-parser.add_argument(
+commandline_args_parser.add_argument(
     "--filepath",
     default=None,
     help="input acquisition file in standard 0.5 fits format.\n"
     "prompt user by default.",
 )
 
-parser.add_argument(
+commandline_args_parser.add_argument(
     "--model",
     default=None,
     choices=supported_models(),
     help="hermes flight model to calibrate.\n" "prompt user by default.",
 )
 
-parser.add_argument(
+commandline_args_parser.add_argument(
     "--source",
     default=None,
     action="append",
@@ -60,25 +60,32 @@ parser.add_argument(
     help="radioactive sources used for calibration.\n" "prompt user by default.",
 )
 
-parser.add_argument(
+commandline_args_parser.add_argument(
     "--adc",
     choices=["LYRA-BE", "CAEN-DT5740"],
     default="LYRA-BE",
     help="select which adc configuration to use.\n" "defaults to LYRA-BE.",
 )
 
-parser.add_argument(
+commandline_args_parser.add_argument(
     "--fmt",
     default="xslx",
     choices=["xslx", "csv", "fits"],
     help="set output format for calibration tables.\n" "defaults to xslx.",
 )
 
-parser.add_argument(
+commandline_args_parser.add_argument(
+    "--filtersoff",
+    default=False,
+    action="store_true",
+    help="disables all filters.",
+)
+
+commandline_args_parser.add_argument(
     "--cache",
     default=False,
     action="store_true",
-    help="enables loading and saving from cache.\n",
+    help="enables loading and saving from cache.",
 )
 
 
@@ -130,7 +137,7 @@ class Mescal(Cmd):
     def __init__(self):
         console = ui.hello()
         super().__init__(console)
-        self.args = parser.parse_args()
+        self.commandline_args = commandline_args_parser.parse_args()
         self.filepath = self.get_filepath()
         self.model = self.get_model()
         self.radsources = self.get_radsources()
@@ -213,7 +220,7 @@ class Mescal(Cmd):
             format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
             "%(levelname)s: %(message)s",
         )
-        logging.info("user args = {}".format(self.args))
+        logging.info("user args = {}".format(self.commandline_args))
         logging.info("logging calibration for file {}".format(self.filepath))
         logging.info("selected model = {}".format(self.model))
         logging.info("selected sources = {}".format(", ".join(self.radsources)))
@@ -240,17 +247,18 @@ class Mescal(Cmd):
 
     def unpack_configuration(self):
         """
-        unpacks ini configuration file into a dict.
+        unpacks ini configuration file parameters into a dict.
         """
         config = configparser.ConfigParser()
         config.read("./source/config.ini")
         general = config["general"]
-        adcitems = config[self.args.adc]
+        adcitems = config[self.commandline_args.adc]
+
         out = {
-            "xpeaks_mincounts": general.getint("xpeaks_mincounts"),
-            "filter_retrigger": general.getfloat("filter_retrigger"),
-            "filter_spurious": general.getboolean("filter_spurious"),
+            "filter_retrigger": 0. if self.commandline_args.filtersoff else general.getfloat("filter_retrigger"),
+            "filter_spurious": False if self.commandline_args.filtersoff else general.getboolean("filter_spurious"),
             "binning": adcitems.getint("binning"),
+            "xpeaks_mincounts": general.getint("xpeaks_mincounts"),
             "gain_center": adcitems.getfloat("gain_center"),
             "gain_sigma": adcitems.getfloat("gain_sigma"),
             "offset_center": adcitems.getfloat("offset_center"),
@@ -270,7 +278,7 @@ class Mescal(Cmd):
         """
         self.console.log(":question_mark: Looking for data..")
         cached = paths.CACHEDIR().joinpath(self.filepath.name).with_suffix(".pkl.gz")
-        if cached.is_file() and self.args.cache:
+        if cached.is_file() and self.commandline_args.cache:
             out = pd.read_pickle(cached)
             self.console.log(
                 "[bold yellow]:yellow_circle: Data were loaded from cache."
@@ -278,7 +286,7 @@ class Mescal(Cmd):
         elif self.filepath.is_file():
             out = pandas_from_LV0d5(self.filepath)
             self.console.log(":open_book: Data loaded.")
-            if self.args.cache:
+            if self.commandline_args.cache:
                 # save data to cache
                 from pickle import DEFAULT_PROTOCOL
 
@@ -300,8 +308,8 @@ class Mescal(Cmd):
             "[yellow]Hint: You can drag & drop.[/yellow]\n"
             "[/italic]\n"
         )
-        if self.args.filepath is not None:
-            return Path(self.args.filepath)
+        if self.commandline_args.filepath is not None:
+            return Path(self.commandline_args.filepath)
         filepath = prompt_user_on_filepath(message, message_error, self.console)
         if filepath is None:
             self.console.print("So soon? Ciao :wave:!\n")
@@ -316,20 +324,22 @@ class Mescal(Cmd):
                 if d in self.filepath.name
             ])[-1]
             # fmt: on
-            model = None
-            while model is None:
-                model = select(
-                    options=supported_models(),
-                    cursor=":flying_saucer:",
-                    cursor_index=cursor_index,
-                    console=self.console,
-                    intro="[italic]For which model?[/italic]\n\n",
-                )
-            return model
+            answer = select(
+                options=supported_models(),
+                cursor=":flying_saucer:",
+                cursor_index=cursor_index,
+                console=self.console,
+                intro="[italic]For which model?[/italic]\n\n",
+                legend="(Confirm with [bold]enter[/bold], exit with esc)"
+            )
+            return answer
 
-        if self.args.model is not None:
-            return self.args.model
+        if self.commandline_args.model is not None:
+            return self.commandline_args.model
         model = prompt_user_on_model()
+        if model is None:
+            self.console.print("So soon? Ciao :wave:!\n")
+            exit()
         return model
 
     def get_radsources(self):
@@ -341,7 +351,6 @@ class Mescal(Cmd):
                 "[/italic]\n"
             )
             legend = (
-                "\n\n"
                 "(mark=[bold]space[/bold], "
                 "confirm=[bold]enter[/bold], "
                 "cancel=[bold]skip[/bold])"
@@ -357,8 +366,8 @@ class Mescal(Cmd):
             )
             return radsources
 
-        if self.args.source is not None:
-            return self.args.source
+        if self.commandline_args.source is not None:
+            return self.commandline_args.source
         radsources = prompt_user_on_radsources()
         return radsources
 
@@ -414,7 +423,7 @@ class Mescal(Cmd):
         return True
 
     def export_essentials(self):
-        exporter = self.calibration.get_exporter(self.filepath, self.args.fmt)
+        exporter = self.calibration.get_exporter(self.filepath, self.commandline_args.fmt)
 
         if exporter.can__write_sdd_calibration_report:
             exporter.write_sdd_calibration_report()
@@ -717,7 +726,7 @@ class Mescal(Cmd):
 
     def do_export(self, arg):
         """Prompts user on optional data product exports."""
-        exporter = self.calibration.get_exporter(self.filepath, self.args.fmt)
+        exporter = self.calibration.get_exporter(self.filepath, self.commandline_args.fmt)
 
         Option = namedtuple(
             "Option",
