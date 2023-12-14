@@ -284,19 +284,19 @@ def perchannel_counts(data, channels, key="all"):
 
 
 def spurious_filter(data):
-    mask = (data["NMULT"] < 2) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))
-    spirit = data[mask]
+    mask = (data["NMULT"] == 1) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))
+    cleaned_data = data[mask]
     waste = data[~mask]
-    return spirit, waste
+    return cleaned_data, waste
 
 
 def delay_filter(data, hold_time):
     unique_times = data.TIME.unique()
     bad_events = unique_times[np.where(np.diff(unique_times) < hold_time)[0] + 1]
     mask = ~(data["TIME"].isin(bad_events))
-    spirit = data[mask]
+    cleaned_data = data[mask]
     waste = data[~mask]
-    return spirit, waste
+    return cleaned_data, waste
 
 
 def infer_onchannels(data):
