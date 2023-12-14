@@ -176,7 +176,10 @@ class Mescal(Cmd):
             self.export_essentials()
 
         failed_tests = check_results(
-            self.calibration, self.data, self.waste, self.config,
+            self.calibration,
+            self.data,
+            self.waste,
+            self.config,
         )
         if failed_tests:
             ui.warning_rule(self.console)
@@ -508,7 +511,10 @@ class Mescal(Cmd):
             quad, ch, binning, neglect_outliers=False
         )
 
-        fig, ax = histogram(counts, bins[:-1],)
+        fig, ax = histogram(
+            counts,
+            bins[:-1],
+        )
         ax.set_title(
             "Count in time over channel {}{:02d}, binning {} s".format(
                 quad, ch, binning
@@ -592,7 +598,9 @@ class Mescal(Cmd):
         """Plots a map of counts per-channel."""
         counts = self.calibration.count()
         fig, ax = mapcounts(
-            counts, self.calibration.detector.map, title="Per-channel events count map",
+            counts,
+            self.calibration.detector.map,
+            title="Per-channel events count map",
         )
         plt.show(block=False)
         return False
@@ -624,7 +632,9 @@ class Mescal(Cmd):
         decays = self.calibration.xradsources()
         source = sorted(decays, key=lambda source: decays[source].energy)[0]
         fig, ax = mapenres(
-            source, self.calibration.resolution, self.calibration.detector.map,
+            source,
+            self.calibration.resolution,
+            self.calibration.detector.map,
         )
         plt.show(block=False)
         return False
@@ -723,7 +733,15 @@ class Mescal(Cmd):
             self.filepath, self.commandline_args.fmt
         )
 
-        Option = namedtuple("Option", ["label", "commands", "conditions", "ticked",],)
+        Option = namedtuple(
+            "Option",
+            [
+                "label",
+                "commands",
+                "conditions",
+                "ticked",
+            ],
+        )
         all_options = [
             Option(
                 "uncalibrated plots",
@@ -733,8 +751,14 @@ class Mescal(Cmd):
             ),
             Option(
                 "diagnostic plots",
-                [exporter.draw_xdiagnostic, exporter.draw_sdiagnostics,],
-                [exporter.can__draw_xdiagnostic, exporter.can__draw_sdiagnostics,],
+                [
+                    exporter.draw_xdiagnostic,
+                    exporter.draw_sdiagnostics,
+                ],
+                [
+                    exporter.can__draw_xdiagnostic,
+                    exporter.can__draw_sdiagnostics,
+                ],
                 True,
             ),
             Option(
@@ -745,20 +769,38 @@ class Mescal(Cmd):
             ),
             Option(
                 "spectra plots per channel",
-                [exporter.draw_sspectra, exporter.draw_xspectra,],
-                [exporter.can__draw_sspectra, exporter.can__draw_xspectra,],
+                [
+                    exporter.draw_sspectra,
+                    exporter.draw_xspectra,
+                ],
+                [
+                    exporter.can__draw_sspectra,
+                    exporter.can__draw_xspectra,
+                ],
                 False,
             ),
             Option(
                 "maps",
-                [exporter.draw_map_counts, exporter.draw_map_resolution,],
-                [exporter.can__draw_map_counts, exporter.can__draw_map_resolution,],
+                [
+                    exporter.draw_map_counts,
+                    exporter.draw_map_resolution,
+                ],
+                [
+                    exporter.can__draw_map_counts,
+                    exporter.can__draw_map_resolution,
+                ],
                 True,
             ),
             Option(
                 "fit tables",
-                [exporter.write_xfit_report, exporter.write_sfit_report,],
-                [exporter.can__write_xfit_report, exporter.can__write_sfit_report,],
+                [
+                    exporter.write_xfit_report,
+                    exporter.write_sfit_report,
+                ],
+                [
+                    exporter.can__write_xfit_report,
+                    exporter.can__write_sfit_report,
+                ],
                 True,
             ),
             Option(
@@ -796,7 +838,11 @@ def prompt_user_on_filepath(message, message_error, console):
     filepath = None
     text = message
     while filepath is None:
-        answer = prompt(text, console=console, target_type=str,)
+        answer = prompt(
+            text,
+            console=console,
+            target_type=str,
+        )
         if answer is None:
             return None
         if not answer:

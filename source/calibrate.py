@@ -66,11 +66,15 @@ def as_peaks_dataframe(f):
         nested_dict, radsources = f(*args)
         quadrants = nested_dict.keys()
         index = pd.MultiIndex.from_product(
-            (radsources.keys(), PEAKS_PARAMS), names=["source", "parameter"],
+            (radsources.keys(), PEAKS_PARAMS),
+            names=["source", "parameter"],
         )
 
         dict_of_dfs = {
-            q: pd.DataFrame(nested_dict[q], index=index,).T.rename_axis("channel")
+            q: pd.DataFrame(
+                nested_dict[q],
+                index=index,
+            ).T.rename_axis("channel")
             for q in quadrants
         }
         return dict_of_dfs
@@ -83,11 +87,15 @@ def as_fit_dataframe(f):
         nested_dict, radsources = f(*args)
         quadrants = nested_dict.keys()
         index = pd.MultiIndex.from_product(
-            (radsources.keys(), FIT_PARAMS), names=["source", "parameter"],
+            (radsources.keys(), FIT_PARAMS),
+            names=["source", "parameter"],
         )
 
         dict_of_dfs = {
-            q: pd.DataFrame(nested_dict[q], index=index,).T.rename_axis("channel")
+            q: pd.DataFrame(
+                nested_dict[q],
+                index=index,
+            ).T.rename_axis("channel")
             for q in quadrants
         }
         return dict_of_dfs
@@ -100,11 +108,15 @@ def as_enres_dataframe(f):
         nested_dict, radsources = f(*args)
         quadrants = nested_dict.keys()
         index = pd.MultiIndex.from_product(
-            (radsources.keys(), RES_PARAMS), names=["source", "parameters"],
+            (radsources.keys(), RES_PARAMS),
+            names=["source", "parameters"],
         )
 
         dict_of_dfs = {
-            q: pd.DataFrame(nested_dict[q], index=index,).T.rename_axis("channel")
+            q: pd.DataFrame(
+                nested_dict[q],
+                index=index,
+            ).T.rename_axis("channel")
             for q in quadrants
         }
         return dict_of_dfs
@@ -118,7 +130,10 @@ def as_cal_dataframe(f):
         quadrants = nested_dict.keys()
 
         dict_of_dfs = {
-            q: pd.DataFrame(nested_dict[q], index=CAL_PARAMS,).T.rename_axis("channel")
+            q: pd.DataFrame(
+                nested_dict[q],
+                index=CAL_PARAMS,
+            ).T.rename_axis("channel")
             for q in quadrants
         }
         return dict_of_dfs
@@ -132,7 +147,10 @@ def as_slo_dataframe(f):
         quadrants = nested_dict.keys()
 
         dict_of_dfs = {
-            q: pd.DataFrame(nested_dict[q], index=LO_PARAMS,).T.rename_axis("channel")
+            q: pd.DataFrame(
+                nested_dict[q],
+                index=LO_PARAMS,
+            ).T.rename_axis("channel")
             for q in quadrants
         }
         return dict_of_dfs
@@ -198,7 +216,12 @@ def cached_xhist():
     def xhistogram(data, bins, nthreads=1):
         value = "ADC"
         data = data[data["EVTYPE"] == "X"]
-        histograms = _histogram(value, data, bins, nthreads=nthreads,)
+        histograms = _histogram(
+            value,
+            data,
+            bins,
+            nthreads=nthreads,
+        )
         return histograms
 
     def helper(*args, **kwargs):
@@ -219,7 +242,12 @@ def cached_shist():
     def shistogram(data, bins, nthreads=1):
         value = "ADC"
         data = data[data["EVTYPE"] == "S"]
-        histograms = _histogram(value, data, bins, nthreads=nthreads,)
+        histograms = _histogram(
+            value,
+            data,
+            bins,
+            nthreads=nthreads,
+        )
         return histograms
 
     def helper(*args, **kwargs):
@@ -237,13 +265,23 @@ shistogram = cached_shist()
 def ehistogram(data, bins, nthreads=1):
     value = "ELECTRONS"
     data = data[data["EVTYPE"] == "S"]
-    histograms = _histogram(value, data, bins, nthreads=nthreads,)
+    histograms = _histogram(
+        value,
+        data,
+        bins,
+        nthreads=nthreads,
+    )
     return histograms
 
 
 class Calibrate:
     def __init__(
-        self, model, radsources, configuration, console=None, nthreads=1,
+        self,
+        model,
+        radsources,
+        configuration,
+        console=None,
+        nthreads=1,
     ):
         self.radsources = radsources_dicts(radsources)
         self.detector = Detector(model)
@@ -287,7 +325,12 @@ class Calibrate:
         return self._counts[key]
 
     def get_exporter(self, filename, tabformat):
-        exporter = Exporter(self, filename, tabformat, nthreads=self.nthreads,)
+        exporter = Exporter(
+            self,
+            filename,
+            tabformat,
+            nthreads=self.nthreads,
+        )
         return exporter
 
     def timehist(self, quad, ch, binning, neglect_outliers=False):
@@ -378,7 +421,9 @@ class Calibrate:
 
         try:
             eventlist = electrons_to_energy(
-                electron_evlist, self.scintillator_calibration, self.detector.couples,
+                electron_evlist,
+                self.scintillator_calibration,
+                self.detector.couples,
             )
         except err.CalibratedEventlistError:
             logging.warning("Event list creation failed.")
@@ -465,7 +510,10 @@ class Calibrate:
 
                 try:
                     intervals, fit_results = self._fit_gaussians_to_peaks(
-                        bins, counts, limits, constraints,
+                        bins,
+                        counts,
+                        limits,
+                        constraints,
                     )
                 except err.FailedFitError:
                     message = err.warn_failed_peak_fit(quad, ch)
@@ -498,7 +546,12 @@ class Calibrate:
 
                 try:
                     limits = find_speaks(
-                        bins, counts, energies, gain, offset, lightout_guess,
+                        bins,
+                        counts,
+                        energies,
+                        gain,
+                        offset,
+                        lightout_guess,
                     )
                 except err.DetectPeakError:
                     companion = self.detector.companion(quad, ch)
@@ -534,7 +587,10 @@ class Calibrate:
 
                 try:
                     intervals, fit_results = self._fit_gaussians_to_peaks(
-                        bins, counts, limits, constraints,
+                        bins,
+                        counts,
+                        limits,
+                        constraints,
                     )
                 except err.FailedFitError:
                     message = err.warn_failed_peak_fit(quad, ch)
@@ -570,7 +626,12 @@ class Calibrate:
                 counts = self.ehistograms.counts[quad][scint]
 
                 try:
-                    limits = find_epeaks(bins, counts, energies, lightout_guess,)
+                    limits = find_epeaks(
+                        bins,
+                        counts,
+                        energies,
+                        lightout_guess,
+                    )
                 except err.DetectPeakError:
                     message = err.warn_failed_peak_detection(quad, scint)
                     logging.warning(message)
@@ -607,7 +668,10 @@ class Calibrate:
 
                 try:
                     intervals, fit_results = self._fit_gaussians_to_peaks(
-                        bins, counts, limits, constraints,
+                        bins,
+                        counts,
+                        limits,
+                        constraints,
                     )
                 except err.FailedFitError:
                     message = err.warn_failed_peak_fit(quad, scint)
@@ -626,7 +690,12 @@ class Calibrate:
         lmod = LinearModel()
         pars = lmod.guess(centers, x=energies)
         try:
-            resultlin = lmod.fit(centers, pars, x=energies, weights=weights,)
+            resultlin = lmod.fit(
+                centers,
+                pars,
+                x=energies,
+                weights=weights,
+            )
         except ValueError:
             raise err.FailedFitError("linear fitter error")
 
@@ -656,7 +725,9 @@ class Calibrate:
 
                 try:
                     cal_results = self._calibrate_chn(
-                        centers, energies, weights=1 / center_errs ** 2,
+                        centers,
+                        energies,
+                        weights=1 / center_errs**2,
                     )
                 except err.FailedFitError:
                     message = err.warn_failed_linearity_fit(quad, ch)
@@ -710,12 +781,16 @@ class Calibrate:
 
     @staticmethod
     def _electron_error(
-        adc, gain, gain_err, offset, offset_err,
+        adc,
+        gain,
+        gain_err,
+        offset,
+        offset_err,
     ):
         error = (
             np.sqrt(
                 +((offset_err / gain) ** 2)
-                + ((adc - offset) / gain ** 2) * (gain_err ** 2)
+                + ((adc - offset) / gain**2) * (gain_err**2)
             )
             / PHOTOEL_PER_KEV
         )
@@ -736,7 +811,7 @@ class Calibrate:
         centers_comp = self.sfit[quad].loc[companion][:, "center"].values
         electron_err_cell = self._electron_error(centers_cell, *cell_cal)
         electron_err_companion = self._electron_error(centers_comp, *comp_cal)
-        electron_err_sum = np.sqrt(electron_err_cell ** 2 + electron_err_companion ** 2)
+        electron_err_sum = np.sqrt(electron_err_cell**2 + electron_err_companion**2)
         fit_error = self.efit[quad].loc[cell][:, "center_err"].values
         error = (electron_err_sum + fit_error) / energies
         return error
@@ -744,7 +819,7 @@ class Calibrate:
     @staticmethod
     def _deal_with_multiple_gamma_decays(light_outs, light_outs_errs):
         mean_lout = light_outs.mean()
-        mean_lout_err = np.sqrt(np.sum(light_outs_errs ** 2)) / len(light_outs_errs)
+        mean_lout_err = np.sqrt(np.sum(light_outs_errs**2)) / len(light_outs_errs)
         return mean_lout, mean_lout_err
 
     @as_slo_dataframe
@@ -810,7 +885,12 @@ class Calibrate:
         mod.set_param_hint("height", value=max(y_fit))
         mod.set_param_hint("sigma", max=stop - start)
         pars = mod.guess(y_fit, x=x_fit)
-        result = mod.fit(y_fit, pars, x=x_fit, weights=1 / errors ** 2,)
+        result = mod.fit(
+            y_fit,
+            pars,
+            x=x_fit,
+            weights=1 / errors**2,
+        )
 
         x_fine = np.linspace(x[0], x[-1], len(x) * 100)
         fitting_curve = mod.eval(
@@ -875,7 +955,13 @@ def _effectivelo_to_scintillatorslo(lightoutput, detector):
 
 class ImportedCalibration(Calibrate):
     def __init__(
-        self, model, configuration, *ignore, sdd_calibration, lightoutput, **kwargs,
+        self,
+        model,
+        configuration,
+        *ignore,
+        sdd_calibration,
+        lightoutput,
+        **kwargs,
     ):
         if ignore:
             raise TypeError("wrong arguments. use keywords for reports.")
@@ -904,7 +990,9 @@ class ImportedCalibration(Calibrate):
             self.nthreads,
         )
         eventlist = electrons_to_energy(
-            electron_evlist, self.scintillator_calibration, self.detector.couples,
+            electron_evlist,
+            self.scintillator_calibration,
+            self.detector.couples,
         )
         self._print("[bold green]:videocassette: Loaded calibration.")
         return eventlist

@@ -123,7 +123,6 @@ if platform.startswith(("linux", "darwin", "freebsd")):
         OPTION_ENTER = (27, 13)
         CTRL_ENTER = OPTION_ENTER
 
-
 elif platform in ("win32", "cygwin"):
 
     class Keys(_PlatformIndependentKeys):
@@ -145,7 +144,6 @@ elif platform in ("win32", "cygwin"):
 
         CTRL_ENTER = (10,)
         OPTION_ENTER = CTRL_ENTER
-
 
 else:
     raise NotImplementedError(f"Platform `{platform}` is not supported")

@@ -179,7 +179,9 @@ def prompt(
                 cursor_index += 1
 
 
-def press_enter(console: Console,) -> Union[bool, None]:
+def press_enter(
+    console: Console,
+) -> Union[bool, None]:
     """Press enter prompt
 
     Args:
@@ -196,7 +198,10 @@ def press_enter(console: Console,) -> Union[bool, None]:
         rendered, console=console, auto_refresh=False, transient=True
     ) as live:
         while True:
-            rendered = Text("\npress ENTER to start", justify="center",)
+            rendered = Text(
+                "\npress ENTER to start",
+                justify="center",
+            )
             rendered.stylize("bold blink magenta", 7, 12)
             _update_rendered(live, rendered)
             keypress = get_key()
@@ -353,7 +358,10 @@ def select_multiple(
     """
     rendered = ""
     with _cursor_hidden(console), Live(
-        rendered, console=console, auto_refresh=False, transient=transient,
+        rendered,
+        console=console,
+        auto_refresh=False,
+        transient=transient,
     ) as live:
         if not options:
             if strict:
