@@ -75,7 +75,10 @@ commandline_args_parser.add_argument(
 )
 
 commandline_args_parser.add_argument(
-    "--filtersoff", default=False, action="store_true", help="disables all filters.",
+    "--nofilters",
+    default=False,
+    action="store_true",
+    help="disables all filters.",
 )
 
 commandline_args_parser.add_argument(
@@ -250,10 +253,10 @@ class Mescal(Cmd):
 
         out = {
             "filter_retrigger": 0.0
-            if self.commandline_args.filtersoff
+            if self.commandline_args.nofilters
             else general.getfloat("filter_retrigger"),
             "filter_spurious": False
-            if self.commandline_args.filtersoff
+            if self.commandline_args.nofilters
             else general.getboolean("filter_spurious"),
             "binning": adcitems.getint("binning"),
             "xpeaks_mincounts": general.getint("xpeaks_mincounts"),
