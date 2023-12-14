@@ -10,32 +10,9 @@ from pathlib import Path
 prjpath = Path(__file__).parent.parent
 
 VERPATH = prjpath.joinpath("version.txt")
+CONFIGPATH = prjpath.joinpah("config.ini")
 ASSETDIR = prjpath.joinpath("assets")
 LOGOPATH = ASSETDIR.joinpath("logo.txt")
-
-DEFCALDIR = ASSETDIR.joinpath("default_calibrations")
-
-FM1CALDIR = DEFCALDIR.joinpath("fm1")
-FM1Tm20DIR = FM1CALDIR.joinpath("20220616_fm1_55Fe109Cd137Cs_m20deg_thr105_LV0d5")
-FM1Tm10DIR = FM1CALDIR.joinpath("20220623_fm1_55Fe109Cd137Cs_m10deg_thr105_LV0d5")
-FM1Tp00DIR = FM1CALDIR.joinpath("20220622_fm1_55Fe109Cd137Cs_0deg_thr105_LV0d5")
-FM1Tp20DIR = FM1CALDIR.joinpath("20220622_fm1_55Fe109Cd137Cs_20deg_thr105_LV0d5")
-FM1Tm20CAL = FM1Tm20DIR.joinpath("report_cal.xlsx")
-FM1Tm10CAL = FM1Tm10DIR.joinpath("report_cal.xlsx")
-FM1Tp00CAL = FM1Tp00DIR.joinpath("report_cal.xlsx")
-FM1Tp20CAL = FM1Tp20DIR.joinpath("report_cal.xlsx")
-
-PFMCALDIR = DEFCALDIR.joinpath("pfm")
-PFMTp20DIR = PFMCALDIR.joinpath("20220804_pfm_55Fe109Cd137Cs_20deg_thr105_LV0d5")
-PFMTp10DIR = PFMCALDIR.joinpath("20220805_pfm_55Fe109Cd137Cs_10deg_thr105_LV0d5")
-PFMTp00DIR = PFMCALDIR.joinpath("20220805_pfm_55Fe109Cd137Cs_00deg_thr105_LV0d5")
-PFMTm10DIR = PFMCALDIR.joinpath("20220808_pfm_55Fe109Cd137Cs_m10deg_105thr_LV0d5")
-PFMTm20DIR = PFMCALDIR.joinpath("20220808_pfm_55Fe109Cd137Cs_m20deg_105thr_LV0d5")
-PFMTp20CAL = PFMTp20DIR.joinpath("report_cal.xlsx")
-PFMTp10CAL = PFMTp10DIR.joinpath("report_cal.xlsx")
-PFMTp00CAL = PFMTp00DIR.joinpath("report_cal.xlsx")
-PFMTm10CAL = PFMTm10DIR.joinpath("report_cal.xlsx")
-PFMTm20CAL = PFMTm20DIR.joinpath("report_cal.xlsx")
 
 
 def create_if_not_exists(func):

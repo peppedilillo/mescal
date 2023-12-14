@@ -906,5 +906,5 @@ class ImportedCalibration(Calibrate):
         eventlist = electrons_to_energy(
             electron_evlist, self.scintillator_calibration, self.detector.couples,
         )
-        self._print_calibstatus()
+        self._print("[bold green]:videocassette: Loaded calibration.")
         return eventlist

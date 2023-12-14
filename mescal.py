@@ -247,7 +247,7 @@ class Mescal(Cmd):
         unpacks ini configuration file parameters into a dict.
         """
         config = configparser.ConfigParser()
-        config.read("./source/config.ini")
+        config.read(paths.CONFIGPATH)
         general = config["general"]
         adcitems = config[self.commandline_args.adc]
 
