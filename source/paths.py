@@ -10,7 +10,7 @@ from pathlib import Path
 prjpath = Path(__file__).parent.parent
 
 VERPATH = prjpath.joinpath("version.txt")
-CONFIGPATH = prjpath.joinpah("config.ini")
+CONFIGPATH = prjpath.joinpath("config.ini")
 ASSETDIR = prjpath.joinpath("assets")
 LOGOPATH = ASSETDIR.joinpath("logo.txt")
 
