@@ -159,7 +159,6 @@ class Mescal(Cmd):
                 filter_retrigger=self.config["filter_retrigger"],
                 console=self.console,
             )
-
         with console.status("Analyzing data.."):
             calibration = Calibrate(
                 self.model,
@@ -606,7 +605,7 @@ class Mescal(Cmd):
         return False
 
     def can_mapbad(self, arg):
-        if self.waste is not None:
+        if self.waste is not None and not self.waste.empty:
             return True
         return False
 

@@ -40,7 +40,6 @@ def preprocess(
     couples = get_couples(model)
     data = add_evtype_tag(data, couples)
     waste = pd.DataFrame()
-
     events_pre_filter = len(data)
     if console:
         console.log(":white_check_mark: Tagged X and S events.")
