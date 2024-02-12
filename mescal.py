@@ -499,29 +499,34 @@ class Mescal(Cmd):
 
     def do_timehist(self, arg):
         """Plots a histogram of counts in time for selected channel."""
-        parsed_arg = parse_chns(arg)
-        if parsed_arg is INVALID_ENTRY:
-            self.console.print(self.invalid_channel_message)
-            return False
 
-        quad, ch = parsed_arg
-        binning = 1.0
-        counts, bins = self.calibration.timehist(
-            quad, ch, binning, neglect_outliers=False
-        )
+        def plot_lightcurve_all_channels(b):
+            counts, bins = self.calibration.timehist_all(b)
 
-        fig, ax = histogram(
-            counts,
-            bins[:-1],
-        )
-        ax.set_title(
-            "Count in time over channel {}{:02d}, binning {} s".format(
-                quad, ch, binning
-            )
-        )
-        ax.set_xlabel("Time")
-        ax.set_ylabel("Counts")
-        plt.show(block=False)
+            fig, ax = histogram(counts,bins[:-1],)
+            ax.set_title(f"Lightcurve for all channels, binning {b} s")
+            ax.set_xlabel("Time")
+            ax.set_ylabel("Counts")
+            plt.show(block=False)
+
+        def plot_lightcurve_single_channel(quad, ch, b):
+            counts, bins = self.calibration.timehist(quad, ch, b)
+            fig, ax = histogram(counts, bins[:-1])
+            ax.set_title(f"Lightcurve for {quad}{ch:02d}, binning {b} s")
+            ax.set_xlabel("Time")
+            ax.set_ylabel("Counts")
+            plt.show(block=False)
+
+        binning = 0.1
+        if arg == "all":
+            plot_lightcurve_all_channels(binning)
+        else:
+            parsed_arg = parse_chns(arg)
+            if parsed_arg is INVALID_ENTRY:
+                self.console.print(self.invalid_channel_message)
+                return False
+            quad, ch = parsed_arg
+            plot_lightcurve_single_channel(quad, ch, binning)
         return False
 
     def can_retry(self, arg):
