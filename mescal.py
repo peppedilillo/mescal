@@ -324,7 +324,7 @@ class Mescal(Cmd):
             # fmt: off
             cursor_index = ([0] + [
                 i for i, d in enumerate(supported_models())
-                if d in self.filepath.name
+                if d in self.filepath.name.lower()
             ])[-1]
             # fmt: on
             answer = select(
@@ -459,6 +459,15 @@ class Mescal(Cmd):
         """
         self.console.print("Ciao! :wave:\n")
         return True
+
+    def can_exit(self, arg):
+        return self.can_quit('')
+
+    def do_exit(self, arg):
+        """
+        An alias for quit.
+        """
+        return self.do_quit('')
 
     def can_plotcal(self, arg):
         if self.calibration.eventlist is not None:
@@ -872,7 +881,7 @@ def parse_chns(arg):
         and (arg[1:3] in chn_strings)
         and len(stripped_arg) == 3
     ):
-        quad = arg[0]
+        quad = arg[0].upper()
         ch = int(arg[1:3])
         return quad, ch
     else:
