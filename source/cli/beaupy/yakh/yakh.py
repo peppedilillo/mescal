@@ -124,7 +124,6 @@ try:
         return Key(ch_str, ch_ord, ch_str.isprintable() or ch_ord in [(13,), (27, 13)])
 
 except ImportError:
-
     import msvcrt
 
     def get_key() -> Key:

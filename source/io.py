@@ -10,10 +10,10 @@ import numpy as np
 import pandas as pd
 
 from source import errors as err
-from source.eventlist import timehist_quadch
 from source import paths
 from source import plot
 from source.constants import PHOTOEL_PER_KEV
+from source.eventlist import timehist_quadch
 
 
 class Exporter:
@@ -447,7 +447,8 @@ class Exporter:
         nthreads = self.nthreads
         data = self.calibration.data
         return Parallel(n_jobs=nthreads)(
-            delayed(helper)(quad, data[data["QUADID"] == quad]) for quad in self.calibration.detector.quadrant_keys
+            delayed(helper)(quad, data[data["QUADID"] == quad])
+            for quad in self.calibration.detector.quadrant_keys
         )
 
 

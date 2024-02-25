@@ -463,13 +463,13 @@ class Mescal(Cmd):
         return True
 
     def can_exit(self, arg):
-        return self.can_quit('')
+        return self.can_quit("")
 
     def do_exit(self, arg):
         """
         An alias for quit.
         """
-        return self.do_quit('')
+        return self.do_quit("")
 
     def can_plotcal(self, arg):
         if self.calibration.eventlist is not None:
@@ -514,7 +514,10 @@ class Mescal(Cmd):
         def plot_lightcurve_all_channels(b):
             counts, bins = timehist_all(self.calibration.data, b)
 
-            fig, ax = histogram(counts,bins[:-1],)
+            fig, ax = histogram(
+                counts,
+                bins[:-1],
+            )
             ax.set_title(f"Lightcurve for all channels, binning {b} s")
             ax.set_xlabel("Time")
             ax.set_ylabel("Counts")

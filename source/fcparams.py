@@ -2393,7 +2393,6 @@ def plotMap(
     zscale="linear",
     levels=None,
 ):
-
     if lo is None:
         lo = np.nanmin(ZZ)
     if hi is None:

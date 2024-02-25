@@ -333,7 +333,9 @@ def timehist_quadch(data, quad, ch, binning, neglect_outliers=True):
     else:
         min_, max_ = data["TIME"].min(), data["TIME"].max()
     mask = (data["QUADID"] == quad) & (data["CHN"] == ch)
-    counts, bins = np.histogram(data[mask]["TIME"].values, range=(min_, max_), bins=int((max_-min_)/binning))
+    counts, bins = np.histogram(
+        data[mask]["TIME"].values, range=(min_, max_), bins=int((max_ - min_) / binning)
+    )
     return counts, bins
 
 
@@ -346,5 +348,7 @@ def timehist_all(data, binning, neglect_outliers=False):
     else:
         min_, max_ = data["TIME"].min(), data["TIME"].max()
     times = data["TIME"].values
-    counts, bins = np.histogram(times, range=(min_, max_), bins=int((max_-min_)/binning))
+    counts, bins = np.histogram(
+        times, range=(min_, max_), bins=int((max_ - min_) / binning)
+    )
     return counts, bins

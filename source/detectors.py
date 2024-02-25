@@ -202,7 +202,9 @@ class Detector:
         self.label = model
         self.map = get_map(model)
         self.couples = get_couples(model)
-        self.quadrant_keys = [*filter(lambda q: set(self.map[q]) != {UNBOND}, [*self.map.keys()])]
+        self.quadrant_keys = [
+            *filter(lambda q: set(self.map[q]) != {UNBOND}, [*self.map.keys()])
+        ]
 
     def scintids(self):
         """

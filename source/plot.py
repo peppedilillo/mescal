@@ -294,6 +294,7 @@ def histogram(counts, bins, **kwargs):
     ax.set_ylim(bottom=0)
     return fig, ax
 
+
 # mapplot utilities
 
 _quadtext = np.array(
