@@ -436,12 +436,7 @@ class Exporter:
 
         def helper(quad, data, neglect_outliers):
             for ch in range(32):
-                counts, bins = timehist_ch(
-                    data,
-                    ch,
-                    binning,
-                    neglect_outliers
-                )
+                counts, bins = timehist_ch(data, ch, binning, neglect_outliers)
                 fig, ax = plot.histogram(counts, bins[:-1])
                 ax.set_title(f"Lightcurve for {quad}{ch:02d}, binning {binning} s")
                 ax.set_xlabel("Time")
@@ -463,6 +458,7 @@ class Exporter:
 
     def draw_timehists(self):
         return self._draw_timehists(False)
+
 
 def get_writer(fmt):
     if fmt == "xslx":

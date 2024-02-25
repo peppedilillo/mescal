@@ -812,11 +812,13 @@ class Mescal(Cmd):
                 "timehist per channel",
                 [
                     exporter.draw_timehists_neglect_outliers
-                    if "time_outliers" in self.failed_tests else exporter.draw_timehists,
+                    if "time_outliers" in self.failed_tests
+                    else exporter.draw_timehists,
                 ],
                 [
                     exporter.can__draw_timehists_neglect_outliers
-                    if "time_outliers" in self.failed_tests else exporter.can__draw_timehists,
+                    if "time_outliers" in self.failed_tests
+                    else exporter.can__draw_timehists,
                 ],
                 False,
             ),

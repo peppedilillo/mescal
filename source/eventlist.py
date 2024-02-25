@@ -325,12 +325,12 @@ def infer_onchannels(data):
 
 
 def timehist_mask_quadrant(data, quad):
-    mask = (data["QUADID"] == quad)
+    mask = data["QUADID"] == quad
     return data[mask]
 
 
 def timehist_mask_channel(data, ch):
-    mask = (data["CHN"] == ch)
+    mask = data["CHN"] == ch
     return data[mask]
 
 
@@ -377,8 +377,10 @@ def timehist_quadch(data, quad, ch, binning, neglect_outliers):
             ch,
         ),
         binning,
-        neglect_outliers,)
+        neglect_outliers,
+    )
     return counts, bins
+
 
 def timehist_all(data, binning, neglect_outliers):
     if len(data) <= 0:
@@ -393,4 +395,3 @@ def timehist_all(data, binning, neglect_outliers):
         times, range=(min_, max_), bins=int((max_ - min_) / binning)
     )
     return counts, bins
-
