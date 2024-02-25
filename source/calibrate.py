@@ -333,35 +333,6 @@ class Calibrate:
         )
         return exporter
 
-    def timehist(self, quad, ch, binning, neglect_outliers=False):
-        if len(self.data) <= 0:
-            raise err.BadDataError("Empty data.")
-
-        mask = (self.data["QUADID"] == quad) & (self.data["CHN"] == ch)
-        if neglect_outliers:
-            min_, max_ = np.quantile(self.data["TIME"], [0.01, 0.99])
-        else:
-            min_, max_ = self.data["TIME"].min(), self.data["TIME"].max()
-        times = self.data[mask]["TIME"].values
-        counts, bins = np.histogram(
-            times, bins=np.arange(min_, max_ + binning, binning)
-        )
-        return counts, bins
-
-    def timehist_all(self, binning, neglect_outliers=False):
-        if len(self.data) <= 0:
-            raise err.BadDataError("Empty data.")
-
-        if neglect_outliers:
-            min_, max_ = np.quantile(self.data["TIME"], [0.01, 0.99])
-        else:
-            min_, max_ = self.data["TIME"].min(), self.data["TIME"].max()
-        times = self.data["TIME"].values
-        counts, bins = np.histogram(
-            times, bins=np.arange(min_, max_ + binning, binning)
-        )
-        return counts, bins
-
     def xradsources(self):
         xradsources, _ = self.radsources
         return xradsources

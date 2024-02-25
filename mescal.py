@@ -25,6 +25,8 @@ from source.detectors import supported_models
 import source.errors as err
 from source.eventlist import perchannel_counts
 from source.eventlist import preprocess
+from source.eventlist import timehist_all
+from source.eventlist import timehist_quadch
 from source.io import pandas_from_LV0d5
 from source.io import read_lightout_report
 from source.io import read_sdd_calibration_report
@@ -510,7 +512,7 @@ class Mescal(Cmd):
         """Plots a histogram of counts in time for selected channel."""
 
         def plot_lightcurve_all_channels(b):
-            counts, bins = self.calibration.timehist_all(b)
+            counts, bins = timehist_all(self.calibration.data, b)
 
             fig, ax = histogram(counts,bins[:-1],)
             ax.set_title(f"Lightcurve for all channels, binning {b} s")
@@ -519,7 +521,7 @@ class Mescal(Cmd):
             plt.show(block=False)
 
         def plot_lightcurve_single_channel(quad, ch, b):
-            counts, bins = self.calibration.timehist(quad, ch, b)
+            counts, bins = timehist_quadch(self.calibration.data, quad, ch, b)
             fig, ax = histogram(counts, bins[:-1])
             ax.set_title(f"Lightcurve for {quad}{ch:02d}, binning {b} s")
             ax.set_xlabel("Time")
@@ -793,6 +795,16 @@ class Mescal(Cmd):
                 False,
             ),
             Option(
+                "timehist per channel",
+                [
+                    exporter.draw_timehists,
+                ],
+                [
+                    exporter.can__draw_timehists,
+                ],
+                False,
+            ),
+            Option(
                 "maps",
                 [
                     exporter.draw_map_counts,
@@ -860,8 +872,9 @@ def prompt_user_on_filepath(message, message_error, console):
             return None
         if not answer:
             continue
-        answer = answer.strip()
-        if not Path(answer).exists():
+        # removes whites spaces at end and beginning, and white space escape code
+        answer = Path(*map(lambda x: x.replace("\\ ", " "), Path(answer.strip()).parts))
+        if not answer.exists():
             text = message_error
         else:
             filepath = Path(answer)

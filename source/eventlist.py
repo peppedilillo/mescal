@@ -322,3 +322,29 @@ def infer_onchannels(data):
         if onchs.any():
             out[quad] = onchs.tolist()
     return out
+
+
+def timehist_quadch(data, quad, ch, binning, neglect_outliers=True):
+    if len(data) <= 0:
+        raise err.BadDataError("Empty data.")
+
+    if neglect_outliers:
+        min_, max_ = np.quantile(data["TIME"], [0.01, 0.99])
+    else:
+        min_, max_ = data["TIME"].min(), data["TIME"].max()
+    mask = (data["QUADID"] == quad) & (data["CHN"] == ch)
+    counts, bins = np.histogram(data[mask]["TIME"].values, range=(min_, max_), bins=int((max_-min_)/binning))
+    return counts, bins
+
+
+def timehist_all(data, binning, neglect_outliers=False):
+    if len(data) <= 0:
+        raise err.BadDataError("Empty data.")
+
+    if neglect_outliers:
+        min_, max_ = np.quantile(data["TIME"], [0.01, 0.99])
+    else:
+        min_, max_ = data["TIME"].min(), data["TIME"].max()
+    times = data["TIME"].values
+    counts, bins = np.histogram(times, range=(min_, max_), bins=int((max_-min_)/binning))
+    return counts, bins

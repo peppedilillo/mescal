@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from source import errors as err
+from source.eventlist import timehist_quadch
 from source import paths
 from source import plot
 from source.constants import PHOTOEL_PER_KEV
@@ -32,6 +33,8 @@ class Exporter:
         self.can__draw_rawspectra = True
 
         self.can__draw_map_counts = True
+
+        self.can__draw_timehists = True
 
         self.can__write_sdd_calibration_report = False
         if self.calibration.sdd_calibration:
@@ -391,12 +394,11 @@ class Exporter:
                 fig.savefig(path(quad, ch))
                 plt.close(fig)
 
-        paths.LINPLOT(self.filepath)
+        path = paths.LINPLOT(self.filepath)
         res_cal = self.calibration.sdd_calibration
         res_fit = self.calibration.xfit
         radsources = self.calibration.xradsources()
         nthreads = self.nthreads
-        path = paths.LINPLOT(self.filepath)
         return Parallel(n_jobs=nthreads)(
             delayed(helper)(quad) for quad in res_cal.keys()
         )
@@ -426,6 +428,27 @@ class Exporter:
         fig.savefig(path)
         plt.close(fig)
         return True
+
+    def draw_timehists(self):
+        assert self.can__draw_timehists
+
+        def helper(quad, data):
+            for ch in range(32):
+                counts, bins = timehist_quadch(data, quad, ch, binning)
+                fig, ax = plot.histogram(counts, bins[:-1])
+                ax.set_title(f"Lightcurve for {quad}{ch:02d}, binning {binning} s")
+                ax.set_xlabel("Time")
+                ax.set_ylabel("Counts")
+                fig.savefig(path(quad, ch))
+                plt.close(fig)
+
+        path = paths.TMSPLOT(self.filepath)
+        binning = 0.1
+        nthreads = self.nthreads
+        data = self.calibration.data
+        return Parallel(n_jobs=nthreads)(
+            delayed(helper)(quad, data[data["QUADID"] == quad]) for quad in self.calibration.detector.quadrant_keys
+        )
 
 
 def get_writer(fmt):
