@@ -331,12 +331,16 @@ def timehist(data):
     This function is curried beacuse partial application are useful
     to make histograms for channels in different quadrants in parallel.
     See timehist_quadch for an example interface."""
+
     def timehist_filter_outliers(outliers):
         """Remove time outliers"""
+
         def timehist_filter_quadrant(quad):
             """Throws away events not on quad"""
+
             def timehist_filter_channel(ch):
                 """Throw away events not on channel"""
+
                 def timehist_histogram(binning):
                     """Makes an histogram"""
                     num_intervals = int((max_ - min_) / binning + 1)

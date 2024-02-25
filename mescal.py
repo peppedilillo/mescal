@@ -554,6 +554,7 @@ class Mescal(Cmd):
         You can call timehist with `all` argument to get a histogram of the sum
         of the counts observed over all channels. Note that this will differ
         from a lightcurve made with calibrated events, see `plotlc`."""
+
         def plot_lightcurve_all_channels(binning):
             counts, bins = timehist_all(
                 self.calibration.data,
