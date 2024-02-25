@@ -13,7 +13,7 @@ from source import errors as err
 from source import paths
 from source import plot
 from source.constants import PHOTOEL_PER_KEV
-from source.eventlist import timehist_quadch
+from source.eventlist import timehist_ch
 
 
 class Exporter:
@@ -35,6 +35,8 @@ class Exporter:
         self.can__draw_map_counts = True
 
         self.can__draw_timehists = True
+
+        self.can__draw_timehists_neglect_outliers = True
 
         self.can__write_sdd_calibration_report = False
         if self.calibration.sdd_calibration:
@@ -429,12 +431,17 @@ class Exporter:
         plt.close(fig)
         return True
 
-    def draw_timehists(self):
+    def _draw_timehists(self, neglect_outliers):
         assert self.can__draw_timehists
 
-        def helper(quad, data):
+        def helper(quad, data, neglect_outliers):
             for ch in range(32):
-                counts, bins = timehist_quadch(data, quad, ch, binning)
+                counts, bins = timehist_ch(
+                    data,
+                    ch,
+                    binning,
+                    neglect_outliers
+                )
                 fig, ax = plot.histogram(counts, bins[:-1])
                 ax.set_title(f"Lightcurve for {quad}{ch:02d}, binning {binning} s")
                 ax.set_xlabel("Time")
@@ -447,10 +454,15 @@ class Exporter:
         nthreads = self.nthreads
         data = self.calibration.data
         return Parallel(n_jobs=nthreads)(
-            delayed(helper)(quad, data[data["QUADID"] == quad])
+            delayed(helper)(quad, data[data["QUADID"] == quad], neglect_outliers)
             for quad in self.calibration.detector.quadrant_keys
         )
 
+    def draw_timehists_neglect_outliers(self):
+        return self._draw_timehists(True)
+
+    def draw_timehists(self):
+        return self._draw_timehists(False)
 
 def get_writer(fmt):
     if fmt == "xslx":

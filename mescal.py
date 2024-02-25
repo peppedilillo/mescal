@@ -146,10 +146,11 @@ class Mescal(Cmd):
         self.start_logger()
         self.config = self.unpack_configuration()
         self.threads = self.check_system()
-        self.data = None
-        self.waste = None
+        self.failed_tests = {}
         self.calibrations = {}
         self.calibration = None
+        self.data = None
+        self.waste = None
 
         ui.logcal_rule(self.console)
         with console.status("Initializing.."):
@@ -176,15 +177,15 @@ class Mescal(Cmd):
         with console.status("Processing results.."):
             self.export_essentials()
 
-        failed_tests = check_results(
+        self.failed_tests = check_results(
             self.calibration,
             self.data,
             self.waste,
             self.config,
         )
-        if failed_tests:
+        if self.failed_tests:
             ui.warning_rule(self.console)
-            self.display_warning(failed_tests)
+            self.display_warning()
 
         ui.shell_rule(self.console)
         self.cmdloop()
@@ -376,11 +377,11 @@ class Mescal(Cmd):
         radsources = prompt_user_on_radsources()
         return radsources
 
-    def display_warning(self, failed_tests):
+    def display_warning(self):
         """Tells user about channels for which calibration
         could not be completed.
         """
-        if "flagged_channels" in failed_tests:
+        if "flagged_channels" in self.failed_tests:
             sublists = self.calibration.flagged.values()
             num_flagged = len(set([item for sublist in sublists for item in sublist]))
             num_channels = len(
@@ -393,7 +394,7 @@ class Mescal(Cmd):
                 "For more details, see the log file.".format(num_flagged, num_channels)
             )
             self.console.print(message)
-        if "too_many_filtered_events" in failed_tests:
+        if "too_many_filtered_events" in self.failed_tests:
             message = (
                 "[i][yellow]"
                 "A significant fraction of the dataset was filtered away."
@@ -401,7 +402,7 @@ class Mescal(Cmd):
                 "Check filter parameters in 'config.ini'."
             )
             self.console.print(message)
-        if "filter_retrigger_off" in failed_tests:
+        if "filter_retrigger_off" in self.failed_tests:
             message = (
                 "[i][yellow]"
                 "Retrigger filter is off."
@@ -409,7 +410,7 @@ class Mescal(Cmd):
                 "You can enable it through 'config.ini'."
             )
             self.console.print(message)
-        if "filter_spurious_off" in failed_tests:
+        if "filter_spurious_off" in self.failed_tests:
             message = (
                 "[i][yellow]"
                 "Spurious events filter is off."
@@ -417,7 +418,7 @@ class Mescal(Cmd):
                 "You can enable it through 'config.ini'."
             )
             self.console.print(message)
-        if "time_outliers" in failed_tests:
+        if "time_outliers" in self.failed_tests:
             message = (
                 "[i][yellow]"
                 "Found large outliers in your time data."
@@ -511,22 +512,32 @@ class Mescal(Cmd):
     def do_timehist(self, arg):
         """Plots a histogram of counts in time for selected channel."""
 
-        def plot_lightcurve_all_channels(b):
-            counts, bins = timehist_all(self.calibration.data, b)
+        def plot_lightcurve_all_channels(binning):
+            counts, bins = timehist_all(
+                self.calibration.data,
+                binning,
+                "time_outliers" in self.failed_tests,
+            )
 
             fig, ax = histogram(
                 counts,
                 bins[:-1],
             )
-            ax.set_title(f"Lightcurve for all channels, binning {b} s")
+            ax.set_title(f"Lightcurve for all channels, binning {binning} s")
             ax.set_xlabel("Time")
             ax.set_ylabel("Counts")
             plt.show(block=False)
 
-        def plot_lightcurve_single_channel(quad, ch, b):
-            counts, bins = timehist_quadch(self.calibration.data, quad, ch, b)
+        def plot_lightcurve_single_channel(quad, ch, binning):
+            counts, bins = timehist_quadch(
+                self.calibration.data,
+                quad,
+                ch,
+                binning,
+                "time_outliers" in self.failed_tests,
+            )
             fig, ax = histogram(counts, bins[:-1])
-            ax.set_title(f"Lightcurve for {quad}{ch:02d}, binning {b} s")
+            ax.set_title(f"Lightcurve for {quad}{ch:02d}, binning {binning} s")
             ax.set_xlabel("Time")
             ax.set_ylabel("Counts")
             plt.show(block=False)
@@ -800,10 +811,12 @@ class Mescal(Cmd):
             Option(
                 "timehist per channel",
                 [
-                    exporter.draw_timehists,
+                    exporter.draw_timehists_neglect_outliers
+                    if "time_outliers" in self.failed_tests else exporter.draw_timehists,
                 ],
                 [
-                    exporter.can__draw_timehists,
+                    exporter.can__draw_timehists_neglect_outliers
+                    if "time_outliers" in self.failed_tests else exporter.can__draw_timehists,
                 ],
                 False,
             ),

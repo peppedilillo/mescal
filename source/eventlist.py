@@ -324,22 +324,63 @@ def infer_onchannels(data):
     return out
 
 
-def timehist_quadch(data, quad, ch, binning, neglect_outliers=True):
-    if len(data) <= 0:
-        raise err.BadDataError("Empty data.")
+def timehist_mask_quadrant(data, quad):
+    mask = (data["QUADID"] == quad)
+    return data[mask]
+
+
+def timehist_mask_channel(data, ch):
+    mask = (data["CHN"] == ch)
+    return data[mask]
+
+
+def timehist_histogram(data, binning, neglect_outliers=True):
+    if len(data) == 0:
+        # causes weird error if empty numpy array are returneed instead?
+        return [], []
 
     if neglect_outliers:
         min_, max_ = np.quantile(data["TIME"], [0.01, 0.99])
     else:
         min_, max_ = data["TIME"].min(), data["TIME"].max()
-    mask = (data["QUADID"] == quad) & (data["CHN"] == ch)
+
+    num_intervals = int((max_ - min_) / binning + 1)
     counts, bins = np.histogram(
-        data[mask]["TIME"].values, range=(min_, max_), bins=int((max_ - min_) / binning)
+        data["TIME"].values,
+        range=(min_, min_ + num_intervals * binning),
+        bins=num_intervals,
     )
     return counts, bins
 
 
-def timehist_all(data, binning, neglect_outliers=False):
+def timehist_ch(data, ch, binning, neglect_outliers):
+    """Supposes `data` to contain events only from one quadrant, i.e.,
+    the data must have been perviously filtered."""
+    counts, bins = timehist_histogram(
+        timehist_mask_channel(
+            data,
+            ch,
+        ),
+        binning,
+        neglect_outliers,
+    )
+    return counts, bins
+
+
+def timehist_quadch(data, quad, ch, binning, neglect_outliers):
+    counts, bins = timehist_histogram(
+        timehist_mask_channel(
+            timehist_mask_quadrant(
+                data,
+                quad,
+            ),
+            ch,
+        ),
+        binning,
+        neglect_outliers,)
+    return counts, bins
+
+def timehist_all(data, binning, neglect_outliers):
     if len(data) <= 0:
         raise err.BadDataError("Empty data.")
 
@@ -352,3 +393,4 @@ def timehist_all(data, binning, neglect_outliers=False):
         times, range=(min_, max_), bins=int((max_ - min_) / binning)
     )
     return counts, bins
+
