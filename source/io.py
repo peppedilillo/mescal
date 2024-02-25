@@ -13,7 +13,7 @@ from source import errors as err
 from source import paths
 from source import plot
 from source.constants import PHOTOEL_PER_KEV
-from source.eventlist import timehist_ch
+from source.eventlist import timehist
 
 
 class Exporter:
@@ -434,9 +434,9 @@ class Exporter:
     def _draw_timehists(self, neglect_outliers):
         assert self.can__draw_timehists
 
-        def helper(quad, data, neglect_outliers):
+        def helper(quad, f):
             for ch in range(32):
-                counts, bins = timehist_ch(data, ch, binning, neglect_outliers)
+                counts, bins = f(ch)(binning)
                 fig, ax = plot.histogram(counts, bins[:-1])
                 ax.set_title(f"Lightcurve for {quad}{ch:02d}, binning {binning} s")
                 ax.set_xlabel("Time")
@@ -449,7 +449,9 @@ class Exporter:
         nthreads = self.nthreads
         data = self.calibration.data
         return Parallel(n_jobs=nthreads)(
-            delayed(helper)(quad, data[data["QUADID"] == quad], neglect_outliers)
+            # we are passing a partial application of timehist, up to
+            # the point where we filter by quadrant.
+            delayed(helper)(quad, timehist(data)(neglect_outliers)(quad))
             for quad in self.calibration.detector.quadrant_keys
         )
 

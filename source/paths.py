@@ -70,7 +70,7 @@ def SDNDIR(filepath: Path) -> Path:
 
 @create_if_not_exists
 def TMSDIR(filepath: Path) -> Path:
-    return PLTDIR(filepath).joinpath("lightcurves")
+    return PLTDIR(filepath).joinpath("timehists")
 
 
 @create_if_not_exists
@@ -100,4 +100,4 @@ SCSPLOT = (lambda filepath: (lambda quad, ch: SCSDIR(filepath).joinpath("spectra
 XDNPLOT = (lambda filepath: (lambda quad, ch: XDNDIR(filepath).joinpath("diagnostic_x_quad{}_ch{:02d}.png".format(quad, ch))))
 SDNPLOT = (lambda filepath: (lambda quad, ch: SDNDIR(filepath).joinpath("diagnostic_s_quad{}_ch{:02d}.png".format(quad, ch))))
 UNCPLOT = (lambda filepath: (lambda quad, ch: UNCDIR(filepath).joinpath("uncalibrated_quad{}_ch{:02d}.png".format(quad, ch))))
-TMSPLOT = (lambda filepath: (lambda quad, ch: TMSDIR(filepath).joinpath("lightcurve_quad{}_ch{:02d}.png".format(quad, ch))))
+TMSPLOT = (lambda filepath: (lambda quad, ch: TMSDIR(filepath).joinpath("timehist_quad{}_ch{:02d}.png".format(quad, ch))))

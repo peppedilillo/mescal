@@ -324,62 +324,48 @@ def infer_onchannels(data):
     return out
 
 
-def timehist_mask_quadrant(data, quad):
-    mask = data["QUADID"] == quad
-    return data[mask]
+def timehist(data):
+    """
+    Makes histograms of counts in time of a channel with safeguards against
+    bad time data.
+    This function is curried beacuse partial application are useful
+    to make histograms for channels in different quadrants in parallel.
+    See timehist_quadch for an example interface."""
+    def timehist_filter_outliers(outliers):
+        """Remove time outliers"""
+        def timehist_filter_quadrant(quad):
+            """Throws away events not on quad"""
+            def timehist_filter_channel(ch):
+                """Throw away events not on channel"""
+                def timehist_histogram(binning):
+                    """Makes an histogram"""
+                    num_intervals = int((max_ - min_) / binning + 1)
+                    counts, bins = np.histogram(
+                        data[mask_quadrant & mask_channel]["TIME"].values,
+                        range=(min_, min_ + num_intervals * binning),
+                        bins=num_intervals,
+                    )
+                    return counts, bins
 
+                mask_channel = data["CHN"] == ch
+                return timehist_histogram
 
-def timehist_mask_channel(data, ch):
-    mask = data["CHN"] == ch
-    return data[mask]
+            mask_quadrant = data["QUADID"] == quad
+            return timehist_filter_channel
 
+        if outliers:
+            min_, max_ = np.quantile(data["TIME"], [0.01, 0.99])
+        else:
+            min_, max_ = data["TIME"].min(), data["TIME"].max()
+        return timehist_filter_quadrant
 
-def timehist_histogram(data, binning, neglect_outliers=True):
-    if len(data) == 0:
-        # causes weird error if empty numpy array are returneed instead?
-        return [], []
-
-    if neglect_outliers:
-        min_, max_ = np.quantile(data["TIME"], [0.01, 0.99])
-    else:
-        min_, max_ = data["TIME"].min(), data["TIME"].max()
-
-    num_intervals = int((max_ - min_) / binning + 1)
-    counts, bins = np.histogram(
-        data["TIME"].values,
-        range=(min_, min_ + num_intervals * binning),
-        bins=num_intervals,
-    )
-    return counts, bins
-
-
-def timehist_ch(data, ch, binning, neglect_outliers):
-    """Supposes `data` to contain events only from one quadrant, i.e.,
-    the data must have been perviously filtered."""
-    counts, bins = timehist_histogram(
-        timehist_mask_channel(
-            data,
-            ch,
-        ),
-        binning,
-        neglect_outliers,
-    )
-    return counts, bins
+    return timehist_filter_outliers
 
 
 def timehist_quadch(data, quad, ch, binning, neglect_outliers):
-    counts, bins = timehist_histogram(
-        timehist_mask_channel(
-            timehist_mask_quadrant(
-                data,
-                quad,
-            ),
-            ch,
-        ),
-        binning,
-        neglect_outliers,
-    )
-    return counts, bins
+    """Returns an histograms of counts observed by (quad, ch) removing entries
+    with non-sense time information."""
+    return timehist(data)(neglect_outliers)(quad)(ch)(binning)
 
 
 def timehist_all(data, binning, neglect_outliers):
@@ -390,8 +376,10 @@ def timehist_all(data, binning, neglect_outliers):
         min_, max_ = np.quantile(data["TIME"], [0.01, 0.99])
     else:
         min_, max_ = data["TIME"].min(), data["TIME"].max()
-    times = data["TIME"].values
+    num_intervals = int((max_ - min_) / binning + 1)
     counts, bins = np.histogram(
-        times, range=(min_, max_), bins=int((max_ - min_) / binning)
+        data["TIME"].values,
+        range=(min_, min_ + num_intervals * binning),
+        bins=num_intervals,
     )
     return counts, bins

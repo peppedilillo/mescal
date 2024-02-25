@@ -134,6 +134,10 @@ class Mescal(Cmd):
         "[red]The file appears to be in wrong format.[/]\n"
         "[i]The command `loadcal` expects .xslx table format.[/i]"
     )
+    invalid_natural_message = (
+        "[red]Wrong number format.[/]\n"
+        "[i]Argument must be expressed as a positive integer (e.g. 100).[/i]"
+    )
     # fmt on
 
     def __init__(self):
@@ -506,12 +510,50 @@ class Mescal(Cmd):
         plt.show(block=False)
         return False
 
+    def can_plotlc(self, arg):
+        if self.calibration.eventlist is not None:
+            return True
+
+    def do_plotlc(self, arg):
+        """Plots lightcurve of calibrated events with optional binning,
+        expressed in units of millisecond.
+        Example usage: plotlc 100
+        if binning is not specified, a default binning of 100ms is assumed.
+        """
+        parsed_arg = parse_natural_number(arg)
+        if parsed_arg is INVALID_ENTRY:
+            self.console.print(self.invalid_natural_message)
+            return False
+        elif parsed_arg is None:
+            binning = 0.1
+        else:
+            binning = parsed_arg / 1000
+
+        counts, bins = timehist_all(
+            self.calibration.eventlist,
+            binning,
+            "time_outliers" in self.failed_tests,
+        )
+
+        fig, ax = histogram(
+            counts,
+            bins[:-1],
+        )
+        ax.set_title(f"Lightcurve for calibrated events, binning {binning} s")
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Counts")
+        plt.show(block=False)
+        return False
+
     def can_timehist(self, arg):
         return True
 
     def do_timehist(self, arg):
-        """Plots a histogram of counts in time for selected channel."""
-
+        """Plots a histogram of counts in time for selected channel.
+        Example usage: `timehist D29`
+        You can call timehist with `all` argument to get a histogram of the sum
+        of the counts observed over all channels. Note that this will differ
+        from a lightcurve made with calibrated events, see `plotlc`."""
         def plot_lightcurve_all_channels(binning):
             counts, bins = timehist_all(
                 self.calibration.data,
@@ -919,11 +961,25 @@ def parse_chns(arg):
         return INVALID_ENTRY
 
 
+def parse_natural_number(arg):
+    """
+    Shell helper
+    """
+    stripped_arg = arg.strip()
+    if stripped_arg == "":
+        return None
+    elif stripped_arg.isnumeric() and int(arg) != 0:
+        return int(arg)
+    else:
+        return INVALID_ENTRY
+
+
 def parse_limits(arg):
     """
     Shell helper.
     """
-    if arg == "":
+    stripped_arg = arg.strip()
+    if stripped_arg == "":
         return None
 
     arglist = arg.strip().split(" ")
