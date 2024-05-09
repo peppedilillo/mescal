@@ -3,6 +3,7 @@ from math import floor
 from pathlib import Path
 
 from astropy.io import fits as fitsio
+from astropy.table import Table
 from joblib import delayed
 from joblib import Parallel
 import matplotlib.pyplot as plt
@@ -472,7 +473,6 @@ def get_writer(fmt):
     else:
         raise err.FormatNotSupportedError("write format not supported")
 
-
 def validate_sdd_calib(func):
     def wrapper(*args):
         from source.calibrate import CAL_PARAMS
@@ -504,7 +504,6 @@ def validate_lightout_report(func):
             if not df.columns.isin(LO_PARAMS).all():
                 raise err.WrongTableError()
         return dic
-
     return wrapper
 
 
@@ -516,16 +515,23 @@ def read_lightout_report(from_path: Path):
         raise err.FormatNotSupportedError("format not supported")
 
 
-def write_report_to_excel(result_df, path):
-    with pd.ExcelWriter(path) as output:
-        for quad in result_df.keys():
-            result_df[quad].to_excel(
-                output,
-                sheet_name=quad,
-                engine="xlsxwriter",
-            )
-    return True
 
+def validate_nlcorrection_fits(func):
+    def wrapper(*args):
+        df = func(*args)
+        if not all([x in df for x in ["ENERGY", "CORRFACTOR"]]):
+            raise err.WrongTableError()
+        return df
+    return wrapper
+
+
+@validate_nlcorrection_fits
+def read_nlcorrection_fits(from_path: Path):
+    if from_path.suffix in [".fits", ".fit"]:
+        df = Table.read(from_path, format="fits").to_pandas()
+    else:
+        raise err.FormatNotSupportedError("format not supported")
+    return df
 
 def read_report_from_excel(from_path, kind):
     if kind == "calib":
@@ -536,6 +542,17 @@ def read_report_from_excel(from_path, kind):
         return pd.read_excel(from_path, header=[0, 1], index_col=0, sheet_name=None)
     else:
         raise ValueError("kind must be either 'calib', 'peaks', or 'fits'.")
+
+
+def write_report_to_excel(result_df, path):
+    with pd.ExcelWriter(path) as output:
+        for quad in result_df.keys():
+            result_df[quad].to_excel(
+                output,
+                sheet_name=quad,
+                engine="xlsxwriter",
+            )
+    return True
 
 
 def write_report_to_fits(result_df, path):
@@ -550,20 +567,12 @@ def write_report_to_fits(result_df, path):
     return True
 
 
-def read_report_from_fits(path):
-    pass
-
-
 def write_report_to_csv(result_df, path):
     for quad, df in result_df.items():
         df.to_csv(
             path.with_name(path.stem + "_quad{}".format(quad)).with_suffix(".csv")
         )
     return True
-
-
-def read_report_from_csv(from_path):
-    pass
 
 
 def write_eventlist_to_fits(eventlist, path):
@@ -582,10 +591,7 @@ def write_eventlist_to_fits(eventlist, path):
 
 
 def pandas_from_LV0d5(fits: Path):
-    fits_path = Path(fits)
-    with fitsio.open(fits_path) as fits_file:
-        fits_data = fits_file[-1].data
-        df = pd.DataFrame(np.array(fits_data).byteswap().newbyteorder())
+    df = Table.read(fits, hdu=2, format="fits").to_pandas()
     # fixes first buffer missing ABT
     start_t = floor(df[df["TIME"] > 1].iloc[0]["TIME"]) - 1
     df.loc[df["TIME"] < 1, "TIME"] += start_t

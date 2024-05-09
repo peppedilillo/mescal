@@ -29,6 +29,7 @@ from source.eventlist import timehist_all
 from source.eventlist import timehist_quadch
 from source.io import pandas_from_LV0d5
 from source.io import read_lightout_report
+from source.io import read_nlcorrection_fits
 from source.io import read_sdd_calibration_report
 from source.plot import histogram
 from source.plot import mapcounts
@@ -240,10 +241,11 @@ class Mescal(Cmd):
         """
         if sys.platform.startswith("win") or sys.platform.startswith("linux"):
             if "TkAgg" in matplotlib.rcsetup.all_backends:
-                pass  # matplotlib.use("TkAgg")
+                matplotlib.use("TkAgg")
         elif sys.platform.startswith("mac"):
-            if "macosx" in matplotlib.rcsetup.all_backends:
-                matplotlib.use("macosx")
+            if "MacOSX" in matplotlib.rcsetup.all_backends:
+                matplotlib.use("MacOSX")
+
         systhreads = min(4, cpu_count())
 
         logging.info("detected {} os".format(sys.platform))
@@ -306,7 +308,7 @@ class Mescal(Cmd):
             raise FileNotFoundError("could not find input datafile.")
         return out
 
-    def get_filepath(self):
+    def get_filepath(self) -> Path:
         message = (
             "[italic]Which file are you calibrating?\n"
             "[yellow]Hint: You can drag & drop.[/yellow]"
@@ -326,7 +328,7 @@ class Mescal(Cmd):
             exit()
         return filepath
 
-    def get_model(self):
+    def get_model(self) -> str:
         def prompt_user_on_model():
             # fmt: off
             cursor_index = ([0] + [
@@ -352,7 +354,7 @@ class Mescal(Cmd):
             exit()
         return model
 
-    def get_radsources(self):
+    def get_radsources(self) -> list[str]:
         def prompt_user_on_radsources():
             message = (
                 "[italic]With which radioactive sources?\n"
@@ -711,6 +713,36 @@ class Mescal(Cmd):
         plt.show(block=False)
         return False
 
+    def can_corrnl(self, arg):
+        if self.calibration.eventlist is not None:
+            return True
+
+    def do_corrnl(self, arg):
+        message_hello = (
+            "[italic]Enter path for non-linearity correction file.\n"
+            "[yellow]Hint: You can drag & drop.[/yellow]"
+            "[/italic]\n"
+        )
+        message_error = (
+            "[italic][red]The file you entered does not exists.[/red]\n"
+            "[yellow]Hint: You can drag & drop.[/yellow]\n"
+            "[/italic]\n"
+        )
+
+        answer = prompt_user_on_filepath(message_hello, message_error, self.console)
+        if answer is None:
+            return False
+        try:
+            nl_correction = read_nlcorrection_fits(answer)
+        except err.WrongTableError:
+            self.console.print(self.invalid_table_message)
+            return False
+        except err.FormatNotSupportedError:
+            self.console.print(self.invalid_format_message)
+            return False
+
+        self.calibration.apply_nlcorrection(nl_correction)
+
     def can_loadcal(self, arg):
         return True
 
@@ -920,7 +952,7 @@ class Mescal(Cmd):
         return False
 
 
-def prompt_user_on_filepath(message, message_error, console):
+def prompt_user_on_filepath(message, message_error, console) -> Path:
     filepath = None
     text = message
     while filepath is None:

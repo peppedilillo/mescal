@@ -8,6 +8,7 @@ from joblib import delayed
 from joblib import Parallel
 from lmfit.models import GaussianModel
 from lmfit.models import LinearModel
+from scipy.interpolate import interp1d
 import numpy as np
 import pandas as pd
 
@@ -332,6 +333,19 @@ class Calibrate:
             nthreads=self.nthreads,
         )
         return exporter
+
+    def apply_nlcorrection(self, nlcorrection: pd.DataFrame):
+        mask = (
+            (self.eventlist["EVTYPE"] == "S") &
+            ((self.eventlist["ENERGY"] < nlcorrection["ENERGY"].iloc[0]) |
+            (self.eventlist["ENERGY"] >= nlcorrection["ENERGY"].iloc[-1]))
+        )
+        self.eventlist = self.eventlist[~mask].reset_index()
+        mask = (self.eventlist["EVTYPE"] == "S")
+        f = interp1d(nlcorrection["ENERGY"], nlcorrection["CORRFACTOR"])
+        corrections = f(self.eventlist[mask]["ENERGY"])
+        self.eventlist.loc[mask, "ENERGY"] /= corrections
+        return
 
     def xradsources(self):
         xradsources, _ = self.radsources
