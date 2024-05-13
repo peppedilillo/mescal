@@ -5,7 +5,6 @@ dependencies:
   - pandas=1.5.2
   - matplotlib=3.6.2
   - astropy=5.1
-  - pyqt=5.15.10
   - openpyxl=3.0
   - joblib=1.1.1
   - rich=12.5

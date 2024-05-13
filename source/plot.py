@@ -132,7 +132,7 @@ def spectrum_xs(
     sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
     scounts, sbins = np.histogram(
         sevs["ENERGY"],
-        bins=np.arange(*_compute_lims_for_s(), 2),
+        bins=np.arange(*_compute_lims_for_s(), 0.5),
     )
 
     fig, axs = plt.subplots(2, 1, **kwargs)
