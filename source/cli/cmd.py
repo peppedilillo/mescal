@@ -361,9 +361,7 @@ class Cmd:
                         cmds_doc.append(cmd)
                     else:
                         cmds_undoc.append(cmd)
-            self.print_topics(
-                self.doc_header, cmds_doc, message="[i]Type help <topic>.[/i]\n"
-            )
+            self.print_topics(self.doc_header, cmds_doc, message="[i]Type help <topic>.[/i]\n")
             self.print_topics(self.misc_header, sorted(topics))
             self.print_topics(self.undoc_header, cmds_undoc)
 

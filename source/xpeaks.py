@@ -81,9 +81,7 @@ def find_xpeaks(
         best_peaks, best_peaks_props = peaks, peaks_props
         limits = [
             (bins[floor(lo)], bins[ceil(hi)])
-            for lo, hi in zip(
-                best_peaks_props["left_ips"], best_peaks_props["right_ips"]
-            )
+            for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])
         ]
         return limits
 
@@ -102,9 +100,7 @@ def find_xpeaks(
 
     # for each combination we compute some metrics
     # posterior of peaks position
-    posteriorscore_ = posteriorscore(
-        bins, peaks_combo, energies, gain_guess, offset_guess
-    )
+    posteriorscore_ = posteriorscore(bins, peaks_combo, energies, gain_guess, offset_guess)
     # peaks linearity
     linscores_, fitparameters = linscores(bins, energies, peaks_combo)
     # peaks prominence
@@ -136,13 +132,10 @@ def find_xpeaks(
     # some packaging
     best_peaks = peaks_combo[winner]
     best_peaks_args = np.argwhere(np.isin(peaks, best_peaks)).T[0]
-    best_peaks_props = {
-        key: value[best_peaks_args] for key, value in peaks_props.items()
-    }
+    best_peaks_props = {key: value[best_peaks_args] for key, value in peaks_props.items()}
 
     limits = [
-        (bins[floor(lo)], bins[ceil(hi)])
-        for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])
+        (bins[floor(lo)], bins[ceil(hi)]) for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])
     ]
     return limits
 
@@ -172,10 +165,7 @@ def baselinescores(bins, counts, fitpars_combinations, thr_energy=2.0):
     evaluates threshold energy given fit parameters of peak combinations.
     """
     baseline = find_baseline(counts)
-    scores = [
-        -(((bins[baseline] - offset) / gain - thr_energy) ** 2)
-        for offset, gain in fitpars_combinations
-    ]
+    scores = [-(((bins[baseline] - offset) / gain - thr_energy) ** 2) for offset, gain in fitpars_combinations]
     return scores
 
 
@@ -462,9 +452,7 @@ def debug_helper(
             alpha=0.1,
             color="grey",
         )
-    for peak, lo, hi in zip(
-        winpeaks, winpeaks_props["left_ips"], winpeaks_props["right_ips"]
-    ):
+    for peak, lo, hi in zip(winpeaks, winpeaks_props["left_ips"], winpeaks_props["right_ips"]):
         plt.axvspan(
             bins[int(lo)],
             bins[int(hi)],

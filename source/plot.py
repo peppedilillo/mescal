@@ -39,11 +39,7 @@ def uncalibrated(xbins, xcounts, sbins, scounts, **kwargs):
     return fig, ax
 
 
-normal = (
-    lambda x, amp, sigma, x0: amp
-    * np.exp(-((x - x0) ** 2) / (2 * sigma**2))
-    / (sigma * sqrt(2 * pi))
-)
+normal = lambda x, amp, sigma, x0: amp * np.exp(-((x - x0) ** 2) / (2 * sigma**2)) / (sigma * sqrt(2 * pi))
 
 
 def diagnostics(bins, counts, centers, amps, fwhms, limits, margin=500, **kwargs):
@@ -166,9 +162,7 @@ def spectrum_xs(
     return fig, axs
 
 
-def linearity(
-    gain, gain_err, offset, offset_err, adcs, adcs_err, radsources: dict, **kwargs
-):
+def linearity(gain, gain_err, offset, offset_err, adcs, adcs_err, radsources: dict, **kwargs):
     radsources_energies = np.array([l.energy for l in radsources.values()])
     measured_energies_err = np.sqrt(
         (adcs_err**2) * (1 / gain) ** 2
@@ -176,9 +170,7 @@ def linearity(
         + (offset_err**2) * (1 / gain) ** 2
     )
     residual = gain * radsources_energies + offset - adcs
-    res_err = np.sqrt(
-        (gain_err**2) * (radsources_energies**2) + offset_err**2 + adcs_err**2
-    )
+    res_err = np.sqrt((gain_err**2) * (radsources_energies**2) + offset_err**2 + adcs_err**2)
     perc_residual = 100 * residual / adcs
     perc_residual_err = 100 * res_err / adcs
 
@@ -187,13 +179,9 @@ def linearity(
     perc_measured_energies_err = 100 * measured_energies_err / radsources_energies
 
     margin = (radsources_energies[-1] - radsources_energies[0]) / 10
-    xs = np.linspace(
-        radsources_energies[0] - margin, radsources_energies[-1] + margin, 10
-    )
+    xs = np.linspace(radsources_energies[0] - margin, radsources_energies[-1] + margin, 10)
 
-    fig, axs = plt.subplots(
-        3, 1, gridspec_kw={"height_ratios": [6, 3, 3]}, sharex=True, **kwargs
-    )
+    fig, axs = plt.subplots(3, 1, gridspec_kw={"height_ratios": [6, 3, 3]}, sharex=True, **kwargs)
     axs[0].errorbar(radsources_energies, adcs, yerr=adcs_err, fmt="o")
     axs[0].plot(xs, gain * xs + offset)
     axs[1].errorbar(
@@ -344,9 +332,7 @@ def _chtext(detmap):
     ):
         quadmap = np.array(detmap[quad])
         rows, cols = quadmap[(quadmap != UNBOND)[:, 0] & (quadmap != UNBOND)[:, 1]].T
-        chtext[rows + ty, cols + tx] = np.arange(len(quadmap))[
-            (quadmap != UNBOND)[:, 0] & (quadmap != UNBOND)[:, 1]
-        ]
+        chtext[rows + ty, cols + tx] = np.arange(len(quadmap))[(quadmap != UNBOND)[:, 0] & (quadmap != UNBOND)[:, 1]]
     return chtext
 
 

@@ -27,7 +27,7 @@ from source.eventlist import perchannel_counts
 from source.eventlist import preprocess
 from source.eventlist import timehist_all
 from source.eventlist import timehist_quadch
-from source.io import pandas_from_LV0d5
+from source.io import pandas_from_lv0d5
 from source.io import read_lightout_report
 from source.io import read_nlcorrection_fits
 from source.io import read_sdd_calibration_report
@@ -44,8 +44,7 @@ commandline_args_parser = argparse.ArgumentParser()
 commandline_args_parser.add_argument(
     "--filepath",
     default=None,
-    help="input acquisition file in standard 0.5 fits format.\n"
-    "prompt user by default.",
+    help="input acquisition file in standard 0.5 fits format.\n" "prompt user by default.",
 )
 
 commandline_args_parser.add_argument(
@@ -112,32 +111,23 @@ class Mescal(Cmd):
     intro = "Type help or ? for a list of commands.\n"
     prompt = "[cyan]\[mescalSH] "
     spinner_message = "Working.."
-    unknown_command_message = (
-        "[red]Unknown command.[/]\n" "[i]Type help or ? for a list of commands.[/i]\n"
-    )
+    unknown_command_message = "[red]Unknown command.[/]\n" "[i]Type help or ? for a list of commands.[/i]\n"
     invalid_command_message = "[red]Command unavailable.[/]\n"
     invalid_channel_message = (
-        "[red]Invalid channel.[/]\n"
-        "[i]Channel ID must be in standard form "
-        "(e.g., d04, A30, B02).[/i]\n"
+        "[red]Invalid channel.[/]\n" "[i]Channel ID must be in standard form " "(e.g., d04, A30, B02).[/i]\n"
     )
     no_counts_message = "[red]No events observed for this channel.[/]\n"
     invalid_limits_message = (
-        "[red]Invalid limits.[/]\n"
-        "[i]Entries must be two, different, "
-        "sorted integers (e.g., 19800 20100).[/i]\n"
+        "[red]Invalid limits.[/]\n" "[i]Entries must be two, different, " "sorted integers (e.g., 19800 20100).[/i]\n"
     )
     invalid_table_message = (
-        "[red]Invalid table.[/]\n"
-        "[i]Make sure the table you are providing has the right columns.[/i]"
+        "[red]Invalid table.[/]\n" "[i]Make sure the table you are providing has the right columns.[/i]"
     )
     invalid_format_message = (
-        "[red]The file appears to be in wrong format.[/]\n"
-        "[i]The command `loadcal` expects .xslx table format.[/i]"
+        "[red]The file appears to be in wrong format.[/]\n" "[i]The command `loadcal` expects .xslx table format.[/i]"
     )
     invalid_natural_message = (
-        "[red]Wrong number format.[/]\n"
-        "[i]Argument must be expressed as a positive integer (e.g. 100).[/i]"
+        "[red]Wrong number format.[/]\n" "[i]Argument must be expressed as a positive integer (e.g. 100).[/i]"
     )
     # fmt on
 
@@ -211,11 +201,7 @@ class Mescal(Cmd):
             len_logo = len(ui.logo().split("\n")[0])
             version_message = "version " + get_version()
             if len_logo > len(version_message) + 1:
-                f.write(
-                    " " * (len_logo - len(version_message) + 1)
-                    + version_message
-                    + "\n\n"
-                )
+                f.write(" " * (len_logo - len(version_message) + 1) + version_message + "\n\n")
             else:
                 f.write(version_message + "\n\n")
 
@@ -224,8 +210,7 @@ class Mescal(Cmd):
         logging.basicConfig(
             filename=logfile,
             level=logging.INFO,
-            format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] "
-            "%(levelname)s: %(message)s",
+            format="[%(funcName)s() @ %(filename)s (L%(lineno)s)] " "%(levelname)s: %(message)s",
         )
         logging.info("user args = {}".format(self.commandline_args))
         logging.info("logging calibration for file {}".format(self.filepath))
@@ -263,12 +248,8 @@ class Mescal(Cmd):
         adcitems = config[self.commandline_args.adc]
 
         out = {
-            "filter_retrigger": 0.0
-            if self.commandline_args.nofilters
-            else general.getfloat("filter_retrigger"),
-            "filter_spurious": False
-            if self.commandline_args.nofilters
-            else general.getboolean("filter_spurious"),
+            "filter_retrigger": (0.0 if self.commandline_args.nofilters else general.getfloat("filter_retrigger")),
+            "filter_spurious": (False if self.commandline_args.nofilters else general.getboolean("filter_spurious")),
             "binning": adcitems.getint("binning"),
             "xpeaks_mincounts": general.getint("xpeaks_mincounts"),
             "gain_center": adcitems.getfloat("gain_center"),
@@ -292,11 +273,9 @@ class Mescal(Cmd):
         cached = paths.CACHEDIR().joinpath(self.filepath.name).with_suffix(".pkl.gz")
         if cached.is_file() and self.commandline_args.cache:
             out = pd.read_pickle(cached)
-            self.console.log(
-                "[bold yellow]:yellow_circle: Data were loaded from cache."
-            )
+            self.console.log("[bold yellow]:yellow_circle: Data were loaded from cache.")
         elif self.filepath.is_file():
-            out = pandas_from_LV0d5(self.filepath)
+            out = pandas_from_lv0d5(self.filepath)
             self.console.log(":open_book: Data loaded.")
             if self.commandline_args.cache:
                 # save data to cache
@@ -310,9 +289,7 @@ class Mescal(Cmd):
 
     def get_filepath(self) -> Path:
         message = (
-            "[italic]Which file are you calibrating?\n"
-            "[yellow]Hint: You can drag & drop.[/yellow]"
-            "[/italic]\n"
+            "[italic]Which file are you calibrating?\n" "[yellow]Hint: You can drag & drop.[/yellow]" "[/italic]\n"
         )
         message_error = (
             "[italic][red]The file you entered does not exists.[/red]\n"
@@ -362,11 +339,7 @@ class Mescal(Cmd):
                 "the calibration process. You will still be able to visualize data.[/yellow]\n"
                 "[/italic]\n"
             )
-            legend = (
-                "(mark=[bold]space[/bold], "
-                "confirm=[bold]enter[/bold], "
-                "cancel=[bold]skip[/bold])"
-            )
+            legend = "(mark=[bold]space[/bold], " "confirm=[bold]enter[/bold], " "cancel=[bold]skip[/bold])"
             radsources = select_multiple(
                 options=supported_sources(),
                 tick_character=":radioactive:",
@@ -390,9 +363,7 @@ class Mescal(Cmd):
         if "flagged_channels" in self.failed_tests:
             sublists = self.calibration.flagged.values()
             num_flagged = len(set([item for sublist in sublists for item in sublist]))
-            num_channels = len(
-                [ch for quad, chs in self.calibration.channels.items() for ch in chs]
-            )
+            num_channels = len([ch for quad, chs in self.calibration.channels.items() for ch in chs])
             message = (
                 "[i][yellow]"
                 "I was unable to complete calibration for {} channels out of {}."
@@ -409,19 +380,11 @@ class Mescal(Cmd):
             )
             self.console.print(message)
         if "filter_retrigger_off" in self.failed_tests:
-            message = (
-                "[i][yellow]"
-                "Retrigger filter is off."
-                "[/yellow]\n"
-                "You can enable it through 'config.ini'."
-            )
+            message = "[i][yellow]" "Retrigger filter is off." "[/yellow]\n" "You can enable it through 'config.ini'."
             self.console.print(message)
         if "filter_spurious_off" in self.failed_tests:
             message = (
-                "[i][yellow]"
-                "Spurious events filter is off."
-                "[/yellow]\n"
-                "You can enable it through 'config.ini'."
+                "[i][yellow]" "Spurious events filter is off." "[/yellow]\n" "You can enable it through 'config.ini'."
             )
             self.console.print(message)
         if "time_outliers" in self.failed_tests:
@@ -435,9 +398,7 @@ class Mescal(Cmd):
         return True
 
     def export_essentials(self):
-        exporter = self.calibration.get_exporter(
-            self.filepath, self.commandline_args.fmt
-        )
+        exporter = self.calibration.get_exporter(self.filepath, self.commandline_args.fmt)
 
         if exporter.can__write_sdd_calibration_report:
             exporter.write_sdd_calibration_report()
@@ -625,9 +586,7 @@ class Mescal(Cmd):
             self.console.print(self.invalid_channel_message)
             return False
         quad, ch = parsed_arg
-        if (quad not in self.calibration.channels) or (
-            ch not in self.calibration.channels[quad]
-        ):
+        if (quad not in self.calibration.channels) or (ch not in self.calibration.channels[quad]):
             self.console.print(self.no_counts_message)
             return False
 
@@ -749,9 +708,7 @@ class Mescal(Cmd):
     def do_loadcal(self, arg):
         """Loads and existing calibration."""
         message_sdd = (
-            "[italic]Enter path for sdd calibration file.\n"
-            "[yellow]Hint: You can drag & drop.[/yellow]"
-            "[/italic]\n"
+            "[italic]Enter path for sdd calibration file.\n" "[yellow]Hint: You can drag & drop.[/yellow]" "[/italic]\n"
         )
         message_lout = (
             "[italic]Enter path for light output calibration file.\n"
@@ -801,8 +758,7 @@ class Mescal(Cmd):
                 )
             except ValueError:
                 self.console.print(
-                    "The file doesn't appear to be in a valid format.\n"
-                    "Presently we only support .xlsx table."
+                    "The file doesn't appear to be in a valid format.\n" "Presently we only support .xlsx table."
                 )
                 return False
             self.register(newcal)
@@ -833,9 +789,7 @@ class Mescal(Cmd):
 
     def do_export(self, arg):
         """Prompts user on optional data product exports."""
-        exporter = self.calibration.get_exporter(
-            self.filepath, self.commandline_args.fmt
-        )
+        exporter = self.calibration.get_exporter(self.filepath, self.commandline_args.fmt)
 
         Option = namedtuple(
             "Option",
@@ -886,14 +840,18 @@ class Mescal(Cmd):
             Option(
                 "timehist per channel",
                 [
-                    exporter.draw_timehists_neglect_outliers
-                    if "time_outliers" in self.failed_tests
-                    else exporter.draw_timehists,
+                    (
+                        exporter.draw_timehists_neglect_outliers
+                        if "time_outliers" in self.failed_tests
+                        else exporter.draw_timehists
+                    ),
                 ],
                 [
-                    exporter.can__draw_timehists_neglect_outliers
-                    if "time_outliers" in self.failed_tests
-                    else exporter.can__draw_timehists,
+                    (
+                        exporter.can__draw_timehists_neglect_outliers
+                        if "time_outliers" in self.failed_tests
+                        else exporter.can__draw_timehists
+                    ),
                 ],
                 False,
             ),
@@ -981,12 +939,7 @@ def parse_chns(arg):
     quadrants = ["A", "B", "C", "D"]
     chn_strings = ["{0:02d}".format(i) for i in range(32)]
     stripped_arg = arg.strip()
-    if (
-        arg
-        and (arg[0].upper() in quadrants)
-        and (arg[1:3] in chn_strings)
-        and len(stripped_arg) == 3
-    ):
+    if arg and (arg[0].upper() in quadrants) and (arg[1:3] in chn_strings) and len(stripped_arg) == 3:
         quad = arg[0].upper()
         ch = int(arg[1:3])
         return quad, ch
@@ -1016,12 +969,7 @@ def parse_limits(arg):
         return None
 
     arglist = arg.strip().split(" ")
-    if (
-        len(arglist) == 2
-        and arglist[0].isdigit()
-        and arglist[1].isdigit()
-        and int(arglist[0]) < int(arglist[1])
-    ):
+    if len(arglist) == 2 and arglist[0].isdigit() and arglist[1].isdigit() and int(arglist[0]) < int(arglist[1]):
         botlim = int(arglist[0])
         toplim = int(arglist[1])
         return botlim, toplim

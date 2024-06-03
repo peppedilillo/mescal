@@ -41,10 +41,7 @@ def find_epeaks(
         best_peaks, best_peaks_props = _closest_peaks(guesses, bins, peaks, peaks_props)
     else:
         raise DetectPeakError("candidate peaks are less than sources to fit.")
-    limits = [
-        (bins[int(p - w)], bins[int(p + w)])
-        for p, w in zip(best_peaks, best_peaks_props["widths"])
-    ]
+    limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(best_peaks, best_peaks_props["widths"])]
     return limits
 
 
@@ -77,10 +74,7 @@ def find_speaks(
         best_peaks, best_peaks_props = _closest_peaks(guesses, bins, peaks, peaks_props)
     else:
         raise DetectPeakError("candidate peaks are less than sources to fit.")
-    limits = [
-        (bins[int(p - w)], bins[int(p + w)])
-        for p, w in zip(best_peaks, best_peaks_props["widths"])
-    ]
+    limits = [(bins[int(p - w)], bins[int(p + w)]) for p, w in zip(best_peaks, best_peaks_props["widths"])]
     return limits
 
 
@@ -88,11 +82,7 @@ def guess_speaks_position(energies, lightout_guess, gain, offset):
     center, sigma = lightout_guess
     lightout_lims = center + sigma, center - sigma
     guesses = [
-        [
-            (0.5 * lout_lim) * PHOTOEL_PER_KEV * lv * gain + offset
-            for lout_lim in lightout_lims
-        ]
-        for lv in energies
+        [(0.5 * lout_lim) * PHOTOEL_PER_KEV * lv * gain + offset for lout_lim in lightout_lims] for lv in energies
     ]
     return guesses
 
@@ -107,10 +97,7 @@ def _dist_from_intv(x, lo, hi):
 
 def _closest_peaks(guess, bins, peaks, peaks_infos):
     peaks_dist_from_guess = np.array(
-        [
-            [_dist_from_intv(bins[peak], guess_lo, guess_hi) for peak in peaks]
-            for guess_lo, guess_hi in guess
-        ]
+        [[_dist_from_intv(bins[peak], guess_lo, guess_hi) for peak in peaks] for guess_lo, guess_hi in guess]
     )
     if PROMINENCE_WEIGHTING:
         assert "prominences" in peaks_infos.keys()
@@ -123,16 +110,10 @@ def _closest_peaks(guess, bins, peaks, peaks_infos):
     return best_peaks, best_peaks_infos
 
 
-def _compute_louts(
-    centers, center_errs, gain, gain_err, offset, offset_err, radsources: list
-):
+def _compute_louts(centers, center_errs, gain, gain_err, offset, offset_err, radsources: list):
     light_outs = (centers - offset) / gain / PHOTOEL_PER_KEV / radsources
     light_out_errs = (
-        np.sqrt(
-            (center_errs / gain) ** 2
-            + (offset_err / gain) ** 2
-            + ((centers - offset) / gain**2) * (gain_err**2)
-        )
+        np.sqrt((center_errs / gain) ** 2 + (offset_err / gain) ** 2 + ((centers - offset) / gain**2) * (gain_err**2))
         / PHOTOEL_PER_KEV
         / radsources
     )

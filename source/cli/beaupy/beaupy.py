@@ -119,9 +119,7 @@ def prompt(
         Union[T, str]: Returns a value formatted as provided type or string if no type is provided
     """
     rendered = ""
-    with _cursor_hidden(console), Live(
-        rendered, console=console, auto_refresh=False, transient=True
-    ) as live:
+    with _cursor_hidden(console), Live(rendered, console=console, auto_refresh=False, transient=True) as live:
         value: List[str] = [*initial_value] if initial_value else []
         cursor_index = len(initial_value) if initial_value else 0
         error: str = ""
@@ -194,9 +192,7 @@ def press_enter(
         Union[int, str, None]: Selected value or the index of a selected option or `None`
     """
     rendered = ""
-    with _cursor_hidden(console), Live(
-        rendered, console=console, auto_refresh=False, transient=True
-    ) as live:
+    with _cursor_hidden(console), Live(rendered, console=console, auto_refresh=False, transient=True) as live:
         while True:
             rendered = Text(
                 "\npress ENTER to start",
@@ -254,17 +250,13 @@ def select(
         Union[int, str, None]: Selected value or the index of a selected option or `None`
     """
     rendered = ""
-    with _cursor_hidden(console), Live(
-        rendered, console=console, auto_refresh=False, transient=True
-    ) as live:
+    with _cursor_hidden(console), Live(rendered, console=console, auto_refresh=False, transient=True) as live:
         if not options:
             if strict:
                 raise ValueError("`options` cannot be empty")
             return None
         if cursor_style in ["", None]:
-            warnings.warn(
-                "`cursor_style` should be a valid style, defaulting to `white`"
-            )
+            warnings.warn("`cursor_style` should be a valid style, defaulting to `white`")
             cursor_style = "white"
 
         index: int = cursor_index
@@ -368,9 +360,7 @@ def select_multiple(
                 raise ValueError("`options` cannot be empty")
             return []
         if cursor_style in ["", None]:
-            warnings.warn(
-                "`cursor_style` should be a valid style, defaulting to `white`"
-            )
+            warnings.warn("`cursor_style` should be a valid style, defaulting to `white`")
             cursor_style = "white"
         if tick_style in ["", None]:
             warnings.warn("`tick_style` should be a valid style, defaulting to `white`")
@@ -497,13 +487,9 @@ def confirm(
         Optional[bool]
     """
     rendered = ""
-    with _cursor_hidden(console), Live(
-        rendered, console=console, auto_refresh=False, transient=True
-    ) as live:
+    with _cursor_hidden(console), Live(rendered, console=console, auto_refresh=False, transient=True) as live:
         if cursor_style in ["", None]:
-            warnings.warn(
-                "`cursor_style` should be a valid style, defaulting to `white`"
-            )
+            warnings.warn("`cursor_style` should be a valid style, defaulting to `white`")
             cursor_style = "white"
         is_yes = default_is_yes
         is_selected = enter_empty_confirms
@@ -517,7 +503,9 @@ def confirm(
             question_line = f"{question}{yn_prompt}{current_message}"
             yes_prefix = selected_prefix if yes else deselected_prefix
             no_prefix = selected_prefix if no else deselected_prefix
-            rendered = f"{question_line}\n{yes_prefix}{yes_text}\n{no_prefix}{no_text}\n\n(Confirm with [bold]enter[/bold])"
+            rendered = (
+                f"{question_line}\n{yes_prefix}{yes_text}\n{no_prefix}{no_text}\n\n(Confirm with [bold]enter[/bold])"
+            )
             _update_rendered(live, rendered)
 
             keypress = get_key()
