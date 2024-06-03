@@ -895,7 +895,8 @@ def _effectivelo_to_scintillatorslo(lightoutput, detector):
             if ch not in lightoutput[quad].index:
                 continue
             companion = detector.companion(quad, ch)
-            assert companion in lightoutput[quad].index
+            if companion not in lightoutput[quad].index:
+                raise err.WrongTableError("Wrong light output calibration table.")
             ch_lo = lightoutput[quad].loc[ch].light_out
             ch_lo_err = lightoutput[quad].loc[ch].light_out_err
             companion_lo = lightoutput[quad].loc[companion].light_out

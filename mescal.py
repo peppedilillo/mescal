@@ -129,6 +129,9 @@ class Mescal(Cmd):
     invalid_natural_message = (
         "[red]Wrong number format.[/]\n" "[i]Argument must be expressed as a positive integer (e.g. 100).[/i]"
     )
+    invalid_slo_message = (
+        "[red]Wrong table content.[/]\n" "[i]The light-output table provided does not match the payload map.[/i]"
+    )
     # fmt on
 
     def __init__(self):
@@ -762,15 +765,17 @@ class Mescal(Cmd):
                     console=self.console,
                     nthreads=self.threads,
                 )
+                self.register(newcal)
+                self.calibration = newcal
+                self.calibration(self.data)
             except ValueError:
-                self.console.print(
-                    "The file doesn't appear to be in a valid format.\n" "Presently we only support .xlsx table."
-                )
+                self.console.print(self.invalid_format_message)
                 return False
-            self.register(newcal)
-            self.calibration = newcal
-            self.calibration(self.data)
-            ui.shell_rule(self.console)
+            except err.WrongTableError:
+                self.console.print(self.invalid_slo_message)
+                return False
+            finally:
+                ui.shell_rule(self.console)
         return False
 
     def can_swapcal(self, arg):
