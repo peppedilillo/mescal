@@ -1,6 +1,7 @@
 import logging
 from math import floor
 from pathlib import Path
+import warnings
 
 from astropy.io import fits as fitsio
 from astropy.table import Table
@@ -15,6 +16,9 @@ from source import paths
 from source import plot
 from source.constants import PHOTOEL_PER_KEV
 from source.eventlist import timehist
+
+
+warnings.filterwarnings('ignore', module='astropy')
 
 
 class Exporter:

@@ -121,7 +121,7 @@ class Mescal(Cmd):
         "[red]Invalid limits.[/]\n" "[i]Entries must be two, different, " "sorted integers (e.g., 19800 20100).[/i]\n"
     )
     invalid_table_message = (
-        "[red]Invalid table.[/]\n" "[i]Make sure the table you are providing has the right columns.[/i]"
+        "[red]Invalid table.[/]\n" "[i]Make sure the table you are providing has the right columns and format.[/i]"
     )
     invalid_format_message = (
         "[red]The file appears to be in wrong format.[/]\n" "[i]The command `loadcal` expects .xslx table format.[/i]"
@@ -274,8 +274,15 @@ class Mescal(Cmd):
         if cached.is_file() and self.commandline_args.cache:
             out = pd.read_pickle(cached)
             self.console.log("[bold yellow]:yellow_circle: Data were loaded from cache.")
-        elif self.filepath.is_file():
-            out = pandas_from_lv0d5(self.filepath)
+        else:
+            try:
+                out = pandas_from_lv0d5(self.filepath)
+            except KeyError:
+                self.console.print("\n" + self.invalid_table_message)
+                exit()
+            except OsError:
+                self.console.print("\n" + self.invalid_table_message)
+                exit()
             self.console.log(":open_book: Data loaded.")
             if self.commandline_args.cache:
                 # save data to cache
@@ -283,8 +290,6 @@ class Mescal(Cmd):
 
                 out.to_pickle(cached, protocol=DEFAULT_PROTOCOL)
                 self.console.log(":blue_book: Data saved to cache.")
-        else:
-            raise FileNotFoundError("could not find input datafile.")
         return out
 
     def get_filepath(self) -> Path:
@@ -292,14 +297,15 @@ class Mescal(Cmd):
             "[italic]Which file are you calibrating?\n" "[yellow]Hint: You can drag & drop.[/yellow]" "[/italic]\n"
         )
         message_error = (
-            "[italic][red]The file you entered does not exists.[/red]\n"
+            "[italic][red]The file you entered does not exists or appears to be in an unexpected format.[/red]\n"
+            "[italic][red]Make sure your file name terminates either in `.fits` or `.fit`.[/red]\n"
             "Which file are you calibrating?\n"
             "[yellow]Hint: You can drag & drop.[/yellow]\n"
             "[/italic]\n"
         )
         if self.commandline_args.filepath is not None:
             return Path(self.commandline_args.filepath)
-        filepath = prompt_user_on_filepath(message, message_error, self.console)
+        filepath = prompt_user_on_filepath(message, message_error, self.console, supported_formats=[".fits", ".fit"])
         if filepath is None:
             self.console.print("So soon? Ciao :wave:!\n")
             exit()
@@ -910,7 +916,7 @@ class Mescal(Cmd):
         return False
 
 
-def prompt_user_on_filepath(message, message_error, console) -> Path:
+def prompt_user_on_filepath(message, message_error, console, supported_formats: list | None = None) -> Path:
     filepath = None
     text = message
     while filepath is None:
@@ -926,6 +932,8 @@ def prompt_user_on_filepath(message, message_error, console) -> Path:
         # removes whites spaces at end and beginning, and white space escape code
         answer = Path(*map(lambda x: x.replace("\\ ", " "), Path(answer.strip()).parts))
         if not answer.exists():
+            text = message_error
+        elif supported_formats and answer.suffix not in supported_formats:
             text = message_error
         else:
             filepath = Path(answer)
