@@ -770,10 +770,8 @@ class Mescal(Cmd):
                 self.calibration(self.data)
             except ValueError:
                 self.console.print(self.invalid_format_message)
-                return False
             except err.WrongTableError:
                 self.console.print(self.invalid_slo_message)
-                return False
             finally:
                 ui.shell_rule(self.console)
         return False
