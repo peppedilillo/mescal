@@ -19,6 +19,8 @@ from source.eventlist import electrons_to_energy
 from source.eventlist import infer_onchannels
 from source.eventlist import make_electron_list
 from source.eventlist import perchannel_counts
+from source.eventlist import widow_filter
+from source.eventlist import find_widows
 from source.io import Exporter
 from source.radsources import radsources_dicts
 from source.speaks import find_epeaks
@@ -927,8 +929,11 @@ class ImportedCalibration(Calibrate):
         self.scintillator_calibration = _effectivelo_to_scintillatorslo(self.lightoutput, self.detector)
 
     def __call__(self, data):
-        self.data = data
         self.channels = infer_onchannels(data)
+        widows = find_widows(self.channels, self.detector)
+        filtered_data, waste = widow_filter(data, widows)
+        self.data = filtered_data
+        self._print(f":white_check_mark: Filtered {len(waste)} event from widow channels")
         self._bin()
         self.eventlist = self._calibrate()
         return self.eventlist

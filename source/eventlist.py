@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from source.constants import PHOTOEL_PER_KEV
-from source.detectors import get_couples
+from source.detectors import get_couples, Detector
 import source.errors as err
 
 s2i = lambda quad: "ABCD".find(str.upper(quad))
@@ -52,6 +52,164 @@ def preprocess(
     if filtered and console:
         console.log(":white_check_mark: Filtered {:.1f}% of the events.".format(filtered))
     return data, waste
+
+
+def add_evtype_tag(data, couples):
+    """
+    inplace add event type (X or S) column
+    """
+    qm = data["QUADID"].map({key: 100 * s2i(key) for key in "ABCD"})
+    chm_dict = dict(np.concatenate([np.array([*couples[key].items()]) + 100 * s2i(key) for key in couples.keys()]))
+    chm = data["CHN"] + qm
+    data.insert(
+        loc=len(data.columns),
+        column="EVTYPE",
+        value=(
+            data.assign(CHN=chm.map(chm_dict).fillna(chm))
+            .duplicated(["SID", "CHN"], keep=False)
+            .map({False: "X", True: "S"})
+            .astype("string")
+        ),
+    )
+    return data
+
+
+def perchannel_counts(data, channels, key="all"):
+    dict_ = {}
+    for quad in channels.keys():
+        if key == "all":
+            quaddata = data[data["QUADID"] == quad]
+        elif key == "x":
+            quaddata = data[(data["QUADID"] == quad) & (data["EVTYPE"] == "X")]
+        elif key == "s":
+            quaddata = data[(data["QUADID"] == quad) & (data["EVTYPE"] == "S")]
+        else:
+            raise ValueError("wrong event type key.")
+
+        for ch in channels[quad]:
+            counts = len(quaddata[(quaddata["CHN"] == ch)])
+            dict_.setdefault(quad, {})[ch] = counts
+
+    out = {
+        k: pd.DataFrame(
+            dict_[k],
+            index=["counts"],
+        ).T.rename_axis("channel")
+        for k in dict_
+    }
+    return out
+
+
+def find_widows(on_channels: dict, model: Detector):
+    widows = {}
+    for quad in on_channels:
+        widows[quad] = []
+        for ch in on_channels[quad]:
+            try:
+                companion = model.companion(quad, ch)
+                if companion not in on_channels[quad]:
+                    widows[quad].append(ch)
+            except KeyError:
+                print(f"{quad} {ch} cant find companion")
+    return widows
+
+
+def spurious_filter(data):
+    mask = (data["NMULT"] == 1) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))
+    cleaned_data = data[mask]
+    waste = data[~mask]
+    return cleaned_data, waste
+
+
+def delay_filter(data, hold_time):
+    unique_times = data.TIME.unique()
+    bad_events = unique_times[np.where(np.diff(unique_times) < hold_time)[0] + 1]
+    mask = ~(data["TIME"].isin(bad_events))
+    cleaned_data = data[mask]
+    waste = data[~mask]
+    return cleaned_data, waste
+
+
+def widow_filter(data, widows):
+    widows_list = [(quad, ch) for quad in widows.keys() for ch in widows[quad]]
+    mask = data.apply(lambda row: (row['QUADID'], row['CHN']) in widows_list, axis=1)
+    cleaned_data = data[~mask]
+    waste = data[mask]
+    return cleaned_data, waste
+
+
+def infer_onchannels(data):
+    out = {}
+    for quad in "ABCD":
+        onchs = np.unique(data[data["QUADID"] == quad]["CHN"])
+        if onchs.any():
+            out[quad] = onchs.tolist()
+    return out
+
+
+def timehist(data):
+    """
+    Makes histograms of counts in time of a channel with safeguards against
+    bad time data.
+    This function is curried beacuse partial application are useful
+    to make histograms for channels in different quadrants in parallel.
+    See timehist_quadch for an example interface."""
+
+    def timehist_filter_outliers(outliers):
+        """Remove time outliers"""
+
+        def timehist_filter_quadrant(quad):
+            """Throws away events not on quad"""
+
+            def timehist_filter_channel(ch):
+                """Throw away events not on channel"""
+
+                def timehist_histogram(binning):
+                    """Makes an histogram"""
+                    num_intervals = int((max_ - min_) / binning + 1)
+                    counts, bins = np.histogram(
+                        data[mask_quadrant & mask_channel]["TIME"].values,
+                        range=(min_, min_ + num_intervals * binning),
+                        bins=num_intervals,
+                    )
+                    return counts, bins
+
+                mask_channel = data["CHN"] == ch
+                return timehist_histogram
+
+            mask_quadrant = data["QUADID"] == quad
+            return timehist_filter_channel
+
+        if outliers:
+            min_, max_ = np.quantile(data["TIME"], [0.01, 0.99])
+        else:
+            min_, max_ = data["TIME"].min(), data["TIME"].max()
+        return timehist_filter_quadrant
+
+    return timehist_filter_outliers
+
+
+def timehist_quadch(data, quad, ch, binning, neglect_outliers):
+    """Returns an histograms of counts observed by (quad, ch) removing entries
+    with non-sense time information."""
+    return timehist(data)(neglect_outliers)(quad)(ch)(binning)
+
+
+def timehist_all(data, binning, neglect_outliers):
+    if len(data) <= 0:
+        raise err.BadDataError("Empty data.")
+
+    if neglect_outliers:
+        min_, max_ = np.quantile(data["TIME"], [0.01, 0.99])
+    else:
+        min_, max_ = data["TIME"].min(), data["TIME"].max()
+    num_intervals = int((max_ - min_) / binning + 1)
+    counts, bins = np.histogram(
+        data["TIME"].values,
+        range=(min_, min_ + num_intervals * binning),
+        bins=num_intervals,
+    )
+    return counts, bins
 
 
 def _convert_x_events(data):
@@ -223,139 +381,3 @@ def _insert_electron_column(data, calibrated_sdds):
     electrons = (adcs - offsets) / gains / PHOTOEL_PER_KEV
     data.insert(0, "ELECTRONS", electrons)
     return data
-
-
-def add_evtype_tag(data, couples):
-    """
-    inplace add event type (X or S) column
-    """
-    qm = data["QUADID"].map({key: 100 * s2i(key) for key in "ABCD"})
-    chm_dict = dict(np.concatenate([np.array([*couples[key].items()]) + 100 * s2i(key) for key in couples.keys()]))
-    chm = data["CHN"] + qm
-    data.insert(
-        loc=len(data.columns),
-        column="EVTYPE",
-        value=(
-            data.assign(CHN=chm.map(chm_dict).fillna(chm))
-            .duplicated(["SID", "CHN"], keep=False)
-            .map({False: "X", True: "S"})
-            .astype("string")
-        ),
-    )
-    return data
-
-
-def perchannel_counts(data, channels, key="all"):
-    dict_ = {}
-    for quad in channels.keys():
-        if key == "all":
-            quaddata = data[data["QUADID"] == quad]
-        elif key == "x":
-            quaddata = data[(data["QUADID"] == quad) & (data["EVTYPE"] == "X")]
-        elif key == "s":
-            quaddata = data[(data["QUADID"] == quad) & (data["EVTYPE"] == "S")]
-        else:
-            raise ValueError("wrong event type key.")
-
-        for ch in channels[quad]:
-            counts = len(quaddata[(quaddata["CHN"] == ch)])
-            dict_.setdefault(quad, {})[ch] = counts
-
-    out = {
-        k: pd.DataFrame(
-            dict_[k],
-            index=["counts"],
-        ).T.rename_axis("channel")
-        for k in dict_
-    }
-    return out
-
-
-def spurious_filter(data):
-    mask = (data["NMULT"] == 1) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))
-    cleaned_data = data[mask]
-    waste = data[~mask]
-    return cleaned_data, waste
-
-
-def delay_filter(data, hold_time):
-    unique_times = data.TIME.unique()
-    bad_events = unique_times[np.where(np.diff(unique_times) < hold_time)[0] + 1]
-    mask = ~(data["TIME"].isin(bad_events))
-    cleaned_data = data[mask]
-    waste = data[~mask]
-    return cleaned_data, waste
-
-
-def infer_onchannels(data):
-    out = {}
-    for quad in "ABCD":
-        onchs = np.unique(data[data["QUADID"] == quad]["CHN"])
-        if onchs.any():
-            out[quad] = onchs.tolist()
-    return out
-
-
-def timehist(data):
-    """
-    Makes histograms of counts in time of a channel with safeguards against
-    bad time data.
-    This function is curried beacuse partial application are useful
-    to make histograms for channels in different quadrants in parallel.
-    See timehist_quadch for an example interface."""
-
-    def timehist_filter_outliers(outliers):
-        """Remove time outliers"""
-
-        def timehist_filter_quadrant(quad):
-            """Throws away events not on quad"""
-
-            def timehist_filter_channel(ch):
-                """Throw away events not on channel"""
-
-                def timehist_histogram(binning):
-                    """Makes an histogram"""
-                    num_intervals = int((max_ - min_) / binning + 1)
-                    counts, bins = np.histogram(
-                        data[mask_quadrant & mask_channel]["TIME"].values,
-                        range=(min_, min_ + num_intervals * binning),
-                        bins=num_intervals,
-                    )
-                    return counts, bins
-
-                mask_channel = data["CHN"] == ch
-                return timehist_histogram
-
-            mask_quadrant = data["QUADID"] == quad
-            return timehist_filter_channel
-
-        if outliers:
-            min_, max_ = np.quantile(data["TIME"], [0.01, 0.99])
-        else:
-            min_, max_ = data["TIME"].min(), data["TIME"].max()
-        return timehist_filter_quadrant
-
-    return timehist_filter_outliers
-
-
-def timehist_quadch(data, quad, ch, binning, neglect_outliers):
-    """Returns an histograms of counts observed by (quad, ch) removing entries
-    with non-sense time information."""
-    return timehist(data)(neglect_outliers)(quad)(ch)(binning)
-
-
-def timehist_all(data, binning, neglect_outliers):
-    if len(data) <= 0:
-        raise err.BadDataError("Empty data.")
-
-    if neglect_outliers:
-        min_, max_ = np.quantile(data["TIME"], [0.01, 0.99])
-    else:
-        min_, max_ = data["TIME"].min(), data["TIME"].max()
-    num_intervals = int((max_ - min_) / binning + 1)
-    counts, bins = np.histogram(
-        data["TIME"].values,
-        range=(min_, min_ + num_intervals * binning),
-        bins=num_intervals,
-    )
-    return counts, bins
