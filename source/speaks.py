@@ -5,18 +5,6 @@ from scipy.signal import find_peaks
 from source.constants import PHOTOEL_PER_KEV
 from source.errors import DetectPeakError
 
-SMOOTHING = 20
-
-SPEAKS_DETECTION_PARAMETERS = {
-    "prominence": 6,
-    "width": 10,
-}
-
-
-EPEAKS_DETECTION_PARAMETERS = {
-    "prominence": 30,
-    "width": 10,
-}
 
 PROMINENCE_WEIGHTING = False
 

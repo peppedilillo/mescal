@@ -13,8 +13,15 @@ s2i = lambda quad: "ABCD".find(str.upper(quad))
 i2s = lambda n: chr(65 + n)
 
 
-def _as_ucid_dataframe(dict_of_df):
+def _as_ucid_dataframe(dict_of_df) -> pd.DataFrame:
+    """
+    Transforms scintillator calibrations from a dictionary of dataframe to a
+    single dataframe, with uniquely defined indeces (e.g. C21 --> 221, A11 -->11
+    and so on). Returns an empty dataframe if an empty dictionary is passed.
+    """
     out = pd.concat(
+        # prevents an error and ensues returning empty df if dict_of_df is empty
+        [pd.DataFrame()] +
         [
             pd.DataFrame(
                 df.values,
@@ -130,8 +137,8 @@ def delay_filter(data, hold_time):
     return cleaned_data, waste
 
 
-def widow_filter(data, widows):
-    widows_list = [(quad, ch) for quad in widows.keys() for ch in widows[quad]]
+def filter_channels(data, channels):
+    widows_list = [(quad, ch) for quad in channels.keys() for ch in channels[quad]]
     mask = data.apply(lambda row: (row['QUADID'], row['CHN']) in widows_list, axis=1)
     cleaned_data = data[~mask]
     waste = data[mask]
@@ -153,8 +160,8 @@ def timehist(data):
     bad time data.
     This function is curried beacuse partial application are useful
     to make histograms for channels in different quadrants in parallel.
-    See timehist_quadch for an example interface."""
-
+    See timehist_quadch for an example interface.
+    """
     def timehist_filter_outliers(outliers):
         """Remove time outliers"""
 
@@ -230,10 +237,16 @@ def _convert_gamma_events(data, scint_calibrations, couples):
     channel = out["CHN"] + qm
     scint_ucid = channel.map(companion_to_channel).fillna(channel).astype(int)
     ucid_calibs = _as_ucid_dataframe(scint_calibrations)
+
     if np.all(scint_ucid.isin(ucid_calibs.index).values):
+        # all the scintillators were successfully calibrated
         electrons = out["ELECTRONS"]
         light_outs = ucid_calibs.loc[scint_ucid]["light_out"].values
+
     elif np.any(scint_ucid.isin(ucid_calibs.index).values):
+        # some scintillators could not be calibrated for whatever reasons,
+        # hence we drop S events from these. Note that this will not
+        # filter widow events, since these are not "S" but definition.;
         mask = scint_ucid.isin(ucid_calibs.index)
         electrons = out[mask]["ELECTRONS"]
         light_outs = ucid_calibs.loc[scint_ucid[mask]]["light_out"].values
@@ -244,10 +257,14 @@ def _convert_gamma_events(data, scint_calibrations, couples):
                 len(uncalibrated_events),
                 100 * len(uncalibrated_events) / len(electrons),
                 str([quad + "{:02d}".format(ch) for (ch, quad) in bad_channels])[1:-1],
-            )
-        )
+            ))
+
     else:
+        # we get here if we have no calibrated scintillators.
+        # TODO: could be improved to return something empty so that we can at least
+        #       return the calibrated X events.
         raise err.CalibratedEventlistError("failed event calibration.")
+
     energies = electrons / light_outs
 
     out.insert(0, "ENERGY", energies)
@@ -265,10 +282,13 @@ def electrons_to_energy(data, scint_calibrations, couples):
 def make_electron_list(
     data,
     calibrated_sdds,
-    sfit_results,
-    scintillator_couples,
+    detector,
     nthreads=1,
+    channels=None,
 ):
+    if channels is None:
+        channels = infer_onchannels(data)
+
     columns = ["TIME", "ELECTRONS", "EVTYPE", "CHN", "QUADID"]
     types = ["float64", "float32", "U1", "int8", "U1"]
     dtypes = {col: tp for col, tp in zip(columns, types)}
@@ -277,8 +297,7 @@ def make_electron_list(
     disorganized_events = _get_calibrated_events(
         data,
         calibrated_sdds,
-        sfit_results,
-        scintillator_couples,
+        detector.couples,
         nthreads=nthreads,
     )
 
@@ -304,14 +323,15 @@ def make_electron_list(
                 dtype=[*dtypes.items()],
             )
             container = np.hstack((container, s_array))
+
     out = pd.DataFrame(container).sort_values("TIME").reset_index(drop=True)
     return out
 
 
-def _get_calibrated_events(data, calibrated_sdds, sfit_results, scintillator_couples, nthreads=1):
+def _get_calibrated_events(data, calibrated_sdds, scintillator_couples, nthreads=1):
     def helper(quadrant):
         couples = scintillator_couples[quadrant]
-        fitted_calibrated_channels = list(set(calibrated_sdds[quadrant].index) & set(sfit_results[quadrant].index))
+        fitted_calibrated_channels = list(set(calibrated_sdds[quadrant].index))
         channels = _get_coupled_channels(fitted_calibrated_channels, couples)
 
         quadrant_data = data[(data["QUADID"] == quadrant) & (data["CHN"].isin(channels))]
@@ -328,7 +348,7 @@ def _get_calibrated_events(data, calibrated_sdds, sfit_results, scintillator_cou
 
         return quadrant, (x_events, gamma_events)
 
-    results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in sfit_results.keys())
+    results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in calibrated_sdds.keys())
     return {quadrant: value for quadrant, value in results}
 
 

@@ -31,7 +31,7 @@ class CalibratedEventlistError(Exception):
 
 
 class BadDataError(Exception):
-    """This is when trying to deal with unexpectedly bad errors."""
+    """This is when trying to deal with unexpectedly bad data inputs."""
 
 
 class WrongTableError(Exception):
@@ -64,3 +64,7 @@ def warn_nan_in_sdd_calib(quad):
 
 def warn_nan_in_slo_table(quad):
     return "NaN in {} quadrant light output table. " "Filling with 0s.".format(quad)
+
+
+def warn_failed_lightout(quad, scint):
+    return ("S-mode fits are missing for both channel coupled to scintillator {}{:02d}. Can't compute light output for these channels.".format(quad, scint))

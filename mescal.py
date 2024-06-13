@@ -14,6 +14,7 @@ import pandas as pd
 from source import paths
 from source.calibrate import Calibrate
 from source.calibrate import ImportedCalibration
+from source.calibrate import PartialCalibration
 from source.calibrate import PEAKS_PARAMS
 from source.checks import check_results
 from source.cli import elementsui as ui
@@ -36,7 +37,7 @@ from source.plot import mapcounts
 from source.plot import mapenres
 from source.plot import spectrum_xs
 from source.plot import uncalibrated
-from source.radsources import supported_sources
+from source.radsources import supported_sources, supported_ssources, supported_xsources
 from source.utils import get_version
 
 commandline_args_parser = argparse.ArgumentParser()
@@ -253,7 +254,8 @@ class Mescal(Cmd):
         out = {
             "filter_retrigger": (0.0 if self.commandline_args.nofilters else general.getfloat("filter_retrigger")),
             "filter_spurious": (False if self.commandline_args.nofilters else general.getboolean("filter_spurious")),
-            "binning": adcitems.getint("binning"),
+            "xbinning": adcitems.getint("xbinning"),
+            "sbinning": adcitems.getint("sbinning"),
             "xpeaks_mincounts": general.getint("xpeaks_mincounts"),
             "gain_center": adcitems.getfloat("gain_center"),
             "gain_sigma": adcitems.getfloat("gain_sigma"),
@@ -283,7 +285,7 @@ class Mescal(Cmd):
             except KeyError:
                 self.console.print("\n" + self.invalid_table_message)
                 exit()
-            except OsError:
+            except OSError:
                 self.console.print("\n" + self.invalid_table_message)
                 exit()
             self.console.log(":open_book: Data loaded.")
@@ -341,29 +343,25 @@ class Mescal(Cmd):
         return model
 
     def get_radsources(self) -> list[str]:
-        def prompt_user_on_radsources():
-            message = (
-                "[italic]With which radioactive sources?\n"
-                "[yellow]Hint: Pressing esc or selecting no source will cause mescal to skip "
-                "the calibration process. You will still be able to visualize data.[/yellow]\n"
-                "[/italic]\n"
-            )
-            legend = "(mark=[bold]space[/bold], " "confirm=[bold]enter[/bold], " "cancel=[bold]skip[/bold])"
-            radsources = select_multiple(
-                options=supported_sources(),
-                tick_character=":radioactive:",
-                ticked_indices=list(range(len(supported_sources()))),
-                console=self.console,
-                intro=message,
-                transient=True,
-                legend=legend,
-            )
-            return radsources
-
+        message_x = (
+            "[italic]Which X radioactive sources you intend to calibrate?\n"
+            "[yellow]Hint: Pressing esc or selecting no source will cause mescal to skip "
+            "the calibration process. You will still be able to visualize data.[/yellow]\n"
+            "[/italic]\n"
+        )
+        message_s = (
+            "[italic]Which gamma radioactive sources you intend to calibrate?\n"
+            "[yellow]Hint: Pressing esc or selecting no source will cause mescal to skip "
+            "the calibration process. You will still be able to visualize data.[/yellow]\n"
+            "[/italic]\n"
+        )
         if self.commandline_args.source is not None:
             return self.commandline_args.source
-        radsources = prompt_user_on_radsources()
-        return radsources
+        xradsources = prompt_user_on_radsources(supported_xsources(), message_x, self.console)
+        if not xradsources:
+            return []
+        sradsources = prompt_user_on_radsources(supported_ssources(), message_s, self.console)
+        return xradsources + sradsources
 
     def display_warning(self):
         """Tells user about channels for which calibration
@@ -570,7 +568,7 @@ class Mescal(Cmd):
         return False
 
     def can_retry(self, arg):
-        if self.radsources and not isinstance(self.calibration, ImportedCalibration):
+        if any(self.calibration.radsources) and not isinstance(self.calibration, ImportedCalibration):
             return True
         return False
 
@@ -584,7 +582,7 @@ class Mescal(Cmd):
         return False
 
     def can_setlim(self, arg):
-        if self.radsources and not isinstance(self.calibration, ImportedCalibration):
+        if any(self.calibration.radsources) and not isinstance(self.calibration, ImportedCalibration):
             return True
         return False
 
@@ -722,6 +720,7 @@ class Mescal(Cmd):
         message_lout = (
             "[italic]Enter path for light output calibration file.\n"
             "[yellow]Hint: You can drag & drop.[/yellow]"
+            "[yellow]Hint: Pressing esc you will be given an option to try S-calibrate anew.[/yellow]"
             "[/italic]\n"
         )
         message_error = (
@@ -730,6 +729,11 @@ class Mescal(Cmd):
             "[yellow]Hint: You can drag & drop.[/yellow]\n"
             "[/italic]\n"
         )
+        message_partial = (
+            "[italic][yellow]Shall I try to calibrate any of these gamma sources?[/yellow]\n"
+            "[/italic]\n"
+        )
+        # we ask the user to tell us where the SDD calibration file is.
         answer = prompt_user_on_filepath(message_sdd, message_error, self.console)
         if answer is None:
             return False
@@ -742,38 +746,65 @@ class Mescal(Cmd):
             self.console.print(self.invalid_format_message)
             return False
 
+        # now we ask where the scintillator calibration file is
         answer = prompt_user_on_filepath(message_lout, message_error, self.console)
-        if answer is None:
-            return False
-        try:
-            local = read_lightout_report(answer)
-        except err.WrongTableError:
-            self.console.print(self.invalid_table_message)
-            return False
-        except err.FormatNotSupportedError:
-            self.console.print(self.invalid_format_message)
-            return False
-
-        with self.console.status(self.spinner_message):
-            ui.logcal_rule(self.console)
+        if answer is not None:
             try:
-                newcal = ImportedCalibration(
-                    self.model,
-                    self.config,
-                    sdd_calibration=sddcal,
-                    lightoutput=local,
-                    console=self.console,
-                    nthreads=self.threads,
-                )
-                self.register(newcal)
-                self.calibration = newcal
-                self.calibration(self.data)
-            except ValueError:
-                self.console.print(self.invalid_format_message)
+                lightouts = read_lightout_report(answer)
             except err.WrongTableError:
-                self.console.print(self.invalid_slo_message)
-            finally:
-                ui.shell_rule(self.console)
+                self.console.print(self.invalid_table_message)
+                return False
+            except err.FormatNotSupportedError:
+                self.console.print(self.invalid_format_message)
+                return False
+
+            # after making sure the file is there and resembles what we expect. we
+            # calibrate starting from the values in the provided files.
+            with self.console.status(self.spinner_message):
+                ui.logcal_rule(self.console)
+                try:
+                    newcal = ImportedCalibration(
+                        self.model,
+                        self.config,
+                        sdd_calibration=sddcal,
+                        lightoutput=lightouts,
+                        console=self.console,
+                        nthreads=self.threads,
+                    )
+                    self.register(newcal)
+                    self.calibration = newcal
+                    self.calibration(self.data)
+                except ValueError:
+                    self.console.print(self.invalid_format_message)
+                except err.WrongTableError:
+                    self.console.print(self.invalid_slo_message)
+                finally:
+                    ui.shell_rule(self.console)
+        else:
+            # if the user does not provide a file we ask him if we should attempt calibrating from scratches
+            sradsources = prompt_user_on_radsources(supported_ssources(), message_partial, self.console)
+
+            with self.console.status(self.spinner_message):
+                ui.logcal_rule(self.console)
+                try:
+                    newcal = PartialCalibration(
+                        self.model,
+                        self.config,
+                        ssources=sradsources,
+                        sdd_calibration=sddcal,
+                        console=self.console,
+                        nthreads=self.threads,
+                    )
+                    self.register(newcal)
+                    self.calibration = newcal
+                    self.calibration(self.data)
+                    self.export_essentials()
+                except ValueError:
+                    self.console.print(self.invalid_format_message)
+                except err.WrongTableError:
+                    self.console.print(self.invalid_slo_message)
+                finally:
+                    ui.shell_rule(self.console)
         return False
 
     def can_swapcal(self, arg):
@@ -917,6 +948,19 @@ class Mescal(Cmd):
                 if condition:
                     f()
         return False
+
+
+def prompt_user_on_radsources(sources: list, message: str, console):
+    legend = "(mark=[bold]space[/bold], " "confirm=[bold]enter[/bold], " "cancel=[bold]skip[/bold])"
+    radsources = select_multiple(
+        options=sources,
+        tick_character=":radioactive:",
+        console=console,
+        intro=message,
+        transient=True,
+        legend=legend,
+    )
+    return radsources
 
 
 def prompt_user_on_filepath(message, message_error, console, supported_formats: list | None = None) -> Path:

@@ -19,7 +19,7 @@ from source.eventlist import electrons_to_energy
 from source.eventlist import infer_onchannels
 from source.eventlist import make_electron_list
 from source.eventlist import perchannel_counts
-from source.eventlist import widow_filter
+from source.eventlist import filter_channels
 from source.eventlist import find_widows
 from source.io import Exporter
 from source.radsources import radsources_dicts
@@ -168,14 +168,12 @@ def linrange(start, stop, step):
     return bins
 
 
-def find_adc_bins(data, binning, maxmargin=10, roundto=500, clipquant=0.996):
+def find_adc_domain(data, maxmargin=10, roundto=500, clipquant=0.996):
     """
-    find good binning for adc data, euristic.
-    not intended to use for binning scintillator electrons data.
+    find good domain limits for adc data, euristic.
 
     Args:
         data: array of int, adc readings
-        binning: int, binning step
         maxmargin: int, ignores data larger than max - maxmargin
         roundto: int, round to nearest
         clipquant: float, ignore data above quantile
@@ -193,9 +191,7 @@ def find_adc_bins(data, binning, maxmargin=10, roundto=500, clipquant=0.996):
     clipped_data = data[data < max_ - maxmargin]
     hi = clipped_data.quantile(clipquant)
     hi = ceil(hi / roundto) * roundto
-
-    bins = linrange(lo, hi, binning)
-    return bins
+    return lo, hi
 
 
 def _histogram(value, data, bins, nthreads=1):
@@ -275,6 +271,10 @@ def ehistogram(data, bins, nthreads=1):
         nthreads=nthreads,
     )
     return histograms
+
+
+def get_ebins():
+    return linrange(1000, 25000, 50)
 
 
 class Calibrate:
@@ -357,24 +357,18 @@ class Calibrate:
         return sradsources
 
     def _bin(self):
-        binning = self.configuration["binning"]
-
-        bins = find_adc_bins(self.data["ADC"], binning)
-        self.xbins = bins
-        self.sbins = bins
+        lo, hi = find_adc_domain(self.data["ADC"])
+        self.xbins = linrange(lo, hi, self.configuration["xbinning"])
+        self.sbins = linrange(lo, hi, self.configuration["sbinning"])
         self.xhistograms = xhistogram(self.data, self.xbins, self.nthreads)
         self.shistograms = shistogram(self.data, self.sbins, self.nthreads)
-        lost = (self.data["ADC"] >= bins[-1]) | (self.data["ADC"] < bins[0])
+        lost = (self.data["ADC"] >= hi) | (self.data["ADC"] < lo)
         lost_fraction = 100 * len(self.data[lost]) / len(self.data["ADC"])
         self._print(":white_check_mark: Binned data. Lost {:.2f}% dataset.".format(lost_fraction))
 
-    def _calibrate(self):
-        message = "attempting new calibration."
-        logging.info(message)
-
-        # X calibration
+    def _calibrate_x(self):
         if len(self.xradsources()) < 2:
-            return None
+            raise err.FewLinesError()
         # generally self.xpeaks will not be None when
         # attempting a new sdd calibration.
         if self.xpeaks is None:
@@ -387,10 +381,11 @@ class Calibrate:
         self.sdd_calibration = self._calibrate_sdds()
         self.resolution = self._compute_energy_resolution()
         self._print(":white_check_mark: Analyzed X events.")
-        # S calibration
+        return True
+
+    def _calibrate_s(self, electron_evlist):
         if not self.sradsources():
-            return None
-        # see note above for self._detect_xpeaks
+            raise err.FewLinesError()
         if self.speaks is None:
             self.speaks = self._detect_speaks()
         elif "speak" in self.flagged:
@@ -398,31 +393,44 @@ class Calibrate:
                 message = err.warn_failed_peak_detection(quad, ch)
                 logging.warning(message)
         self.sfit = self._fit_sradsources()
-        electron_evlist = make_electron_list(
-            self.data,
-            self.sdd_calibration,
-            self.sfit,
-            self.detector.couples,
-            self.nthreads,
-        )
-        self.ebins = linrange(1000, 25000, 50)
+        self.ebins = get_ebins()
         self.ehistograms = ehistogram(electron_evlist, self.ebins, self.nthreads)
         self.epeaks = self._detect_epeaks()
         self.efit = self._fit_gamma_electrons()
         self.scintillator_calibration = self._calibrate_scintillators()
         self.lightoutput = self._compute_effective_light_outputs()
         self._print(":white_check_mark: Analyzed S events.")
-        if not self.scintillator_calibration:
-            return None
+        return True
 
+    def _calibrate(self):
+        message = "Attempting new calibration."
+        logging.info(message)
+
+        try:
+            self._calibrate_x()
+        except err.FewLinesError:
+            logging.warning("Too few lines to calibrate in X-mode.")
+            return
+        electron_evlist = make_electron_list(
+            self.data,
+            self.sdd_calibration,
+            self.detector,
+            nthreads=self.nthreads,
+            channels=self.channels
+        )
+        try:
+            self._calibrate_s(electron_evlist)
+        except err.FewLinesError:
+            logging.warning("Attempted S-calibration but got no radiation sources.")
+            return
         try:
             eventlist = electrons_to_energy(
                 electron_evlist,
                 self.scintillator_calibration,
                 self.detector.couples,
             )
-        except err.CalibratedEventlistError:
-            logging.warning("Event list creation failed.")
+        except err.CalibratedEventlistError as e:
+            logging.warning(f"Photon events calibration error: {e}.")
             return None
         return eventlist
 
@@ -475,6 +483,9 @@ class Calibrate:
                         energies,
                         gain_guess,
                         offset_guess,
+                        width=ceil(5 / self.configuration["xbinning"]),
+                        distance=ceil(5 / self.configuration["xbinning"]),
+                        smoothing=ceil(5 / self.configuration["xbinning"]),
                         mincounts=self.configuration["xpeaks_mincounts"],
                         channel_id=(quad, ch),
                     )
@@ -518,6 +529,7 @@ class Calibrate:
                 results.setdefault(quad, {})[ch] = np.column_stack((*fit_results, int_inf, int_sup)).flatten()
         return results, radiation_sources
 
+
     @as_peaks_dataframe
     def _detect_speaks(self):
         lightout_center = self.configuration["lightout_center"]
@@ -532,18 +544,20 @@ class Calibrate:
         for quad in self.sdd_calibration.keys():
             for ch in self.sdd_calibration[quad].index:
                 counts = self.shistograms.counts[quad][ch]
-                gain = self.sdd_calibration[quad].loc[ch]["gain"]
-                offset = self.sdd_calibration[quad].loc[ch]["offset"]
 
                 try:
                     limits = find_speaks(
                         bins,
                         counts,
                         energies,
-                        gain,
-                        offset,
+                        self.sdd_calibration[quad].loc[ch]["gain"],
+                        self.sdd_calibration[quad].loc[ch]["offset"],
                         lightout_guess,
+                        smoothing=ceil(200/self.configuration["sbinning"]),
+                        width=ceil(75/self.configuration["sbinning"]),
+                        prominence=5,
                     )
+
                 except err.DetectPeakError:
                     companion = self.detector.companion(quad, ch)
                     if companion in self.sdd_calibration[quad].index:
@@ -615,6 +629,9 @@ class Calibrate:
                         counts,
                         energies,
                         lightout_guess,
+                        smoothing=20,
+                        prominence=30,
+                        width=10,
                     )
                 except err.DetectPeakError:
                     message = err.warn_failed_peak_detection(quad, scint)
@@ -746,6 +763,12 @@ class Calibrate:
         results = {}
         for quad in self.efit.keys():
             for scint in self.efit[quad].index:
+                if (scint not in self.sfit[quad].index) or (self.detector.couples[quad][scint] not in self.sfit[quad].index):
+                    message = err.warn_failed_lightout(quad, scint)
+                    logging.warning(message)
+                    self._flag(quad, scint, "scal")
+                    continue
+
                 los = self.efit[quad].loc[scint][:, "center"].values / energies
                 lo_errs = self._scintillator_lout_error(quad, scint, energies)
                 lo, lo_err = self._deal_with_multiple_gamma_decays(los, lo_errs)
@@ -931,7 +954,7 @@ class ImportedCalibration(Calibrate):
     def __call__(self, data):
         self.channels = infer_onchannels(data)
         widows = find_widows(self.channels, self.detector)
-        filtered_data, waste = widow_filter(data, widows)
+        filtered_data, waste = filter_channels(data, widows)
         self.data = filtered_data
         self._print(f":white_check_mark: Filtered {len(waste)} event from widow channels")
         self._bin()
@@ -942,9 +965,9 @@ class ImportedCalibration(Calibrate):
         electron_evlist = make_electron_list(
             self.data,
             self.sdd_calibration,
-            self.lightoutput,
-            self.detector.couples,
-            self.nthreads,
+            self.detector,
+            nthreads=self.nthreads,
+            channels=self.channels,
         )
         eventlist = electrons_to_energy(
             electron_evlist,
@@ -953,3 +976,52 @@ class ImportedCalibration(Calibrate):
         )
         self._print("[bold green]:videocassette: Calibration complete.")
         return eventlist
+
+
+class PartialCalibration(Calibrate):
+    def __init__(
+        self,
+        model,
+        configuration,
+        ssources: list[str],
+        sdd_calibration,
+        **kwargs,
+    ):
+        super().__init__(model,  ssources, configuration, **kwargs)
+        self.sdd_calibration = sdd_calibration
+
+    def __call__(self, data):
+        self.data = data
+        self.channels = infer_onchannels(data)
+        self._bin()
+        self.eventlist = self._calibrate()
+        self._print_calibstatus()
+        return self.eventlist
+
+    def _calibrate(self):
+        message = "Attempting new calibration."
+        logging.info(message)
+
+        electron_evlist = make_electron_list(
+            self.data,
+            self.sdd_calibration,
+            self.detector,
+            nthreads=self.nthreads,
+            channels=self.channels
+        )
+        try:
+            self._calibrate_s(electron_evlist)
+        except err.FewLinesError:
+            logging.warning("Attempted S-calibration but got no radiation sources.")
+            return
+        try:
+            eventlist = electrons_to_energy(
+                electron_evlist,
+                self.scintillator_calibration,
+                self.detector.couples,
+            )
+        except err.CalibratedEventlistError as e:
+            logging.warning(f"Photon events calibration error: {e}.")
+            return None
+        return eventlist
+

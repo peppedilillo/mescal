@@ -31,18 +31,32 @@ _137cs = {
     'Cs 662 keV': Decay(661.6, -1., +2.),
 }
 
+_176lu = {
+    'Lu 202 keV': Decay(201.8, -1, +1),
+    'Lu 307 keV': Decay(306.8, -1, +2),
+}
+
 _xsources = {
     "55Fe": _55fe,
     "109Cd": _109cd,
 }
 
 _ssources = {
+    "176Lu": _176lu,
     "137Cs": _137cs,
 }
 
 
-def supported_sources():
-    return list(_xsources.keys()) + list(_ssources.keys())
+def supported_xsources():
+    return list(_xsources.keys())
+
+
+def supported_ssources():
+    return list(_ssources.keys())
+
+
+def supported_sources() -> list:
+    return supported_xsources() + supported_ssources()
 
 
 def radsources_dicts(sources: list):
