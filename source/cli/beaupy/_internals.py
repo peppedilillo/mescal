@@ -38,7 +38,9 @@ def _replace_emojis(text: str) -> str:
     return str(_emoji_replace(text, "  "))
 
 
-def _format_option_select(i: int, cursor_index: int, option: str, cursor_style: str, cursor: str) -> str:
+def _format_option_select(
+    i: int, cursor_index: int, option: str, cursor_style: str, cursor: str
+) -> str:
     return "{}{}".format(
         (
             f"[{cursor_style}]{cursor}[/{cursor_style}] "
@@ -70,7 +72,9 @@ def _update_rendered(live: Live, renderable: Union[ConsoleRenderable, str]) -> N
     live.refresh()
 
 
-def _render_prompt(secure: bool, typed_values: List[str], prompt: str, cursor_position: int, error: str) -> str:
+def _render_prompt(
+    secure: bool, typed_values: List[str], prompt: str, cursor_position: int, error: str
+) -> str:
     render_value = (len(typed_values) * "*" if secure else "".join(typed_values)) + " "
     render_value = Text(render_value)
     render_value.stylize("black on white", cursor_position, cursor_position + 1)

@@ -8,19 +8,19 @@ from joblib import delayed
 from joblib import Parallel
 from lmfit.models import GaussianModel
 from lmfit.models import LinearModel
-from scipy.interpolate import interp1d
 import numpy as np
 import pandas as pd
+from scipy.interpolate import interp1d
 
 from source.constants import PHOTOEL_PER_KEV
 from source.detectors import Detector
 import source.errors as err
 from source.eventlist import electrons_to_energy
+from source.eventlist import filter_channels
+from source.eventlist import find_widows
 from source.eventlist import infer_onchannels
 from source.eventlist import make_electron_list
 from source.eventlist import perchannel_counts
-from source.eventlist import filter_channels
-from source.eventlist import find_widows
 from source.io import Exporter
 from source.radsources import radsources_dicts
 from source.speaks import find_epeaks
@@ -364,7 +364,11 @@ class Calibrate:
         self.shistograms = shistogram(self.data, self.sbins, self.nthreads)
         lost = (self.data["ADC"] >= hi) | (self.data["ADC"] < lo)
         lost_fraction = 100 * len(self.data[lost]) / len(self.data["ADC"])
-        self._print(":white_check_mark: Binned data. Lost {:.2f}% dataset.".format(lost_fraction))
+        self._print(
+            ":white_check_mark: Binned data. Lost {:.2f}% dataset.".format(
+                lost_fraction
+            )
+        )
 
     def _calibrate_x(self):
         if len(self.xradsources()) < 2:
@@ -416,7 +420,7 @@ class Calibrate:
             self.sdd_calibration,
             self.detector,
             nthreads=self.nthreads,
-            channels=self.channels
+            channels=self.channels,
         )
         try:
             self._calibrate_s(electron_evlist)
@@ -510,7 +514,10 @@ class Calibrate:
             for ch in self.xpeaks[quad].index:
                 row = self.xpeaks[quad].loc[ch]
                 counts = self.xhistograms.counts[quad][ch]
-                limits = [(row[source]["lim_low"], row[source]["lim_high"]) for source in radiation_sources.keys()]
+                limits = [
+                    (row[source]["lim_low"], row[source]["lim_high"])
+                    for source in radiation_sources.keys()
+                ]
 
                 try:
                     intervals, fit_results = self._fit_gaussians_to_peaks(
@@ -526,9 +533,10 @@ class Calibrate:
                     continue
 
                 int_inf, int_sup = zip(*intervals)
-                results.setdefault(quad, {})[ch] = np.column_stack((*fit_results, int_inf, int_sup)).flatten()
+                results.setdefault(quad, {})[ch] = np.column_stack(
+                    (*fit_results, int_inf, int_sup)
+                ).flatten()
         return results, radiation_sources
-
 
     @as_peaks_dataframe
     def _detect_speaks(self):
@@ -553,8 +561,8 @@ class Calibrate:
                         self.sdd_calibration[quad].loc[ch]["gain"],
                         self.sdd_calibration[quad].loc[ch]["offset"],
                         lightout_guess,
-                        smoothing=ceil(200/self.configuration["sbinning"]),
-                        width=ceil(75/self.configuration["sbinning"]),
+                        smoothing=ceil(200 / self.configuration["sbinning"]),
+                        width=ceil(75 / self.configuration["sbinning"]),
                         prominence=5,
                     )
 
@@ -585,7 +593,10 @@ class Calibrate:
             for ch in self.speaks[quad].index:
                 counts = self.shistograms.counts[quad][ch]
                 row = self.speaks[quad].loc[ch]
-                limits = [(row[source]["lim_low"], row[source]["lim_high"]) for source in radiation_sources.keys()]
+                limits = [
+                    (row[source]["lim_low"], row[source]["lim_high"])
+                    for source in radiation_sources.keys()
+                ]
 
                 try:
                     intervals, fit_results = self._fit_gaussians_to_peaks(
@@ -601,7 +612,9 @@ class Calibrate:
                     continue
 
                 int_inf, int_sup = zip(*intervals)
-                results.setdefault(quad, {})[ch] = np.column_stack((*fit_results, int_inf, int_sup)).flatten()
+                results.setdefault(quad, {})[ch] = np.column_stack(
+                    (*fit_results, int_inf, int_sup)
+                ).flatten()
         return results, radiation_sources
 
     @as_peaks_dataframe
@@ -618,7 +631,9 @@ class Calibrate:
         for quad in self.sfit.keys():
             for ch in self.sfit[quad].index:
                 if ch not in self.detector.couples[quad].keys():
-                    assert self.detector.scintid(quad, ch) == self.detector.companion(quad, ch)
+                    assert self.detector.scintid(quad, ch) == self.detector.companion(
+                        quad, ch
+                    )
                     continue
                 scint = ch
                 counts = self.ehistograms.counts[quad][scint]
@@ -640,7 +655,9 @@ class Calibrate:
                     continue
 
                 inf, sup = zip(*limits)
-                results.setdefault(quad, {})[scint] = np.column_stack((inf, sup)).flatten()
+                results.setdefault(quad, {})[scint] = np.column_stack(
+                    (inf, sup)
+                ).flatten()
         return results, radiation_sources
 
     @as_fit_dataframe
@@ -653,12 +670,17 @@ class Calibrate:
         for quad in self.epeaks.keys():
             for ch in self.epeaks[quad].index:
                 if ch not in self.detector.couples[quad].keys():
-                    assert self.detector.scintid(quad, ch) == self.detector.companion(quad, ch)
+                    assert self.detector.scintid(quad, ch) == self.detector.companion(
+                        quad, ch
+                    )
                     continue
                 scint = ch
                 counts = self.ehistograms.counts[quad][scint]
                 row = self.epeaks[quad].loc[ch]
-                limits = [(row[source]["lim_low"], row[source]["lim_high"]) for source in radiation_sources.keys()]
+                limits = [
+                    (row[source]["lim_low"], row[source]["lim_high"])
+                    for source in radiation_sources.keys()
+                ]
 
                 try:
                     intervals, fit_results = self._fit_gaussians_to_peaks(
@@ -674,7 +696,9 @@ class Calibrate:
                     continue
 
                 int_inf, int_sup = zip(*intervals)
-                results.setdefault(quad, {})[scint] = np.column_stack((*fit_results, int_inf, int_sup)).flatten()
+                results.setdefault(quad, {})[scint] = np.column_stack(
+                    (*fit_results, int_inf, int_sup)
+                ).flatten()
         return results, radiation_sources
 
     @staticmethod
@@ -749,7 +773,9 @@ class Calibrate:
                     gains_err = cal["gain_err"].loc[ch]
 
                     energyres = fwhms / gains
-                    energyres_err = energyres * np.sqrt((fwhms_err / fwhms) ** 2 + (gains_err / gains) ** 2)
+                    energyres_err = energyres * np.sqrt(
+                        (fwhms_err / fwhms) ** 2 + (gains_err / gains) ** 2
+                    )
                     helper.append((energyres, energyres_err))
 
                 results.setdefault(quad, {})[ch] = np.hstack(helper)
@@ -763,7 +789,9 @@ class Calibrate:
         results = {}
         for quad in self.efit.keys():
             for scint in self.efit[quad].index:
-                if (scint not in self.sfit[quad].index) or (self.detector.couples[quad][scint] not in self.sfit[quad].index):
+                if (scint not in self.sfit[quad].index) or (
+                    self.detector.couples[quad][scint] not in self.sfit[quad].index
+                ):
                     message = err.warn_failed_lightout(quad, scint)
                     logging.warning(message)
                     self._flag(quad, scint, "scal")
@@ -783,7 +811,12 @@ class Calibrate:
         offset,
         offset_err,
     ):
-        error = np.sqrt(+((offset_err / gain) ** 2) + ((adc - offset) / gain**2) * (gain_err**2)) / PHOTOEL_PER_KEV
+        error = (
+            np.sqrt(
+                +((offset_err / gain) ** 2) + ((adc - offset) / gain**2) * (gain_err**2)
+            )
+            / PHOTOEL_PER_KEV
+        )
         return error
 
     def _scintillator_lout_error(self, quad, scint, energies):
@@ -838,9 +871,19 @@ class Calibrate:
                     comp_ = self.sdd_calibration[quad].loc[companion]
                     gain_comp, offset_comp = comp_[["gain", "offset"]].values
 
-                    centers_electrons_comp = (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
-                    effs = lo * centers_electrons / (centers_electrons + centers_electrons_comp)
-                    eff_errs = lo_err * centers_electrons / (centers_electrons + centers_electrons_comp)
+                    centers_electrons_comp = (
+                        (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
+                    )
+                    effs = (
+                        lo
+                        * centers_electrons
+                        / (centers_electrons + centers_electrons_comp)
+                    )
+                    eff_errs = (
+                        lo_err
+                        * centers_electrons
+                        / (centers_electrons + centers_electrons_comp)
+                    )
 
                     eff, eff_err = self._deal_with_multiple_gamma_decays(effs, eff_errs)
                     results.setdefault(quad, {})[ch] = np.array((eff, eff_err))
@@ -893,7 +936,9 @@ class Calibrate:
 
         for i in range(n_peaks):
             lowlim, hilim = limits[i]
-            result, start, stop, x_fine, fitting_curve = self._peak_fitter(x, y, (lowlim, hilim))
+            result, start, stop, x_fine, fitting_curve = self._peak_fitter(
+                x, y, (lowlim, hilim)
+            )
             centers[i] = result.params["center"].value
             center_errs[i] = result.params["center"].stderr
             fwhms[i] = result.params["fwhm"].value
@@ -949,14 +994,18 @@ class ImportedCalibration(Calibrate):
         self._print(":open_book: Loaded SDD calibration.")
         self.lightoutput = lightoutput
         self._print(":open_book: Loaded scintillators calibration.")
-        self.scintillator_calibration = _effectivelo_to_scintillatorslo(self.lightoutput, self.detector)
+        self.scintillator_calibration = _effectivelo_to_scintillatorslo(
+            self.lightoutput, self.detector
+        )
 
     def __call__(self, data):
         self.channels = infer_onchannels(data)
         widows = find_widows(self.channels, self.detector)
         filtered_data, waste = filter_channels(data, widows)
         self.data = filtered_data
-        self._print(f":white_check_mark: Filtered {len(waste)} event from widow channels")
+        self._print(
+            f":white_check_mark: Filtered {len(waste)} event from widow channels"
+        )
         self._bin()
         self.eventlist = self._calibrate()
         return self.eventlist
@@ -987,7 +1036,7 @@ class PartialCalibration(Calibrate):
         sdd_calibration,
         **kwargs,
     ):
-        super().__init__(model,  ssources, configuration, **kwargs)
+        super().__init__(model, ssources, configuration, **kwargs)
         self.sdd_calibration = sdd_calibration
 
     def __call__(self, data):
@@ -1007,7 +1056,7 @@ class PartialCalibration(Calibrate):
             self.sdd_calibration,
             self.detector,
             nthreads=self.nthreads,
-            channels=self.channels
+            channels=self.channels,
         )
         try:
             self._calibrate_s(electron_evlist)
@@ -1024,4 +1073,3 @@ class PartialCalibration(Calibrate):
             logging.warning(f"Photon events calibration error: {e}.")
             return None
         return eventlist
-

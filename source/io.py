@@ -17,8 +17,7 @@ from source import plot
 from source.constants import PHOTOEL_PER_KEV
 from source.eventlist import timehist
 
-
-warnings.filterwarnings('ignore', module='astropy')
+warnings.filterwarnings("ignore", module="astropy")
 
 
 class Exporter:
@@ -216,7 +215,9 @@ class Exporter:
         xhistograms = self.calibration.xhistograms
         shistograms = self.calibration.shistograms
         nthreads = self.nthreads
-        return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in xhistograms.counts.keys())
+        return Parallel(n_jobs=nthreads)(
+            delayed(helper)(quad) for quad in xhistograms.counts.keys()
+        )
 
     def draw_sdiagnostics(self):
         assert self.can__draw_sdiagnostics
@@ -229,7 +230,11 @@ class Exporter:
                     res_fit[quad].loc[ch].loc[:, "center"],
                     res_fit[quad].loc[ch].loc[:, "amp"],
                     res_fit[quad].loc[ch].loc[:, "fwhm"],
-                    res_fit[quad].loc[ch].loc[:, ["lim_low", "lim_high"]].values.reshape(2, -1).T,
+                    res_fit[quad]
+                    .loc[ch]
+                    .loc[:, ["lim_low", "lim_high"]]
+                    .values.reshape(2, -1)
+                    .T,
                     figsize=(8, 4.5),
                 )
                 ax.set_title("Diagnostic plot {}{:02d}".format(quad, ch))
@@ -240,7 +245,9 @@ class Exporter:
         histograms = self.calibration.shistograms
         res_fit = self.calibration.sfit
         nthreads = self.nthreads
-        return Parallel(n_jobs=nthreads, max_nbytes=None)(delayed(helper)(quad) for quad in res_fit.keys())
+        return Parallel(n_jobs=nthreads, max_nbytes=None)(
+            delayed(helper)(quad) for quad in res_fit.keys()
+        )
 
     def draw_xdiagnostic(self):
         assert self.can__draw_xdiagnostic
@@ -253,7 +260,11 @@ class Exporter:
                     res_fit[quad].loc[ch].loc[:, "center"],
                     res_fit[quad].loc[ch].loc[:, "amp"],
                     res_fit[quad].loc[ch].loc[:, "fwhm"],
-                    res_fit[quad].loc[ch].loc[:, ["lim_low", "lim_high"]].values.reshape(2, -1).T,
+                    res_fit[quad]
+                    .loc[ch]
+                    .loc[:, ["lim_low", "lim_high"]]
+                    .values.reshape(2, -1)
+                    .T,
                     figsize=(8, 4.5),
                 )
                 ax.set_title("Diagnostic plot {}{:02d}".format(quad, ch))
@@ -264,7 +275,9 @@ class Exporter:
         histograms = self.calibration.xhistograms
         res_fit = self.calibration.xfit
         nthreads = self.nthreads
-        return Parallel(n_jobs=nthreads, max_nbytes=None)(delayed(helper)(quad) for quad in res_fit.keys())
+        return Parallel(n_jobs=nthreads, max_nbytes=None)(
+            delayed(helper)(quad) for quad in res_fit.keys()
+        )
 
     def draw_xspectra(self):
         assert self.can__draw_xspectra
@@ -289,7 +302,9 @@ class Exporter:
         res_cal = self.calibration.sdd_calibration
         radsources = self.calibration.xradsources()
         nthreads = self.nthreads
-        return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
+        return Parallel(n_jobs=nthreads)(
+            delayed(helper)(quad) for quad in res_cal.keys()
+        )
 
     def draw_sspectra(self):
         assert self.can__draw_sspectra
@@ -318,7 +333,9 @@ class Exporter:
         res_slo = self.calibration.lightoutput
         radsources = self.calibration.sradsources()
         nthreads = self.nthreads
-        return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_slo.keys())
+        return Parallel(n_jobs=nthreads)(
+            delayed(helper)(quad) for quad in res_slo.keys()
+        )
 
     def draw_spectrum(self):
         assert self.can__draw_spectrum
@@ -371,7 +388,9 @@ class Exporter:
         def helper(quad):
             for ch in res_cal[quad].index:
                 fig, ax = plot.linearity(
-                    *res_cal[quad].loc[ch][["gain", "gain_err", "offset", "offset_err"]],
+                    *res_cal[quad].loc[ch][
+                        ["gain", "gain_err", "offset", "offset_err"]
+                    ],
                     res_fit[quad].loc[ch].loc[:, "center"],
                     res_fit[quad].loc[ch].loc[:, "center_err"],
                     radsources,
@@ -386,7 +405,9 @@ class Exporter:
         res_fit = self.calibration.xfit
         radsources = self.calibration.xradsources()
         nthreads = self.nthreads
-        return Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in res_cal.keys())
+        return Parallel(n_jobs=nthreads)(
+            delayed(helper)(quad) for quad in res_cal.keys()
+        )
 
     def draw_map_resolution(self):
         assert self.can__draw_map_resolution
@@ -544,7 +565,9 @@ def write_report_to_fits(result_df, path):
     header = fitsio.PrimaryHDU()
     output = fitsio.HDUList([header])
     for quad in result_df.keys():
-        table_quad = fitsio.BinTableHDU.from_columns(result_df[quad].to_records(), name="Quadrant " + quad)
+        table_quad = fitsio.BinTableHDU.from_columns(
+            result_df[quad].to_records(), name="Quadrant " + quad
+        )
         output.append(table_quad)
     output.writeto(path.with_suffix(".fits"), overwrite=True)
     return True
@@ -552,7 +575,9 @@ def write_report_to_fits(result_df, path):
 
 def write_report_to_csv(result_df, path):
     for quad, df in result_df.items():
-        df.to_csv(path.with_name(path.stem + "_quad{}".format(quad)).with_suffix(".csv"))
+        df.to_csv(
+            path.with_name(path.stem + "_quad{}".format(quad)).with_suffix(".csv")
+        )
     return True
 
 
@@ -580,6 +605,7 @@ def check_lv0d5(func):
         except OSError:
             raise err.FormatNotSupportedError("The input file is not a FITS.")
         return df
+
     return wrapper
 
 
@@ -594,9 +620,16 @@ def pandas_from_lv0d5(fits: Path):
     types = ["int32", "int8", "string", "int8", "float64", "int32"]
     dtypes = {col: tp for col, tp in zip(columns, types)}
 
-    temp = np.concatenate([df[["ADC" + i, "CHANNEL" + i, "QUADID", "NMULT", "TIME", "SID"]] for i in "012345"])
+    temp = np.concatenate(
+        [
+            df[["ADC" + i, "CHANNEL" + i, "QUADID", "NMULT", "TIME", "SID"]]
+            for i in "012345"
+        ]
+    )
     temp = temp[temp[:, 0] > 0]
     temp = temp[temp[:, -1].argsort()]
     df = pd.DataFrame(temp, columns=columns)
-    df = df.assign(QUADID=df["QUADID"].map({0: "A", 1: "B", 2: "C", 3: "D"})).astype(dtypes)
+    df = df.assign(QUADID=df["QUADID"].map({0: "A", 1: "B", 2: "C", 3: "D"})).astype(
+        dtypes
+    )
     return df

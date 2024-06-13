@@ -3,7 +3,9 @@ import source.errors as err
 
 def check_results(calibration, data, waste, configuration):
     results = []
-    if ("filter_retrigger" in configuration) and (not configuration["filter_retrigger"]):
+    if ("filter_retrigger" in configuration) and (
+        not configuration["filter_retrigger"]
+    ):
         results.append("filter_retrigger_off")
     if ("filter_spurious" in configuration) and (not configuration["filter_spurious"]):
         results.append("filter_spurious_off")

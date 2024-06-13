@@ -2050,7 +2050,9 @@ def defineColorMap(mpl):
         (0.75553, 0.03608, 0.029827),
         (0.75243, 0.0084181, 0.021805),
     ]
-    valsCW = [(min(float(v[0]), 1), min(float(v[1]), 1), min(float(v[2]), 1)) for v in valsCW]
+    valsCW = [
+        (min(float(v[0]), 1), min(float(v[1]), 1), min(float(v[2]), 1)) for v in valsCW
+    ]
     cmapCW = mpl.colors.LinearSegmentedColormap.from_list("coolwarm_u", valsCW)
     cmapCWR = mpl.colors.LinearSegmentedColormap.from_list("coolwarm_ur", valsCW[::-1])
     mpl.pyplot.register_cmap(cmap=cmapCW)
@@ -2315,9 +2317,13 @@ def defineColorMap(mpl):
         (0.98801, 0.8912, 0.057534),
         (0.99097, 0.89391, 0.035647),
     ]
-    valsBJY = [(min(float(v[0]), 1), min(float(v[1]), 1), min(float(v[2]), 1)) for v in valsBJY]
+    valsBJY = [
+        (min(float(v[0]), 1), min(float(v[1]), 1), min(float(v[2]), 1)) for v in valsBJY
+    ]
     cmapBJY = mpl.colors.LinearSegmentedColormap.from_list("bluegreyyellow_u", valsBJY)
-    cmapBJYR = mpl.colors.LinearSegmentedColormap.from_list("bluegreyyellow_ur", valsBJY[::-1])
+    cmapBJYR = mpl.colors.LinearSegmentedColormap.from_list(
+        "bluegreyyellow_ur", valsBJY[::-1]
+    )
     mpl.pyplot.register_cmap(cmap=cmapBJY)
     mpl.pyplot.register_cmap(cmap=cmapBJYR)
 

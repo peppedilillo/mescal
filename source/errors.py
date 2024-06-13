@@ -51,7 +51,9 @@ def warn_failed_peak_detection(quad, ch):
 
 
 def warn_widow(quad, ch, companion):
-    return "failed peak detection of {0}{1:02d}, companion cell {0}{2:02d} off.".format(quad, ch, companion)
+    return "failed peak detection of {0}{1:02d}, companion cell {0}{2:02d} off.".format(
+        quad, ch, companion
+    )
 
 
 def warn_missing_lout(quad, ch):
@@ -59,7 +61,9 @@ def warn_missing_lout(quad, ch):
 
 
 def warn_nan_in_sdd_calib(quad):
-    return "NaN in {} quadrant SDD calibration results. " "Filling with 0s.".format(quad)
+    return "NaN in {} quadrant SDD calibration results. " "Filling with 0s.".format(
+        quad
+    )
 
 
 def warn_nan_in_slo_table(quad):
@@ -67,4 +71,6 @@ def warn_nan_in_slo_table(quad):
 
 
 def warn_failed_lightout(quad, scint):
-    return ("S-mode fits are missing for both channel coupled to scintillator {}{:02d}. Can't compute light output for these channels.".format(quad, scint))
+    return "S-mode fits are missing for both channel coupled to scintillator {}{:02d}. Can't compute light output for these channels.".format(
+        quad, scint
+    )

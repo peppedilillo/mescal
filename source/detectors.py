@@ -182,7 +182,10 @@ def _get_quadrant_map(model: str, quad: str, arr_borders):
 
 
 def get_map(model):
-    return {quad: _get_quadrant_map(model, quad, arr_borders=False) for quad in ["A", "B", "C", "D"]}
+    return {
+        quad: _get_quadrant_map(model, quad, arr_borders=False)
+        for quad in ["A", "B", "C", "D"]
+    }
 
 
 def get_couples(model):
@@ -199,7 +202,9 @@ class Detector:
         self.label = model
         self.map = get_map(model)
         self.couples = get_couples(model)
-        self.quadrant_keys = [*filter(lambda q: set(self.map[q]) != {UNBOND}, [*self.map.keys()])]
+        self.quadrant_keys = [
+            *filter(lambda q: set(self.map[q]) != {UNBOND}, [*self.map.keys()])
+        ]
 
     def scintids(self):
         """
