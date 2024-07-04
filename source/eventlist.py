@@ -303,11 +303,7 @@ def make_electron_list(
     calibrated_sdds,
     detector,
     nthreads=1,
-    channels=None,
 ):
-    if channels is None:
-        channels = infer_onchannels(data)
-
     columns = ["TIME", "ELECTRONS", "EVTYPE", "CHN", "QUADID"]
     types = ["float64", "float32", "U1", "int8", "U1"]
     dtypes = {col: tp for col, tp in zip(columns, types)}
@@ -402,6 +398,8 @@ def _extract_gamma_events(quadrant_data, scintillator_couples):
     same_value_if_coupled = gamma_events["CHN"].map(companion_to_chn).fillna(channels)
     gamma_events = gamma_events.assign(CHN=same_value_if_coupled)
 
+    if not np.any(gamma_events.values):
+        return np.array([])
     simultaneous_scintillator_events = gamma_events.groupby(["TIME", "CHN"])
     times, channels = np.array([*simultaneous_scintillator_events.groups.keys()]).T
 

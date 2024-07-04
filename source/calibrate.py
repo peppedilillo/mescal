@@ -420,7 +420,6 @@ class Calibrate:
             self.sdd_calibration,
             self.detector,
             nthreads=self.nthreads,
-            channels=self.channels,
         )
         try:
             self._calibrate_s(electron_evlist)
