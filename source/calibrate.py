@@ -1015,7 +1015,6 @@ class ImportedCalibration(Calibrate):
             self.sdd_calibration,
             self.detector,
             nthreads=self.nthreads,
-            channels=self.channels,
         )
         eventlist = electrons_to_energy(
             electron_evlist,
