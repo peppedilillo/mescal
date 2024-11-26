@@ -124,10 +124,11 @@ def find_widows(on_channels: dict, model: Detector):
         for ch in on_channels[quad]:
             try:
                 companion = model.companion(quad, ch)
-                if companion not in on_channels[quad]:
-                    widows[quad].append(ch)
             except KeyError:
-                print(f"{quad} {ch} cant find companion")
+                logging.warning(f"Cant find companion for channel {quad}{ch:02d}.")
+                continue
+            if companion not in on_channels[quad]:
+                widows[quad].append(ch)
     return widows
 
 

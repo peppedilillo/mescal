@@ -612,8 +612,13 @@ def check_lv0d5(func):
 def pandas_from_lv0d5(fits: Path):
     df = Table.read(fits, hdu=2, format="fits").to_pandas()
     # fixes first buffer missing ABT
-    start_t = floor(df[df["TIME"] > 1].iloc[0]["TIME"]) - 1
-    df.loc[df["TIME"] < 1, "TIME"] += start_t
+    try:
+        start_t = floor(df[df["TIME"] > 1].iloc[0]["TIME"]) - 1
+    except IndexError:
+        # it has happened to have problematic acquisitions with all negative times.
+        pass
+    else:
+        df.loc[df["TIME"] < 1, "TIME"] += start_t
 
     df = df.reset_index(level=0).rename({"index": "SID"}, axis="columns")
     columns = ["ADC", "CHN", "QUADID", "NMULT", "TIME", "SID"]
