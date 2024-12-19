@@ -1109,4 +1109,8 @@ def parse_limits(arg):
 
 
 if __name__ == "__main__":
-    Mescal()
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        Mescal()
