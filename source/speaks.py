@@ -131,8 +131,6 @@ def find_speaks(
         (bins[floor(lo)], bins[ceil(hi)])
         for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])
     ]
-
-    # plot(bins, counts, best_peaks, best_peaks_props, channel_id, xlim=(15000, 25000))
     return limits
 
 
@@ -162,12 +160,6 @@ def posteriorscore(bins, peaks_combinations, energies, gain, offset, lightout_gu
     energies_equivalent_kev = PHOTOEL_PER_KEV * lightout_center / 2 * np.array(energies)
     standard_distances = np.abs(bins_kev[peaks_combinations] - energies_equivalent_kev)
     scores = -np.sum(standard_distances, axis=1)
-    # print(
-    #     "\n\nPOSTERIOR SCORE",
-    #     "peaks combo:", bins[peaks_combinations],
-    #     "\nequivalente energies:", energies_equivalent_kev,
-    #     "\ndistances: ", standard_distances,
-    #     "\nscores:", scores)
     return scores
 
 
@@ -186,12 +178,6 @@ def deltascore(bins, peaks_combinations, energies, gain, offset, lightout_guess)
     deltaen_true_kev = np.diff(energies_equivalent_kev)
     deltaen_observed_kev = np.diff(bins_kev[peaks_combinations])
     scores = -np.sum(np.square(np.diff(deltaen_observed_kev - deltaen_true_kev)))
-    # print(
-    #     "\n\nDELTA SCORE",
-    #     "peaks combo:", bins[peaks_combinations],
-    #     "\ntrue delta energies:", deltaen_true_kev,
-    #     "\ndistances: ", deltaen_observed_kev,
-    #     "\nscores:", scores)
     return scores
 
 
@@ -242,34 +228,7 @@ def find_epeaks(
         (bins[floor(lo)], bins[ceil(hi)])
         for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])
     ]
-    # plot(bins, counts, best_peaks, best_peaks_props, channel_id=channel_id)
     return limits
-
-# def find_epeaks(
-#     bins,
-#     counts,
-#     energies,
-#     lightout_guess,
-#     smoothing=20,
-#     prominence=30,
-#     width=10,
-# ):
-#     search_pars = {
-#         "prominence": prominence,
-#         "width": width,
-#     }
-#     mm = moving_average(counts, smoothing)
-#     peaks, peaks_props = find_peaks(mm, **search_pars)
-#     guesses = guess_epeaks_position(energies, lightout_guess)
-#     if len(peaks) >= len(guesses):
-#         best_peaks, best_peaks_props = _closest_peaks(guesses, bins, peaks, peaks_props)
-#     else:
-#         raise err.DetectPeakError("candidate peaks are less than sources to fit.")
-#     limits = [
-#         (bins[int(p - w)], bins[int(p + w)])
-#         for p, w in zip(best_peaks, best_peaks_props["widths"])
-#     ]
-#     return limits
 
 
 def guess_epeaks_position(energies, lightout_guess):
@@ -277,47 +236,6 @@ def guess_epeaks_position(energies, lightout_guess):
     lightout_lims = center + sigma, center - sigma
     guesses = [[lo * lv for lo in lightout_lims] for lv in energies]
     return guesses
-
-
-# def find_speaks(
-#     bins,
-#     counts,
-#     energies,
-#     gain,
-#     offset,
-#     lightout_guess,
-#     smoothing=20,
-#     prominence=6,
-#     width=10,
-# ):
-#     search_pars = {
-#         "prominence": prominence,
-#         "width": width,
-#     }
-#     mm = moving_average(counts, smoothing)
-#     peaks, peaks_props = find_peaks(mm, **search_pars)
-#     guesses = guess_speaks_position(energies, lightout_guess, gain, offset)
-#     if len(peaks) >= len(guesses):
-#         best_peaks, best_peaks_props = _closest_peaks(guesses, bins, peaks, peaks_props)
-#     else:
-#         raise DetectPeakError("candidate peaks are less than sources to fit.")
-#     limits = [
-#         (bins[int(p - w)], bins[int(p + w)])
-#         for p, w in zip(best_peaks, best_peaks_props["widths"])
-#     ]
-#     return limitsexport
-#
-# def guess_speaks_position(energies, lightout_guess, gain, offset):
-#     center, sigma = lightout_guess
-#     lightout_lims = center + sigma, center - sigma
-#     guesses = [
-#         [
-#             (0.5 * lout_lim) * PHOTOEL_PER_KEV * lv * gain + offset
-#             for lout_lim in lightout_lims
-#         ]
-#         for lv in energies
-#     ]
-#     return guesses
 
 
 def moving_average(arr, n):
