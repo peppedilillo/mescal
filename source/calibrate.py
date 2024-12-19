@@ -274,7 +274,7 @@ def ehistogram(data, bins, nthreads=1):
 
 
 def get_ebins():
-    return linrange(1000, 25000, 50)
+    return linrange(500, 25000, 50)
 
 
 class Calibrate:
@@ -553,16 +553,26 @@ class Calibrate:
                 counts = self.shistograms.counts[quad][ch]
 
                 try:
+                    gain = (
+                        self.sdd_calibration[quad].loc[ch]["gain"],
+                        self.sdd_calibration[quad].loc[ch]["gain_err"],
+                    )
+                    offset = (
+                        self.sdd_calibration[quad].loc[ch]["offset"],
+                        self.sdd_calibration[quad].loc[ch]["offset_err"],
+                    )
                     limits = find_speaks(
                         bins,
                         counts,
                         energies,
-                        self.sdd_calibration[quad].loc[ch]["gain"],
-                        self.sdd_calibration[quad].loc[ch]["offset"],
+                        gain,
+                        offset,
                         lightout_guess,
-                        smoothing=ceil(200 / self.configuration["sbinning"]),
-                        width=ceil(75 / self.configuration["sbinning"]),
-                        prominence=5,
+                        width=ceil(50 / self.configuration["sbinning"]),
+                        distance=ceil(100 / self.configuration["sbinning"]),
+                        smoothing=ceil(25 / self.configuration["sbinning"]),
+                        mincounts=50,
+                        channel_id=ch,
                     )
 
                 except err.DetectPeakError:
@@ -630,22 +640,53 @@ class Calibrate:
         for quad in self.sfit.keys():
             for ch in self.sfit[quad].index:
                 if ch not in self.detector.couples[quad].keys():
-                    assert self.detector.scintid(quad, ch) == self.detector.companion(
-                        quad, ch
-                    )
+                    assert self.detector.scintid(quad, ch) == self.detector.companion(quad, ch)
                     continue
+
                 scint = ch
+                companion = self.detector.companion(quad, ch)
                 counts = self.ehistograms.counts[quad][scint]
+
+                gain_ch = (
+                    self.sdd_calibration[quad].loc[ch]["gain"],
+                    self.sdd_calibration[quad].loc[ch]["gain_err"],
+                )
+                offset_ch = (
+                    self.sdd_calibration[quad].loc[ch]["offset"],
+                    self.sdd_calibration[quad].loc[ch]["offset_err"],
+                )
+                gain_comp = (
+                    self.sdd_calibration[quad].loc[companion]["gain"],
+                    self.sdd_calibration[quad].loc[companion]["gain_err"],
+                )
+                offset_comp = (
+                    self.sdd_calibration[quad].loc[companion]["offset"],
+                    self.sdd_calibration[quad].loc[companion]["offset_err"],
+                )
+
+                sfit_ch = self.sfit[quad].loc[ch][:, "center"].values
+                if companion in self.sfit[quad].index:
+                    sfit_comp = self.sfit[quad].loc[companion][:, "center"].values
+                else:
+                    # it could be that we missed a sfit.
+                    # this can certainly be improve but i can't get it right now.
+                    sfit_comp = sfit_ch
 
                 try:
                     limits = find_epeaks(
                         bins,
                         counts,
-                        energies,
-                        lightout_guess,
-                        smoothing=20,
-                        prominence=30,
-                        width=10,
+                        sfit_ch,
+                        sfit_comp,
+                        gain_ch,
+                        gain_comp,
+                        offset_ch,
+                        offset_comp,
+                        mincounts=100,
+                        width=5,
+                        smoothing=10,
+                        distance=20,
+                        channel_id=f"{quad}{ch}"
                     )
                 except err.DetectPeakError:
                     message = err.warn_failed_peak_detection(quad, scint)
