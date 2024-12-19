@@ -59,23 +59,35 @@ def _render_option_select_multiple(
     selected: bool,
     cursor_style: str,
 ) -> str:
-    prefix = "\[{}]".format(" " * len(_replace_emojis(tick_character)))  # noqa: W605
+    prefix = "\[{}]".format(
+        " " * len(_replace_emojis(tick_character))
+    )  # noqa: W605
     if ticked:
-        prefix = f"\[[{tick_style}]{tick_character}[/{tick_style}]]"  # noqa: W605
+        prefix = (
+            f"\[[{tick_style}]{tick_character}[/{tick_style}]]"  # noqa: W605
+        )
     if selected:
         option = f"[{cursor_style}]{option}[/{cursor_style}]"
     return f"{prefix} {option}"
 
 
-def _update_rendered(live: Live, renderable: Union[ConsoleRenderable, str]) -> None:
+def _update_rendered(
+    live: Live, renderable: Union[ConsoleRenderable, str]
+) -> None:
     live.update(renderable=renderable)
     live.refresh()
 
 
 def _render_prompt(
-    secure: bool, typed_values: List[str], prompt: str, cursor_position: int, error: str
+    secure: bool,
+    typed_values: List[str],
+    prompt: str,
+    cursor_position: int,
+    error: str,
 ) -> str:
-    render_value = (len(typed_values) * "*" if secure else "".join(typed_values)) + " "
+    render_value = (
+        len(typed_values) * "*" if secure else "".join(typed_values)
+    ) + " "
     render_value = Text(render_value)
     render_value.stylize("black on white", cursor_position, cursor_position + 1)
     confirm_text = Text("\n\n(Confirm with enter, exit with esc)")

@@ -63,7 +63,8 @@ commandline_args_parser.add_argument(
     default=None,
     action="append",
     choices=supported_sources(),
-    help="radioactive sources used for calibration.\n" "prompt user by default.",
+    help="radioactive sources used for calibration.\n"
+    "prompt user by default.",
 )
 
 commandline_args_parser.add_argument(
@@ -116,7 +117,8 @@ class Mescal(Cmd):
     prompt = "[cyan]\[mescalSH] "
     spinner_message = "Working.."
     unknown_command_message = (
-        "[red]Unknown command.[/]\n" "[i]Type help or ? for a list of commands.[/i]\n"
+        "[red]Unknown command.[/]\n"
+        "[i]Type help or ? for a list of commands.[/i]\n"
     )
     invalid_command_message = "[red]Command unavailable.[/]\n"
     invalid_channel_message = (
@@ -256,7 +258,9 @@ class Mescal(Cmd):
         systhreads = min(4, cpu_count())
 
         logging.info("detected {} os".format(sys.platform))
-        logging.info("using matplotlib backend {}".format(matplotlib.get_backend()))
+        logging.info(
+            "using matplotlib backend {}".format(matplotlib.get_backend())
+        )
         logging.info("running over {} threads".format(systhreads))
         return systhreads
 
@@ -301,7 +305,9 @@ class Mescal(Cmd):
         deals with data load and caching.
         """
         self.console.log(":question_mark: Looking for data..")
-        cached = paths.CACHEDIR().joinpath(self.filepath.name).with_suffix(".pkl.gz")
+        cached = (
+            paths.CACHEDIR().joinpath(self.filepath.name).with_suffix(".pkl.gz")
+        )
         if cached.is_file() and self.commandline_args.cache:
             out = pd.read_pickle(cached)
             self.console.log(
@@ -341,7 +347,10 @@ class Mescal(Cmd):
         if self.commandline_args.filepath is not None:
             return Path(self.commandline_args.filepath)
         filepath = prompt_user_on_filepath(
-            message, message_error, self.console, supported_formats=[".fits", ".fit"]
+            message,
+            message_error,
+            self.console,
+            supported_formats=[".fits", ".fit"],
         )
         if filepath is None:
             self.console.print("So soon? Ciao :wave:!\n")
@@ -405,15 +414,23 @@ class Mescal(Cmd):
         """
         if "flagged_channels" in self.failed_tests:
             sublists = self.calibration.flagged.values()
-            num_flagged = len(set([item for sublist in sublists for item in sublist]))
+            num_flagged = len(
+                set([item for sublist in sublists for item in sublist])
+            )
             num_channels = len(
-                [ch for quad, chs in self.calibration.channels.items() for ch in chs]
+                [
+                    ch
+                    for quad, chs in self.calibration.channels.items()
+                    for ch in chs
+                ]
             )
             message = (
                 "[i][yellow]"
                 "I was unable to complete calibration for {} channels out of {}."
                 "[/yellow]\n"
-                "For more details, see the log file.".format(num_flagged, num_channels)
+                "For more details, see the log file.".format(
+                    num_flagged, num_channels
+                )
             )
             self.console.print(message)
         if "too_many_filtered_events" in self.failed_tests:
@@ -472,7 +489,9 @@ class Mescal(Cmd):
             self.console.log(":chart_increasing: Saved light output plots.")
         if exporter.can__draw_spectrum:
             exporter.draw_spectrum()
-            self.console.log(":chart_increasing: Saved calibrated spectra plots.")
+            self.console.log(
+                ":chart_increasing: Saved calibrated spectra plots."
+            )
 
     # shell prompt commands
     def can_quit(self, arg):
@@ -662,8 +681,12 @@ class Mescal(Cmd):
             else:
                 lim_lo, lim_hi = parsed_arg
                 label_lo, label_hi = PEAKS_PARAMS
-                self.calibration.xpeaks[quad].loc[ch, (source, label_lo)] = int(lim_lo)
-                self.calibration.xpeaks[quad].loc[ch, (source, label_hi)] = int(lim_hi)
+                self.calibration.xpeaks[quad].loc[ch, (source, label_lo)] = int(
+                    lim_lo
+                )
+                self.calibration.xpeaks[quad].loc[ch, (source, label_hi)] = int(
+                    lim_hi
+                )
 
         for source, decay in self.calibration.sradsources().items():
             arg = input(source + ": ")
@@ -676,8 +699,12 @@ class Mescal(Cmd):
             else:
                 lim_lo, lim_hi = parsed_arg
                 label_lo, label_hi = PEAKS_PARAMS
-                self.calibration.speaks[quad].loc[ch, (source, label_lo)] = int(lim_lo)
-                self.calibration.speaks[quad].loc[ch, (source, label_hi)] = int(lim_hi)
+                self.calibration.speaks[quad].loc[ch, (source, label_lo)] = int(
+                    lim_lo
+                )
+                self.calibration.speaks[quad].loc[ch, (source, label_hi)] = int(
+                    lim_hi
+                )
 
         message = "reset fit limits for channel {}{:02d}".format(quad, ch)
         logging.info(message)
@@ -706,7 +733,9 @@ class Mescal(Cmd):
 
     def do_mapbad(self, arg):
         """Plots a map of counts per-channel from filtered data."""
-        counts = perchannel_counts(self.waste, self.calibration.channels, key="all")
+        counts = perchannel_counts(
+            self.waste, self.calibration.channels, key="all"
+        )
         fig, ax = mapcounts(
             counts,
             self.calibration.detector.map,
@@ -717,7 +746,10 @@ class Mescal(Cmd):
         return False
 
     def can_mapres(self, arg):
-        if self.calibration.xradsources().keys() and self.calibration.resolution:
+        if (
+            self.calibration.xradsources().keys()
+            and self.calibration.resolution
+        ):
             return True
         return False
 
@@ -749,7 +781,9 @@ class Mescal(Cmd):
             "[/italic]\n"
         )
 
-        answer = prompt_user_on_filepath(message_hello, message_error, self.console)
+        answer = prompt_user_on_filepath(
+            message_hello, message_error, self.console
+        )
         if answer is None:
             return False
         try:
@@ -790,7 +824,9 @@ class Mescal(Cmd):
             "[/italic]\n"
         )
         # we ask the user to tell us where the SDD calibration file is.
-        answer = prompt_user_on_filepath(message_sdd, message_error, self.console)
+        answer = prompt_user_on_filepath(
+            message_sdd, message_error, self.console
+        )
         if answer is None:
             return False
         try:
@@ -803,7 +839,9 @@ class Mescal(Cmd):
             return False
 
         # now we ask where the scintillator calibration file is
-        answer = prompt_user_on_filepath(message_lout, message_error, self.console)
+        answer = prompt_user_on_filepath(
+            message_lout, message_error, self.console
+        )
         if answer is not None:
             try:
                 lightouts = read_lightout_report(answer)
@@ -989,11 +1027,15 @@ class Mescal(Cmd):
 
         options = [o for o in all_options if any(o.conditions)]
         if arg != "all":
-            with ui.small_section(self.console, message="Select one or more.") as ss:
+            with ui.small_section(
+                self.console, message="Select one or more."
+            ) as ss:
                 indeces = select_multiple(
                     [o.label for o in options],
                     self.console,
-                    ticked_indices=[i for i, v in enumerate(options) if v.ticked],
+                    ticked_indices=[
+                        i for i, v in enumerate(options) if v.ticked
+                    ],
                     return_indices=True,
                 )
         else:
@@ -1004,7 +1046,9 @@ class Mescal(Cmd):
         commands = [c for o in selection for c in o.commands]
         conditions = [c for o in selection for c in o.conditions]
         with ui.progress_bar(self.console) as p:
-            for condition, f in p.track(zip(conditions, commands), total=len(commands)):
+            for condition, f in p.track(
+                zip(conditions, commands), total=len(commands)
+            ):
                 if condition:
                     f()
         return False
@@ -1043,7 +1087,9 @@ def prompt_user_on_filepath(
         if not answer:
             continue
         # removes whites spaces at end and beginning, and white space escape code
-        answer = Path(*map(lambda x: x.replace("\\ ", " "), Path(answer.strip()).parts))
+        answer = Path(
+            *map(lambda x: x.replace("\\ ", " "), Path(answer.strip()).parts)
+        )
         if not answer.exists():
             text = message_error
         elif supported_formats and answer.suffix not in supported_formats:

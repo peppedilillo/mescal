@@ -8,9 +8,10 @@ import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
 
-import source.errors as err
-from source.xpeaks import peaks_with_enough_stat, remove_baseline
 from source.constants import PHOTOEL_PER_KEV
+import source.errors as err
+from source.xpeaks import peaks_with_enough_stat
+from source.xpeaks import remove_baseline
 
 
 def plot(bins, counts, peaks, peaks_props=None, channel_id=None, xlim=None):
@@ -42,22 +43,22 @@ def to_bins(bins):
 
 
 def find_speaks(
-        bins,
-        counts,
-        energies,
-        gain,
-        offset,
-        lightout_guess,
-        width,
-        distance,
-        smoothing,
-        mincounts,
-        channel_id=None,
+    bins,
+    counts,
+    energies,
+    gain,
+    offset,
+    lightout_guess,
+    width,
+    distance,
+    smoothing,
+    mincounts,
+    channel_id=None,
 ):
     initial_search_pars = {
         "prominence": max(counts),
         "width": width,
-        "distance": distance
+        "distance": distance,
     }
 
     peaks, peaks_props = peaks_with_enough_stat(
@@ -86,7 +87,9 @@ def find_speaks(
         best_peaks, best_peaks_props = peaks, peaks_props
         limits = [
             (bins[floor(lo)], bins[ceil(hi)])
-            for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])
+            for lo, hi in zip(
+                best_peaks_props["left_ips"], best_peaks_props["right_ips"]
+            )
         ]
         return limits
 
@@ -100,7 +103,9 @@ def find_speaks(
     permutation = rng.permutation(len(peaks_combo))
 
     # computes scores
-    posteriorscores_ = posteriorscore(bins, peaks_combo, energies, gain, offset, lightout_guess)
+    posteriorscores_ = posteriorscore(
+        bins, peaks_combo, energies, gain, offset, lightout_guess
+    )
 
     # computes rankings
     posteriorranking = np.argsort(np.argsort(posteriorscores_))
@@ -110,7 +115,9 @@ def find_speaks(
 
     # this would result in an error for single energies
     if len(energies) > 1:
-        deltascores_ = deltascore(bins, peaks_combo, energies, gain, offset, lightout_guess)
+        deltascores_ = deltascore(
+            bins, peaks_combo, energies, gain, offset, lightout_guess
+        )
         deltaranking = np.argsort(np.argsort(deltascores_))
         combined_score += deltaranking
 
@@ -129,7 +136,9 @@ def find_speaks(
 
     limits = [
         (bins[floor(lo)], bins[ceil(hi)])
-        for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])
+        for lo, hi in zip(
+            best_peaks_props["left_ips"], best_peaks_props["right_ips"]
+        )
     ]
     return limits
 
@@ -145,7 +154,9 @@ def promscores(peaks_combinations_proms):
     return scores
 
 
-def posteriorscore(bins, peaks_combinations, energies, gain, offset, lightout_guess):
+def posteriorscore(
+    bins, peaks_combinations, energies, gain, offset, lightout_guess
+):
     """
     evaluates peaks combinations given a prior on gain, offset, light output.
     """
@@ -157,13 +168,19 @@ def posteriorscore(bins, peaks_combinations, energies, gain, offset, lightout_gu
     bins_kev = (bins - offset_center) / gain_center
     lightout_center, lightout_sigma = lightout_guess
     # the halving is because we will deal with one cell
-    energies_equivalent_kev = PHOTOEL_PER_KEV * lightout_center / 2 * np.array(energies)
-    standard_distances = np.abs(bins_kev[peaks_combinations] - energies_equivalent_kev)
+    energies_equivalent_kev = (
+        PHOTOEL_PER_KEV * lightout_center / 2 * np.array(energies)
+    )
+    standard_distances = np.abs(
+        bins_kev[peaks_combinations] - energies_equivalent_kev
+    )
     scores = -np.sum(standard_distances, axis=1)
     return scores
 
 
-def deltascore(bins, peaks_combinations, energies, gain, offset, lightout_guess):
+def deltascore(
+    bins, peaks_combinations, energies, gain, offset, lightout_guess
+):
     """
     evaluates peaks distance given a prior on guess and offset.
     """
@@ -174,10 +191,14 @@ def deltascore(bins, peaks_combinations, energies, gain, offset, lightout_guess)
     offset_center, offset_sigma = offset
     bins_kev = (bins - offset_center) / gain_center
     lightout_center, lightout_sigma = lightout_guess
-    energies_equivalent_kev = PHOTOEL_PER_KEV * lightout_center / 2 * np.array(energies)
+    energies_equivalent_kev = (
+        PHOTOEL_PER_KEV * lightout_center / 2 * np.array(energies)
+    )
     deltaen_true_kev = np.diff(energies_equivalent_kev)
     deltaen_observed_kev = np.diff(bins_kev[peaks_combinations])
-    scores = -np.sum(np.square(np.diff(deltaen_observed_kev - deltaen_true_kev)))
+    scores = -np.sum(
+        np.square(np.diff(deltaen_observed_kev - deltaen_true_kev))
+    )
     return scores
 
 
@@ -185,32 +206,34 @@ PROMINENCE_WEIGHTING = False
 
 
 def find_epeaks(
-        bins,
-        counts,
-        sfit_ch,
-        sfit_comp,
-        gain_ch,
-        gain_comp,
-        offset_ch,
-        offset_comp,
-        mincounts,
-        width,
-        smoothing,
-        distance,
-        channel_id=None,
+    bins,
+    counts,
+    sfit_ch,
+    sfit_comp,
+    gain_ch,
+    gain_comp,
+    offset_ch,
+    offset_comp,
+    mincounts,
+    width,
+    smoothing,
+    distance,
+    channel_id=None,
 ):
     gain_ch_center, _ = gain_ch
     gain_comp_center, _ = gain_comp
     offset_ch_center, _ = offset_ch
     offset_comp_center, _ = offset_comp
     pe_ch = (sfit_ch - offset_ch_center) / gain_ch_center / PHOTOEL_PER_KEV
-    pe_comp = (sfit_comp - offset_comp_center) / gain_comp_center / PHOTOEL_PER_KEV
+    pe_comp = (
+        (sfit_comp - offset_comp_center) / gain_comp_center / PHOTOEL_PER_KEV
+    )
     pe_guess = pe_ch + pe_comp
 
     initial_search_pars = {
         "prominence": max(counts),
         "width": width,
-        "distance": distance
+        "distance": distance,
     }
     peaks, peaks_props = peaks_with_enough_stat(
         counts,
@@ -220,13 +243,19 @@ def find_epeaks(
     )
 
     if len(peaks) >= len(pe_guess):
-        best_peaks, best_peaks_props = _closest_peaks(pe_guess, bins, peaks, peaks_props)
+        best_peaks, best_peaks_props = _closest_peaks(
+            pe_guess, bins, peaks, peaks_props
+        )
     else:
-        raise err.DetectPeakError("candidate peaks are less than sources to fit.")
+        raise err.DetectPeakError(
+            "candidate peaks are less than sources to fit."
+        )
 
     limits = [
         (bins[floor(lo)], bins[ceil(hi)])
-        for lo, hi in zip(best_peaks_props["left_ips"], best_peaks_props["right_ips"])
+        for lo, hi in zip(
+            best_peaks_props["left_ips"], best_peaks_props["right_ips"]
+        )
     ]
     return limits
 
@@ -248,10 +277,7 @@ def _dist_from_intv(x, lo, hi):
 
 def _closest_peaks(guess, bins, peaks, peaks_infos):
     peaks_dist_from_guess = np.array(
-        [
-            [abs(guess - bins[peak]) for peak in peaks]
-            for guess in guess
-        ]
+        [[abs(guess - bins[peak]) for peak in peaks] for guess in guess]
     )
     args_sorted_distances = np.argsort(np.min(peaks_dist_from_guess, axis=1))
     args_peaks = []

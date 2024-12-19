@@ -123,7 +123,9 @@ class small_section:
 def progress_bar(console):
     out = Progress(
         SpinnerColumn(),
-        TextColumn("[i]Working..[/] [progress.percentage]{task.percentage:>3.0f}%"),
+        TextColumn(
+            "[i]Working..[/] [progress.percentage]{task.percentage:>3.0f}%"
+        ),
         BarColumn(),
         MofNCompleteColumn(),
         TextColumn("-"),

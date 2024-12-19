@@ -46,7 +46,9 @@ normal = (
 )
 
 
-def diagnostics(bins, counts, centers, amps, fwhms, limits, margin=500, **kwargs):
+def diagnostics(
+    bins, counts, centers, amps, fwhms, limits, margin=500, **kwargs
+):
     low_lims, high_lims = [*zip(*limits)]
     min_xlim, max_xlim = min(low_lims) - margin, max(high_lims) + margin
     start = np.where(bins >= min_xlim)[0][0]
@@ -167,7 +169,14 @@ def spectrum_xs(
 
 
 def linearity(
-    gain, gain_err, offset, offset_err, adcs, adcs_err, radsources: dict, **kwargs
+    gain,
+    gain_err,
+    offset,
+    offset_err,
+    adcs,
+    adcs_err,
+    radsources: dict,
+    **kwargs,
 ):
     radsources_energies = np.array([l.energy for l in radsources.values()])
     measured_energies_err = np.sqrt(
@@ -183,8 +192,12 @@ def linearity(
     perc_residual_err = 100 * res_err / adcs
 
     prediction_discrepancy = (adcs - offset) / gain - radsources_energies
-    perc_prediction_discrepancy = 100 * prediction_discrepancy / radsources_energies
-    perc_measured_energies_err = 100 * measured_energies_err / radsources_energies
+    perc_prediction_discrepancy = (
+        100 * prediction_discrepancy / radsources_energies
+    )
+    perc_measured_energies_err = (
+        100 * measured_energies_err / radsources_energies
+    )
 
     margin = (radsources_energies[-1] - radsources_energies[0]) / 10
     xs = np.linspace(
@@ -343,7 +356,9 @@ def _chtext(detmap):
         _quadcorners,
     ):
         quadmap = np.array(detmap[quad])
-        rows, cols = quadmap[(quadmap != UNBOND)[:, 0] & (quadmap != UNBOND)[:, 1]].T
+        rows, cols = quadmap[
+            (quadmap != UNBOND)[:, 0] & (quadmap != UNBOND)[:, 1]
+        ].T
         chtext[rows + ty, cols + tx] = np.arange(len(quadmap))[
             (quadmap != UNBOND)[:, 0] & (quadmap != UNBOND)[:, 1]
         ]

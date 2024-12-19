@@ -59,7 +59,9 @@ def preprocess(
     filtered = 100 * (events_pre_filter - len(data)) / events_pre_filter
     if filtered and console:
         console.log(
-            ":white_check_mark: Filtered {:.1f}% of the events.".format(filtered)
+            ":white_check_mark: Filtered {:.1f}% of the events.".format(
+                filtered
+            )
         )
     return data, waste
 
@@ -125,7 +127,9 @@ def find_widows(on_channels: dict, model: Detector):
             try:
                 companion = model.companion(quad, ch)
             except KeyError:
-                logging.warning(f"Cant find companion for channel {quad}{ch:02d}.")
+                logging.warning(
+                    f"Cant find companion for channel {quad}{ch:02d}."
+                )
                 continue
             if companion not in on_channels[quad]:
                 widows[quad].append(ch)
@@ -133,7 +137,9 @@ def find_widows(on_channels: dict, model: Detector):
 
 
 def spurious_filter(data):
-    mask = (data["NMULT"] == 1) | ((data["NMULT"] == 2) & (data["EVTYPE"] == "S"))
+    mask = (data["NMULT"] == 1) | (
+        (data["NMULT"] == 2) & (data["EVTYPE"] == "S")
+    )
     cleaned_data = data[mask]
     waste = data[~mask]
     return cleaned_data, waste
@@ -141,7 +147,9 @@ def spurious_filter(data):
 
 def delay_filter(data, hold_time):
     unique_times = data.TIME.unique()
-    bad_events = unique_times[np.where(np.diff(unique_times) < hold_time)[0] + 1]
+    bad_events = unique_times[
+        np.where(np.diff(unique_times) < hold_time)[0] + 1
+    ]
     mask = ~(data["TIME"].isin(bad_events))
     cleaned_data = data[mask]
     waste = data[~mask]
@@ -149,8 +157,12 @@ def delay_filter(data, hold_time):
 
 
 def filter_channels(data, channels):
-    widows_list = [(quad, ch) for quad in channels.keys() for ch in channels[quad]]
-    mask = data.apply(lambda row: (row["QUADID"], row["CHN"]) in widows_list, axis=1)
+    widows_list = [
+        (quad, ch) for quad in channels.keys() for ch in channels[quad]
+    ]
+    mask = data.apply(
+        lambda row: (row["QUADID"], row["CHN"]) in widows_list, axis=1
+    )
     cleaned_data = data[~mask]
     waste = data[mask]
     return cleaned_data, waste
@@ -242,7 +254,9 @@ def _convert_x_events(data):
 def _convert_gamma_events(data, scint_calibrations, couples):
     out = data[data["EVTYPE"] == "S"]
     qm = out["QUADID"].map({key: 100 * s2i(key) for key in "ABCD"})
-    inverted_couples = {key: {v: k for k, v in d.items()} for key, d in couples.items()}
+    inverted_couples = {
+        key: {v: k for k, v in d.items()} for key, d in couples.items()
+    }
     companion_to_channel = dict(
         np.concatenate(
             [
@@ -269,13 +283,17 @@ def _convert_gamma_events(data, scint_calibrations, couples):
         light_outs = ucid_calibs.loc[scint_ucid[mask]]["light_out"].values
         uncalibrated_events = out[~mask]
         bad_channels = (
-            uncalibrated_events[["CHN", "QUADID"]].drop_duplicates().values.tolist()
+            uncalibrated_events[["CHN", "QUADID"]]
+            .drop_duplicates()
+            .values.tolist()
         )
         logging.warning(
             "{} ({:.2f} %) events from channels {} were not calibrated.".format(
                 len(uncalibrated_events),
                 100 * len(uncalibrated_events) / len(electrons),
-                str([quad + "{:02d}".format(ch) for (ch, quad) in bad_channels])[1:-1],
+                str(
+                    [quad + "{:02d}".format(ch) for (ch, quad) in bad_channels]
+                )[1:-1],
             )
         )
 
@@ -295,7 +313,11 @@ def _convert_gamma_events(data, scint_calibrations, couples):
 def electrons_to_energy(data, scint_calibrations, couples):
     x_events = _convert_x_events(data)
     gamma_events = _convert_gamma_events(data, scint_calibrations, couples)
-    out = pd.concat((x_events, gamma_events)).sort_values("TIME").reset_index(drop=True)
+    out = (
+        pd.concat((x_events, gamma_events))
+        .sort_values("TIME")
+        .reset_index(drop=True)
+    )
     return out
 
 
@@ -344,7 +366,9 @@ def make_electron_list(
     return out
 
 
-def _get_calibrated_events(data, calibrated_sdds, scintillator_couples, nthreads=1):
+def _get_calibrated_events(
+    data, calibrated_sdds, scintillator_couples, nthreads=1
+):
     def helper(quadrant):
         couples = scintillator_couples[quadrant]
         fitted_calibrated_channels = list(set(calibrated_sdds[quadrant].index))
@@ -396,13 +420,17 @@ def _extract_gamma_events(quadrant_data, scintillator_couples):
     gamma_events = quadrant_data[quadrant_data["EVTYPE"] == "S"]
     channels = gamma_events["CHN"]
     companion_to_chn = {k: v for v, k in scintillator_couples.items()}
-    same_value_if_coupled = gamma_events["CHN"].map(companion_to_chn).fillna(channels)
+    same_value_if_coupled = (
+        gamma_events["CHN"].map(companion_to_chn).fillna(channels)
+    )
     gamma_events = gamma_events.assign(CHN=same_value_if_coupled)
 
     if not np.any(gamma_events.values):
         return np.array([])
     simultaneous_scintillator_events = gamma_events.groupby(["TIME", "CHN"])
-    times, channels = np.array([*simultaneous_scintillator_events.groups.keys()]).T
+    times, channels = np.array(
+        [*simultaneous_scintillator_events.groups.keys()]
+    ).T
 
     electrons_sum = simultaneous_scintillator_events.sum(numeric_only=True)[
         "ELECTRONS"

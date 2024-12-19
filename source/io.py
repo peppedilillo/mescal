@@ -350,7 +350,9 @@ class Exporter:
         radsources = self.calibration.xradsources()
 
         xevs = calibrated_events[calibrated_events["EVTYPE"] == "X"]
-        xcounts, xbins = np.histogram(xevs["ENERGY"], bins=np.arange(2, 40, 0.05))
+        xcounts, xbins = np.histogram(
+            xevs["ENERGY"], bins=np.arange(2, 40, 0.05)
+        )
 
         fig, ax = plot.spectrum_x(
             xbins,
@@ -370,7 +372,9 @@ class Exporter:
         radsources = self.calibration.sradsources()
 
         sevs = calibrated_events[calibrated_events["EVTYPE"] == "S"]
-        scounts, sbins = np.histogram(sevs["ENERGY"], bins=np.arange(30, 1000, 2))
+        scounts, sbins = np.histogram(
+            sevs["ENERGY"], bins=np.arange(30, 1000, 2)
+        )
         fig, ax = plot.spectrum_s(
             sbins,
             scounts,
@@ -442,7 +446,9 @@ class Exporter:
             for ch in range(32):
                 counts, bins = f(ch)(binning)
                 fig, ax = plot.histogram(counts, bins[:-1])
-                ax.set_title(f"Lightcurve for {quad}{ch:02d}, binning {binning} s")
+                ax.set_title(
+                    f"Lightcurve for {quad}{ch:02d}, binning {binning} s"
+                )
                 ax.set_xlabel("Time")
                 ax.set_ylabel("Counts")
                 fig.savefig(path(quad, ch))
@@ -543,9 +549,13 @@ def read_report_from_excel(from_path, kind):
     if kind == "calib":
         return pd.read_excel(from_path, index_col=0, sheet_name=None)
     elif kind == "peaks":
-        return pd.read_excel(from_path, header=[0, 1], index_col=0, sheet_name=None)
+        return pd.read_excel(
+            from_path, header=[0, 1], index_col=0, sheet_name=None
+        )
     elif kind == "fits":
-        return pd.read_excel(from_path, header=[0, 1], index_col=0, sheet_name=None)
+        return pd.read_excel(
+            from_path, header=[0, 1], index_col=0, sheet_name=None
+        )
     else:
         raise ValueError("kind must be either 'calib', 'peaks', or 'fits'.")
 
@@ -576,7 +586,9 @@ def write_report_to_fits(result_df, path):
 def write_report_to_csv(result_df, path):
     for quad, df in result_df.items():
         df.to_csv(
-            path.with_name(path.stem + "_quad{}".format(quad)).with_suffix(".csv")
+            path.with_name(path.stem + "_quad{}".format(quad)).with_suffix(
+                ".csv"
+            )
         )
     return True
 
@@ -601,7 +613,9 @@ def check_lv0d5(func):
         try:
             df = func(*args)
         except KeyError as err:
-            raise err.WrongTableError("Input fits table is missing required keys.")
+            raise err.WrongTableError(
+                "Input fits table is missing required keys."
+            )
         except OSError:
             raise err.FormatNotSupportedError("The input file is not a FITS.")
         return df
@@ -634,7 +648,7 @@ def pandas_from_lv0d5(fits: Path):
     temp = temp[temp[:, 0] > 0]
     temp = temp[temp[:, -1].argsort()]
     df = pd.DataFrame(temp, columns=columns)
-    df = df.assign(QUADID=df["QUADID"].map({0: "A", 1: "B", 2: "C", 3: "D"})).astype(
-        dtypes
-    )
+    df = df.assign(
+        QUADID=df["QUADID"].map({0: "A", 1: "B", 2: "C", 3: "D"})
+    ).astype(dtypes)
     return df

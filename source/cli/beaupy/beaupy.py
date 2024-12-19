@@ -59,9 +59,18 @@ class DefaultKeys:
     confirm: List[Union[Tuple[int, ...], str]] = [Keys.ENTER]
     backspace: List[Union[Tuple[int, ...], str]] = [Keys.BACKSPACE]
     delete: List[Union[Tuple[int, ...], str]] = [Keys.DELETE]
-    down: List[Union[Tuple[int, ...], str]] = [Keys.DOWN_ARROW, Keys.NUMPAD_DOWN_ARROW]
-    up: List[Union[Tuple[int, ...], str]] = [Keys.UP_ARROW, Keys.NUMPAD_UP_ARROW]
-    left: List[Union[Tuple[int, ...], str]] = [Keys.LEFT_ARROW, Keys.NUMPAD_LEFT_ARROW]
+    down: List[Union[Tuple[int, ...], str]] = [
+        Keys.DOWN_ARROW,
+        Keys.NUMPAD_DOWN_ARROW,
+    ]
+    up: List[Union[Tuple[int, ...], str]] = [
+        Keys.UP_ARROW,
+        Keys.NUMPAD_UP_ARROW,
+    ]
+    left: List[Union[Tuple[int, ...], str]] = [
+        Keys.LEFT_ARROW,
+        Keys.NUMPAD_LEFT_ARROW,
+    ]
     right: List[Union[Tuple[int, ...], str]] = [
         Keys.RIGHT_ARROW,
         Keys.NUMPAD_RIGHT_ARROW,
@@ -126,7 +135,9 @@ def prompt(
         cursor_index = len(initial_value) if initial_value else 0
         error: str = ""
         while True:
-            rendered = _render_prompt(secure, value, prompt, cursor_index, error)
+            rendered = _render_prompt(
+                secure, value, prompt, cursor_index, error
+            )
             error = ""
             _update_rendered(live, rendered)
             keypress = get_key()
@@ -373,7 +384,9 @@ def select_multiple(
             )
             cursor_style = "white"
         if tick_style in ["", None]:
-            warnings.warn("`tick_style` should be a valid style, defaulting to `white`")
+            warnings.warn(
+                "`tick_style` should be a valid style, defaulting to `white`"
+            )
             tick_style = "white"
         if ticked_indices is None:
             ticked_indices = []
@@ -421,12 +434,16 @@ def select_multiple(
                     if len(ticked_indices) + 1 <= maximal_count:
                         ticked_indices.append(index)
                     else:
-                        error_message = f"Must select at most {maximal_count} options"
+                        error_message = (
+                            f"Must select at most {maximal_count} options"
+                        )
                 else:
                     ticked_indices.append(index)
             elif keypress in DefaultKeys.confirm:
                 if minimal_count > len(ticked_indices):
-                    error_message = f"Must select at least {minimal_count} options"
+                    error_message = (
+                        f"Must select at least {minimal_count} options"
+                    )
                 else:
                     rendered = "\n".join(
                         [

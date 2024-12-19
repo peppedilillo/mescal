@@ -31,7 +31,9 @@ class Key:
     key_codes: Tuple[int, ...]
     is_printable: bool
 
-    def __init__(self, key: str, key_codes: Tuple[int, ...], is_printable: bool):
+    def __init__(
+        self, key: str, key_codes: Tuple[int, ...], is_printable: bool
+    ):
         self.key = key
         self.key_codes = key_codes
         self.is_printable = is_printable
@@ -46,7 +48,9 @@ class Key:
         if isinstance(other, str):
             return self.key == other
 
-        if isinstance(other, tuple) and all(isinstance(item, int) for item in other):
+        if isinstance(other, tuple) and all(
+            isinstance(item, int) for item in other
+        ):
             return self.key_codes == other
 
         if isinstance(other, Key):
@@ -58,7 +62,9 @@ class Key:
                 ]
             )
 
-        raise ValueError(f"Cannot compare with {other}. Expected `List[int]` or `str`.")
+        raise ValueError(
+            f"Cannot compare with {other}. Expected `List[int]` or `str`."
+        )
 
     def __ne__(self, other):
         return not self.__eq__(other)

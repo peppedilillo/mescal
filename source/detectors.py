@@ -269,7 +269,11 @@ if __name__ == "__main__":
             assert len(channels) == TOT_CH
             # checks for no duplicates in each quadrant
             if len(bonded) != len(set(bonded)):
-                print("duplicated channels quadrant {} of {}".format(quadrant, model))
+                print(
+                    "duplicated channels quadrant {} of {}".format(
+                        quadrant, model
+                    )
+                )
                 print(set(ch for ch in bonded if bonded.count(ch) > 1))
             assert len(bonded) == len(set(bonded))
             # check no entry out of grid

@@ -204,7 +204,9 @@ def _histogram(value, data, bins, nthreads=1):
             hist_quads[ch] = ys
         return quad, hist_quads
 
-    results = Parallel(n_jobs=nthreads)(delayed(helper)(quad) for quad in "ABCD")
+    results = Parallel(n_jobs=nthreads)(
+        delayed(helper)(quad) for quad in "ABCD"
+    )
     counts = {key: value for key, value in results}
     return histogram(bins, counts)
 
@@ -398,7 +400,9 @@ class Calibrate:
                 logging.warning(message)
         self.sfit = self._fit_sradsources()
         self.ebins = get_ebins()
-        self.ehistograms = ehistogram(electron_evlist, self.ebins, self.nthreads)
+        self.ehistograms = ehistogram(
+            electron_evlist, self.ebins, self.nthreads
+        )
         self.epeaks = self._detect_epeaks()
         self.efit = self._fit_gamma_electrons()
         self.scintillator_calibration = self._calibrate_scintillators()
@@ -424,7 +428,9 @@ class Calibrate:
         try:
             self._calibrate_s(electron_evlist)
         except err.FewLinesError:
-            logging.warning("Attempted S-calibration but got no radiation sources.")
+            logging.warning(
+                "Attempted S-calibration but got no radiation sources."
+            )
             return
         try:
             eventlist = electrons_to_energy(
@@ -499,14 +505,18 @@ class Calibrate:
                     continue
 
                 inf, sup = zip(*limits)
-                results.setdefault(quad, {})[ch] = np.column_stack((inf, sup)).flatten()
+                results.setdefault(quad, {})[ch] = np.column_stack(
+                    (inf, sup)
+                ).flatten()
         return results, radiation_sources
 
     @as_fit_dataframe
     def _fit_xradsources(self):
         bins = self.xhistograms.bins
         radiation_sources = self.xradsources()
-        constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
+        constraints = [
+            (s.low_lim, s.hi_lim) for s in radiation_sources.values()
+        ]
 
         results = {}
         for quad in self.xpeaks.keys():
@@ -588,14 +598,18 @@ class Calibrate:
                     continue
 
                 inf, sup = zip(*limits)
-                results.setdefault(quad, {})[ch] = np.column_stack((inf, sup)).flatten()
+                results.setdefault(quad, {})[ch] = np.column_stack(
+                    (inf, sup)
+                ).flatten()
         return results, radiation_sources
 
     @as_fit_dataframe
     def _fit_sradsources(self):
         bins = self.shistograms.bins
         radiation_sources = self.sradsources()
-        constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
+        constraints = [
+            (s.low_lim, s.hi_lim) for s in radiation_sources.values()
+        ]
 
         results = {}
         for quad in self.speaks.keys():
@@ -640,7 +654,9 @@ class Calibrate:
         for quad in self.sfit.keys():
             for ch in self.sfit[quad].index:
                 if ch not in self.detector.couples[quad].keys():
-                    assert self.detector.scintid(quad, ch) == self.detector.companion(quad, ch)
+                    assert self.detector.scintid(
+                        quad, ch
+                    ) == self.detector.companion(quad, ch)
                     continue
 
                 scint = ch
@@ -666,7 +682,9 @@ class Calibrate:
 
                 sfit_ch = self.sfit[quad].loc[ch][:, "center"].values
                 if companion in self.sfit[quad].index:
-                    sfit_comp = self.sfit[quad].loc[companion][:, "center"].values
+                    sfit_comp = (
+                        self.sfit[quad].loc[companion][:, "center"].values
+                    )
                 else:
                     # it could be that we missed a sfit.
                     # this can certainly be improve but i can't get it right now.
@@ -686,7 +704,7 @@ class Calibrate:
                         width=5,
                         smoothing=10,
                         distance=20,
-                        channel_id=f"{quad}{ch}"
+                        channel_id=f"{quad}{ch}",
                     )
                 except err.DetectPeakError:
                     message = err.warn_failed_peak_detection(quad, scint)
@@ -704,15 +722,17 @@ class Calibrate:
     def _fit_gamma_electrons(self):
         bins = self.ehistograms.bins
         radiation_sources = self.sradsources()
-        constraints = [(s.low_lim, s.hi_lim) for s in radiation_sources.values()]
+        constraints = [
+            (s.low_lim, s.hi_lim) for s in radiation_sources.values()
+        ]
 
         results = {}
         for quad in self.epeaks.keys():
             for ch in self.epeaks[quad].index:
                 if ch not in self.detector.couples[quad].keys():
-                    assert self.detector.scintid(quad, ch) == self.detector.companion(
+                    assert self.detector.scintid(
                         quad, ch
-                    )
+                    ) == self.detector.companion(quad, ch)
                     continue
                 scint = ch
                 counts = self.ehistograms.counts[quad][scint]
@@ -830,7 +850,8 @@ class Calibrate:
         for quad in self.efit.keys():
             for scint in self.efit[quad].index:
                 if (scint not in self.sfit[quad].index) or (
-                    self.detector.couples[quad][scint] not in self.sfit[quad].index
+                    self.detector.couples[quad][scint]
+                    not in self.sfit[quad].index
                 ):
                     message = err.warn_failed_lightout(quad, scint)
                     logging.warning(message)
@@ -853,7 +874,8 @@ class Calibrate:
     ):
         error = (
             np.sqrt(
-                +((offset_err / gain) ** 2) + ((adc - offset) / gain**2) * (gain_err**2)
+                +((offset_err / gain) ** 2)
+                + ((adc - offset) / gain**2) * (gain_err**2)
             )
             / PHOTOEL_PER_KEV
         )
@@ -874,7 +896,9 @@ class Calibrate:
         centers_comp = self.sfit[quad].loc[companion][:, "center"].values
         electron_err_cell = self._electron_error(centers_cell, *cell_cal)
         electron_err_companion = self._electron_error(centers_comp, *comp_cal)
-        electron_err_sum = np.sqrt(electron_err_cell**2 + electron_err_companion**2)
+        electron_err_sum = np.sqrt(
+            electron_err_cell**2 + electron_err_companion**2
+        )
         fit_error = self.efit[quad].loc[cell][:, "center_err"].values
         error = (electron_err_sum + fit_error) / energies
         return error
@@ -882,7 +906,9 @@ class Calibrate:
     @staticmethod
     def _deal_with_multiple_gamma_decays(light_outs, light_outs_errs):
         mean_lout = light_outs.mean()
-        mean_lout_err = np.sqrt(np.sum(light_outs_errs**2)) / len(light_outs_errs)
+        mean_lout_err = np.sqrt(np.sum(light_outs_errs**2)) / len(
+            light_outs_errs
+        )
         return mean_lout, mean_lout_err
 
     @as_slo_dataframe
@@ -905,14 +931,18 @@ class Calibrate:
                     centers = self.sfit[quad].loc[ch][:, "center"].values
                     ch_ = self.sdd_calibration[quad].loc[ch]
                     gain, offset = ch_[["gain", "offset"]].values
-                    centers_electrons = (centers - offset) / gain / PHOTOEL_PER_KEV
+                    centers_electrons = (
+                        (centers - offset) / gain / PHOTOEL_PER_KEV
+                    )
                     compfit_ = self.sfit[quad].loc[companion]
                     centers_companion = compfit_[:, "center"].values
                     comp_ = self.sdd_calibration[quad].loc[companion]
                     gain_comp, offset_comp = comp_[["gain", "offset"]].values
 
                     centers_electrons_comp = (
-                        (centers_companion - offset_comp) / gain_comp / PHOTOEL_PER_KEV
+                        (centers_companion - offset_comp)
+                        / gain_comp
+                        / PHOTOEL_PER_KEV
                     )
                     effs = (
                         lo
@@ -925,7 +955,9 @@ class Calibrate:
                         / (centers_electrons + centers_electrons_comp)
                     )
 
-                    eff, eff_err = self._deal_with_multiple_gamma_decays(effs, eff_errs)
+                    eff, eff_err = self._deal_with_multiple_gamma_decays(
+                        effs, eff_errs
+                    )
                     results.setdefault(quad, {})[ch] = np.array((eff, eff_err))
         return results
 
@@ -1006,7 +1038,9 @@ def _effectivelo_to_scintillatorslo(lightoutput, detector):
                 continue
             companion = detector.companion(quad, ch)
             if companion not in lightoutput[quad].index:
-                raise err.WrongTableError("Wrong light output calibration table.")
+                raise err.WrongTableError(
+                    "Wrong light output calibration table."
+                )
             ch_lo = lightoutput[quad].loc[ch].light_out
             ch_lo_err = lightoutput[quad].loc[ch].light_out_err
             companion_lo = lightoutput[quad].loc[companion].light_out
@@ -1099,7 +1133,9 @@ class PartialCalibration(Calibrate):
         try:
             self._calibrate_s(electron_evlist)
         except err.FewLinesError:
-            logging.warning("Attempted S-calibration but got no radiation sources.")
+            logging.warning(
+                "Attempted S-calibration but got no radiation sources."
+            )
             return
         try:
             eventlist = electrons_to_energy(
